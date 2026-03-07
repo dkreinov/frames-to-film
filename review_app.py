@@ -46,6 +46,7 @@ ISSUE_LABELS = {
 
 STATUS_FILTERS = [
     "All clips",
+    "Rebuilt clips",
     "Needs review",
     "Redo queue",
     "Approved",
@@ -232,6 +233,7 @@ def build_pair_rows(pairs, review_lookup, redo_lookup, winners):
                 "latest_version": latest.version,
                 "winner_version": winner_version,
                 "version_count": len(pair.versions),
+                "rebuilt": len(pair.versions) > 1,
                 "status": status,
                 "rating": str(review.rating) if review and review.rating is not None else "-",
             }
@@ -267,6 +269,7 @@ def render_inbox(pair_rows, status_filter: str, selected_pair_id: str) -> None:
                 "latest": f"v{item['latest_version']}",
                 "winner": f"v{item['winner_version']}" if item["winner_version"] else "-",
                 "versions": item["version_count"],
+                "rebuilt": "Yes" if item["rebuilt"] else "-",
                 "status": item["status"],
                 "rating": item["rating"],
             }
@@ -595,6 +598,8 @@ def render_redo_request_table(redo_requests, review_lookup, winners) -> None:
 def filtered_rows(pair_rows, status_filter: str):
     if status_filter == "All clips":
         return pair_rows
+    if status_filter == "Rebuilt clips":
+        return [item for item in pair_rows if item["rebuilt"]]
     if status_filter == "Needs review":
         return [item for item in pair_rows if item["status"] == "Needs review"]
     if status_filter == "Redo queue":
