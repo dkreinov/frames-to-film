@@ -4,6 +4,7 @@ from pathlib import Path
 
 import streamlit as st
 
+from redo_runner import preview_redo_queue, run_redo_queue
 from review_models import DECISIONS, ISSUE_TAGS, RedoRequest, ReviewRecord
 from review_store import (
     DEFAULT_RUN_ID,
@@ -15,6 +16,7 @@ from review_store import (
     load_winners,
     queue_redo,
     remove_redo_request,
+    remove_redo_waiting_review,
     save_review,
     save_winner,
 )
@@ -74,8 +76,12 @@ def main() -> None:
         return
 
     review_lookup = {(item.pair_id, item.version): item for item in reviews}
-    redo_lookup = {(item.pair_id, item.source_version): item for item in redo_requests}
-    pair_rows = build_pair_rows(pairs, review_lookup, redo_lookup, winners)
+    queued_redo_lookup = {
+        (item.pair_id, item.source_version): item
+        for item in redo_requests
+        if item.status == "queued"
+    }
+    pair_rows = build_pair_rows(pairs, review_lookup, queued_redo_lookup, winners)
 
     selected_pair = select_pair(pairs, pair_rows, status_filter)
 
@@ -85,10 +91,10 @@ def main() -> None:
         with left_col:
             render_inbox(pair_rows, status_filter, selected_pair.pair_id)
         with right_col:
-            render_review_panel(selected_pair, review_lookup, redo_lookup, winners, run_id)
+            render_review_panel(selected_pair, review_lookup, queued_redo_lookup, winners, run_id)
 
     with queue_tab:
-        render_redo_queue(redo_requests, review_lookup, winners)
+        render_redo_queue(redo_requests, review_lookup, winners, run_id)
 
 
 def inject_styles() -> None:
@@ -377,6 +383,7 @@ def render_review_panel(selected_pair, review_lookup, redo_lookup, winners, run_
                     reviewed_by=reviewed_by.strip() or "local-user",
                 )
                 save_review(record, run_id=run_id)
+                remove_redo_waiting_review(selected_pair.pair_id, current_clip.version, run_id=run_id)
 
                 if decision == "redo":
                     queue_redo(
@@ -434,34 +441,99 @@ def compare_versions(selected_pair) -> None:
     compare_cols[1].video(str(Path(version_map[right_version].video_path)))
 
 
-def render_redo_queue(redo_requests, review_lookup, winners) -> None:
+def render_redo_queue(redo_requests, review_lookup, winners, run_id: str) -> None:
     st.subheader("Redo queue")
     if not redo_requests:
         st.info("No clips are queued for redo.")
         return
 
+    queued_requests = [item for item in redo_requests if item.status == "queued"]
+    waiting_review_requests = [item for item in redo_requests if item.status == "waiting_review"]
+    failed_requests = [item for item in redo_requests if item.status == "failed"]
+
+    metric_cols = st.columns(3)
+    metric_cols[0].metric("Queued", len(queued_requests))
+    metric_cols[1].metric("Waiting review", len(waiting_review_requests))
+    metric_cols[2].metric("Failed", len(failed_requests))
+
+    st.caption("Queued items can be sent to Kling. Waiting review items already produced a new version and will not be sent again.")
+
+    control_cols = st.columns([1, 1, 1.2], gap="large")
+    if control_cols[0].button("Preview queued retries", use_container_width=True):
+        st.session_state.redo_preview = preview_redo_queue(run_id)
+
+    run_confirmed = control_cols[1].checkbox("Use Kling credits", value=False)
+    if control_cols[2].button(
+        "Run queued retries",
+        use_container_width=True,
+        disabled=not queued_requests,
+        type="primary",
+    ):
+        if not run_confirmed:
+            st.warning("Tick 'Use Kling credits' before running queued retries.")
+        else:
+            with st.spinner("Submitting queued retries to Kling..."):
+                st.session_state.redo_results = run_redo_queue(run_id)
+                st.session_state.redo_preview = []
+            st.rerun()
+
+    preview_rows = st.session_state.get("redo_preview", [])
+    if preview_rows:
+        st.markdown("**Queued retry preview**")
+        st.dataframe(
+            [
+                {
+                    "pair": item["pair_id"],
+                    "from": f"v{item['source_version']}",
+                    "to": f"v{item['target_version']}",
+                    "output_file": item["output_file"],
+                    "issues": item["issues"],
+                }
+                for item in preview_rows
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+        for item in preview_rows:
+            with st.expander(f"{item['pair_id']} retry prompt", expanded=False):
+                st.write(item["retry_prompt"])
+
+    result_rows = st.session_state.get("redo_results", [])
+    if result_rows:
+        st.markdown("**Last retry run**")
+        st.dataframe(result_rows, use_container_width=True, hide_index=True)
+
+    st.markdown("**Queued for Kling**")
+    render_redo_request_table(queued_requests, review_lookup, winners)
+
+    if waiting_review_requests:
+        st.markdown("**Waiting for review**")
+        render_redo_request_table(waiting_review_requests, review_lookup, winners)
+
+    if failed_requests:
+        st.markdown("**Failed**")
+        render_redo_request_table(failed_requests, review_lookup, winners)
+
+
+def render_redo_request_table(redo_requests, review_lookup, winners) -> None:
     rows: list[dict[str, str | int]] = []
     for item in redo_requests:
         review = review_lookup.get((item.pair_id, item.source_version))
         rows.append(
             {
                 "pair": item.pair_id,
-                "version": f"v{item.source_version}",
+                "source_version": f"v{item.source_version}",
+                "target_version": f"v{item.target_version}" if item.target_version else "-",
                 "status": item.status,
                 "issues": ", ".join(ISSUE_LABELS[tag] for tag in item.issues) if item.issues else "-",
                 "note": item.note or "-",
                 "winner": f"v{winners[item.pair_id]}" if item.pair_id in winners else "-",
                 "decision": DECISION_LABELS.get(review.decision, "-") if review else "-",
+                "output_file": item.output_file or "-",
+                "error": item.error or "-",
             }
         )
-
-    metric_cols = st.columns(3)
-    metric_cols[0].metric("Queued clips", len(rows))
-    metric_cols[1].metric("Pairs with winners", sum(1 for item in rows if item["winner"] != "-"))
-    metric_cols[2].metric("Notes added", sum(1 for item in rows if item["note"] != "-"))
-
     st.dataframe(rows, use_container_width=True, hide_index=True)
-    st.caption("This queue is the handoff for the next regeneration pass.")
 
 
 def filtered_rows(pair_rows, status_filter: str):

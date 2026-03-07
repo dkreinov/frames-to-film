@@ -86,6 +86,11 @@ class RedoRequest:
     note: str = ""
     status: str = "queued"
     queued_at: str = field(default_factory=utc_now_iso)
+    target_version: int | None = None
+    output_file: str = ""
+    retry_prompt: str = ""
+    processed_at: str = ""
+    error: str = ""
 
     def to_dict(self) -> dict:
         return asdict(self)

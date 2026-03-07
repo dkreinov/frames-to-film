@@ -5,7 +5,7 @@ import re
 from collections.abc import Iterable
 from pathlib import Path
 
-from review_models import ClipPair, ClipVersion, RedoRequest, ReviewPaths, ReviewRecord
+from review_models import ClipPair, ClipVersion, RedoRequest, ReviewPaths, ReviewRecord, utc_now_iso
 
 
 ROOT_DIR = Path(__file__).resolve().parent
@@ -147,14 +147,7 @@ def queue_redo(request: RedoRequest, run_id: str = DEFAULT_RUN_ID) -> None:
         if not (item.pair_id == request.pair_id and item.source_version == request.source_version)
     ]
     filtered.append(request)
-    paths = ensure_review_files(run_id)
-    _write_json(
-        paths.redo_queue_file,
-        {
-            "run_id": run_id,
-            "redo_requests": [item.to_dict() for item in filtered],
-        },
-    )
+    save_redo_requests(filtered, run_id)
 
 
 def remove_redo_request(pair_id: str, source_version: int, run_id: str = DEFAULT_RUN_ID) -> None:
@@ -164,14 +157,58 @@ def remove_redo_request(pair_id: str, source_version: int, run_id: str = DEFAULT
         for item in redo_requests
         if not (item.pair_id == pair_id and item.source_version == source_version)
     ]
+    save_redo_requests(filtered, run_id)
+
+
+def remove_redo_waiting_review(pair_id: str, target_version: int, run_id: str = DEFAULT_RUN_ID) -> None:
+    redo_requests = load_redo_queue(run_id)
+    filtered = [
+        item
+        for item in redo_requests
+        if not (
+            item.pair_id == pair_id
+            and item.target_version == target_version
+            and item.status == "waiting_review"
+        )
+    ]
+    save_redo_requests(filtered, run_id)
+
+
+def save_redo_requests(redo_requests: Iterable[RedoRequest], run_id: str = DEFAULT_RUN_ID) -> None:
     paths = ensure_review_files(run_id)
     _write_json(
         paths.redo_queue_file,
         {
             "run_id": run_id,
-            "redo_requests": [item.to_dict() for item in filtered],
+            "redo_requests": [item.to_dict() for item in redo_requests],
         },
     )
+
+
+def save_redo_result(
+    pair_id: str,
+    source_version: int,
+    status: str,
+    run_id: str = DEFAULT_RUN_ID,
+    *,
+    target_version: int | None = None,
+    output_file: str = "",
+    retry_prompt: str = "",
+    error: str = "",
+) -> None:
+    redo_requests = load_redo_queue(run_id)
+    for item in redo_requests:
+        if item.pair_id != pair_id or item.source_version != source_version:
+            continue
+        item.status = status
+        item.target_version = target_version
+        item.output_file = output_file
+        item.retry_prompt = retry_prompt
+        item.error = error
+        item.processed_at = "" if status == "queued" else utc_now_iso()
+        break
+
+    save_redo_requests(redo_requests, run_id)
 
 
 def load_winners(run_id: str = DEFAULT_RUN_ID) -> dict[str, int]:

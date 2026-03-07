@@ -60,6 +60,21 @@ C:\Users\nishtiak\AppData\Local\Programs\Python\Python312\python.exe -m streamli
 6. If multiple versions exist, use `Compare versions` and mark the winning version.
 7. Open the `Redo queue` tab to see the clips that should be regenerated next.
 
+## Run Queued Retries From The App
+
+The `Redo queue` tab now has two controls:
+
+- `Preview queued retries`: shows the next version number, output filename, and retry prompt before anything is submitted
+- `Run queued retries`: sends only `queued` items to Kling
+
+Important behavior:
+
+- after a retry succeeds, that queue item changes from `queued` to `waiting_review`
+- `waiting_review` items stay visible in the app, but they are not sent to Kling again
+- once the new version is reviewed in the app, the old `waiting_review` entry is removed automatically
+
+This prevents the queue from looping on already-generated retries.
+
 ## Review Decisions
 
 - `Approve`: the clip is good enough for the final movie.
