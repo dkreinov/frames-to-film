@@ -64,6 +64,9 @@ def main() -> None:
 
     st.title("Olga Movie Review")
     st.caption("Review clips, pick the winning version, and queue retries for weak segments.")
+    review_notice = st.session_state.pop("review_notice", "")
+    if review_notice:
+        st.success(review_notice)
 
     run_id, status_filter = sidebar_controls()
     ensure_review_files(run_id)
@@ -94,18 +97,17 @@ def main() -> None:
 
     review_tab, queue_tab = st.tabs(["Review", "Redo queue"])
     with review_tab:
-        left_col, right_col = st.columns([1.05, 1.95], gap="large")
-        with left_col:
+        render_review_panel(
+            selected_pair,
+            review_lookup,
+            queued_redo_lookup,
+            waiting_review_lookup,
+            winners,
+            run_id,
+            pair_rows,
+        )
+        with st.expander("Inbox overview", expanded=False):
             render_inbox(pair_rows, status_filter, selected_pair.pair_id)
-        with right_col:
-            render_review_panel(
-                selected_pair,
-                review_lookup,
-                queued_redo_lookup,
-                waiting_review_lookup,
-                winners,
-                run_id,
-            )
 
     with queue_tab:
         render_redo_queue(redo_requests, review_lookup, winners, run_id)
@@ -286,7 +288,15 @@ def render_inbox(pair_rows, status_filter: str, selected_pair_id: str) -> None:
     st.dataframe(rows, use_container_width=True, hide_index=True)
 
 
-def render_review_panel(selected_pair, review_lookup, redo_lookup, waiting_review_lookup, winners, run_id: str) -> None:
+def render_review_panel(
+    selected_pair,
+    review_lookup,
+    redo_lookup,
+    waiting_review_lookup,
+    winners,
+    run_id: str,
+    pair_rows,
+) -> None:
     st.subheader(pair_label(selected_pair.pair_id))
 
     version_numbers = [item.version for item in selected_pair.versions]
@@ -299,13 +309,16 @@ def render_review_panel(selected_pair, review_lookup, redo_lookup, waiting_revie
     if selected_version not in version_numbers:
         selected_version = default_version
 
-    selected_version = st.selectbox(
-        "Version",
-        options=version_numbers,
-        index=version_numbers.index(selected_version),
-        format_func=lambda version: version_labels[version],
-    )
-    st.session_state.selected_version_by_pair[selected_pair.pair_id] = selected_version
+    main_cols = st.columns([1.35, 1], gap="large")
+
+    with main_cols[1]:
+        selected_version = st.selectbox(
+            "Version",
+            options=version_numbers,
+            index=version_numbers.index(selected_version),
+            format_func=lambda version: version_labels[version],
+        )
+        st.session_state.selected_version_by_pair[selected_pair.pair_id] = selected_version
 
     version_map = {item.version: item for item in selected_pair.versions}
     current_clip = version_map[selected_version]
@@ -315,39 +328,46 @@ def render_review_panel(selected_pair, review_lookup, redo_lookup, waiting_revie
     waiting_review = waiting_review_lookup.get((selected_pair.pair_id, current_clip.version))
     current_status = pair_status(selected_pair.pair_id, current_clip.version, review_lookup, redo_lookup)
 
-    render_status_banner(current_status, winner_version, current_clip.version)
+    with main_cols[0]:
+        st.video(str(Path(current_clip.video_path)))
+        image_cols = st.columns(2, gap="medium")
+        start_path = frame_image_path(selected_pair.start_frame_id)
+        end_path = frame_image_path(selected_pair.end_frame_id)
+        image_cols[0].image(
+            str(start_path),
+            caption=f"Start: {selected_pair.start_frame_id}",
+            use_container_width=True,
+        )
+        image_cols[1].image(
+            str(end_path),
+            caption=f"End: {selected_pair.end_frame_id}",
+            use_container_width=True,
+        )
 
-    meta_cols = st.columns(4)
-    meta_cols[0].metric("Selected version", f"v{current_clip.version}")
-    meta_cols[1].metric("Start frame", selected_pair.start_frame_id)
-    meta_cols[2].metric("End frame", selected_pair.end_frame_id)
-    meta_cols[3].metric("Winner", f"v{winner_version}" if winner_version else "Not set")
+    with main_cols[1]:
+        render_status_banner(current_status, winner_version, current_clip.version)
 
-    st.markdown(
-        """
-        <div class="review-guide">
-        Approve the clip if it is ready for the final cut.
-        Choose Redo if the clip should be regenerated, then tag the problem so the next pass knows what to fix.
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+        meta_cols = st.columns(2)
+        meta_cols[0].metric("Selected version", f"v{current_clip.version}")
+        meta_cols[1].metric("Winner", f"v{winner_version}" if winner_version else "Not set")
+        frame_cols = st.columns(2)
+        frame_cols[0].metric("Start frame", selected_pair.start_frame_id)
+        frame_cols[1].metric("End frame", selected_pair.end_frame_id)
 
-    st.video(str(Path(current_clip.video_path)))
+        st.markdown(
+            """
+            <div class="review-guide">
+            Approve if the clip is ready for the final cut. Choose Redo only when the next pass needs to fix a clear problem.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-    image_cols = st.columns(2, gap="large")
-    start_path = frame_image_path(selected_pair.start_frame_id)
-    end_path = frame_image_path(selected_pair.end_frame_id)
-    image_cols[0].image(str(start_path), caption=f"Start frame: {selected_pair.start_frame_id}", use_container_width=True)
-    image_cols[1].image(str(end_path), caption=f"End frame: {selected_pair.end_frame_id}", use_container_width=True)
-
-    compare_tab, review_tab = st.tabs(["Compare versions", "Review this version"])
-
-    with compare_tab:
         if len(selected_pair.versions) == 1:
-            st.info("Only one version exists for this pair right now. You can still mark it as the winner.")
+            st.caption("Only one version exists for this pair right now.")
         else:
-            compare_versions(selected_pair)
+            with st.expander("Compare versions", expanded=False):
+                compare_versions(selected_pair)
 
         winner_button_label = "Mark selected version as winner"
         if waiting_review is not None:
@@ -364,7 +384,6 @@ def render_review_panel(selected_pair, review_lookup, redo_lookup, waiting_revie
                 st.success(f"Saved v{current_clip.version} as the winner for {selected_pair.pair_id}.")
             st.rerun()
 
-    with review_tab:
         if review is not None:
             st.info(
                 f"Last review: {DECISION_LABELS.get(review.decision, review.decision)}"
@@ -438,7 +457,17 @@ def render_review_panel(selected_pair, review_lookup, redo_lookup, waiting_revie
                 else:
                     remove_redo_request(selected_pair.pair_id, current_clip.version, run_id=run_id)
 
-                st.success("Review saved.")
+                if decision == "approve":
+                    next_pair_id = next_pair_to_review(pair_rows, selected_pair.pair_id)
+                    if next_pair_id is not None:
+                        set_selected_pair(next_pair_id)
+                        st.session_state.review_notice = (
+                            f"Saved approval for {selected_pair.pair_id}. Moved to {next_pair_id}."
+                        )
+                    else:
+                        st.session_state.review_notice = f"Saved approval for {selected_pair.pair_id}."
+                else:
+                    st.session_state.review_notice = "Review saved."
                 st.rerun()
 
 
@@ -642,6 +671,20 @@ def next_pair_needing_review(pair_rows, current_pair_id: str):
         current_index = pair_ids.index(current_pair_id)
 
     ordered_rows = pair_rows[current_index + 1 :] + pair_rows[: current_index + 1]
+    for item in ordered_rows:
+        if item["status"] == "Needs review":
+            return item["pair_id"]
+    return None
+
+
+def next_pair_to_review(pair_rows, current_pair_id: str):
+    pair_ids = [item["pair_id"] for item in pair_rows]
+    if current_pair_id not in pair_ids:
+        ordered_rows = pair_rows
+    else:
+        current_index = pair_ids.index(current_pair_id)
+        ordered_rows = pair_rows[current_index + 1 :] + pair_rows[:current_index]
+
     for item in ordered_rows:
         if item["status"] == "Needs review":
             return item["pair_id"]
