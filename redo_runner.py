@@ -89,17 +89,22 @@ def rewrite_prompt_with_llm(
 
     issue_lines = "\n".join(f"- {item}: {ISSUE_INSTRUCTIONS[item]}" for item in issues if item in ISSUE_INSTRUCTIONS)
     note_line = note.strip() or "None"
+    must_include_lines = build_must_include_lines(issues, note)
     rewrite_request = f"""Rewrite this Kling image-to-video prompt for pair {pair_id}.
 
 Return only the final prompt text.
 
 Goals:
 - keep the original scene continuity and emotional direction
-- directly address the reviewer feedback
+- treat the reviewer feedback as a hard constraint, not a suggestion
+- make the fixes explicit in the final prompt
 - preserve the person, face, and identity when relevant
-- avoid horror-like or overly dramatic transitions unless already required by the source frames
+- avoid horror-like, scary, or overly dramatic transitions unless already required by the source frames
+- if the feedback says a face, identity, or transition was wrong, visibly change the wording to address that problem
+- do not return a near-copy of the base prompt when issues are present
 - do not mention reviewer notes, issue tags, or analysis language in the final prompt
 - keep it concise and usable as a single Kling prompt
+- prefer 2 to 4 short sentences
 
 Base prompt:
 {base_prompt}
@@ -109,6 +114,9 @@ Issue guidance:
 
 Reviewer note:
 {note_line}
+
+The final prompt must include these constraints when relevant:
+{must_include_lines}
 
 If the feedback is too vague, fall back to this safe retry prompt:
 {fallback_prompt}
@@ -126,6 +134,27 @@ If the feedback is too vague, fall back to this safe retry prompt:
     if not text:
         return None
     return " ".join(text.strip().split())
+
+
+def build_must_include_lines(issues: list[str], note: str) -> str:
+    lines: list[str] = []
+    if "face_bad" in issues:
+        lines.append("- explicitly say the face stays stable and natural, with no morphing")
+    if "identity_drift" in issues:
+        lines.append("- explicitly say it remains the same woman/person throughout the transition")
+    if "transition_bad" in issues:
+        lines.append("- explicitly say the transition is gentle, calm, and non-scary")
+    if "too_fast" in issues:
+        lines.append("- explicitly slow the motion down")
+    if "too_slow" in issues:
+        lines.append("- explicitly allow slightly more motion while keeping control")
+    if "scenario_wrong" in issues or "background_wrong" in issues:
+        lines.append("- explicitly keep the same setting and avoid inventing a new scene")
+    if note.strip():
+        lines.append("- reflect the reviewer note in the actual prompt wording")
+    if not lines:
+        return "- none"
+    return "\n".join(lines)
 
 
 def next_retry_version(pair_id: str, videos_dir: Path = VIDEOS_DIR) -> int:
