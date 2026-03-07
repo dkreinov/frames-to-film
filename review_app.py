@@ -187,30 +187,37 @@ def select_pair(pairs, pair_rows, status_filter: str):
 
     if st.session_state.selected_pair_id not in visible_pair_ids:
         st.session_state.selected_pair_id = visible_pair_ids[0]
+    if "selected_pair_choice" not in st.session_state:
+        st.session_state.selected_pair_choice = st.session_state.selected_pair_id
+    if st.session_state.selected_pair_choice not in visible_pair_ids:
+        st.session_state.selected_pair_choice = st.session_state.selected_pair_id
 
     button_cols = st.sidebar.columns(2)
     current_index = visible_pair_ids.index(st.session_state.selected_pair_id)
     if button_cols[0].button("Previous", use_container_width=True, disabled=current_index == 0):
-        st.session_state.selected_pair_id = visible_pair_ids[current_index - 1]
+        set_selected_pair(visible_pair_ids[current_index - 1])
+        st.rerun()
     if button_cols[1].button(
         "Next",
         use_container_width=True,
         disabled=current_index == len(visible_pair_ids) - 1,
     ):
-        st.session_state.selected_pair_id = visible_pair_ids[current_index + 1]
+        set_selected_pair(visible_pair_ids[current_index + 1])
+        st.rerun()
 
-    next_review_pair = next_pair_needing_review(filtered_pair_ids)
+    next_review_pair = next_pair_needing_review(filtered_pair_ids, st.session_state.selected_pair_id)
     if st.sidebar.button(
         "Jump to next needs review",
         use_container_width=True,
         disabled=next_review_pair is None,
     ) and next_review_pair is not None:
-        st.session_state.selected_pair_id = next_review_pair
+        set_selected_pair(next_review_pair)
+        st.rerun()
 
     selected_pair_id = st.sidebar.selectbox(
         "Clip",
         options=visible_pair_ids,
-        index=visible_pair_ids.index(st.session_state.selected_pair_id),
+        key="selected_pair_choice",
         format_func=pair_label,
     )
     st.session_state.selected_pair_id = selected_pair_id
@@ -627,11 +634,23 @@ def count_rows(pair_rows, status: str) -> int:
     return sum(1 for item in pair_rows if item["status"] == status)
 
 
-def next_pair_needing_review(pair_rows):
-    for item in pair_rows:
+def next_pair_needing_review(pair_rows, current_pair_id: str):
+    pair_ids = [item["pair_id"] for item in pair_rows]
+    if current_pair_id not in pair_ids:
+        current_index = -1
+    else:
+        current_index = pair_ids.index(current_pair_id)
+
+    ordered_rows = pair_rows[current_index + 1 :] + pair_rows[: current_index + 1]
+    for item in ordered_rows:
         if item["status"] == "Needs review":
             return item["pair_id"]
     return None
+
+
+def set_selected_pair(pair_id: str) -> None:
+    st.session_state.selected_pair_id = pair_id
+    st.session_state.selected_pair_choice = pair_id
 
 
 def pair_label(pair_id: str) -> str:
