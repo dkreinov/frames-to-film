@@ -390,7 +390,7 @@ def render_review_panel(selected_pair, review_lookup, redo_lookup, waiting_revie
             )
 
             rating_options = ["-"] + [str(number) for number in range(1, 6)]
-            saved_rating = str(review.rating) if review and review.rating is not None else "-"
+            saved_rating = str(review.rating) if review and review.rating is not None else "5"
             rating_value = st.select_slider("Quality rating", options=rating_options, value=saved_rating)
 
             issue_defaults = review.issues if review else []
