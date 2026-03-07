@@ -7,7 +7,8 @@ Turn a mixed set of family photographs into a single stitched movie:
 1. Normalize source images into consistent 4:3 landscape stills.
 2. Expand numbered story frames into 16:9 images for Kling.
 3. Generate start-frame/end-frame Kling clips for consecutive image pairs.
-4. Stitch the generated clips into one final movie.
+4. Review generated clips, queue weak segments for redo, and regenerate better versions.
+5. Stitch the selected winning clips into one final movie.
 
 This document describes the current checked-in flow in this workspace. Historical experiments and optional quality-control ideas are kept in the appendix.
 
@@ -15,7 +16,7 @@ This document describes the current checked-in flow in this workspace. Historica
 
 The current pipeline is file-based and script-driven. It is not yet an orchestrated agent. The working path is:
 
-`raw images -> outpainted/ -> kling_test/ -> kling_test/videos/ -> full_movie.mp4`
+`raw images -> outpainted/ -> kling_test/ -> kling_test/videos/ -> review app + redo queue -> full_movie.mp4`
 
 ## Pipeline Summary
 
@@ -23,6 +24,8 @@ The current pipeline is file-based and script-driven. It is not yet an orchestra
 - `outpaint_images.py` converts mixed-orientation photos into 4:3 outputs in `outpainted/`.
 - `outpaint_16_9.py` converts numbered 4:3 story frames into 16:9 outputs in `kling_test/`.
 - `generate_all_videos.py` creates resumable Kling clips for consecutive numbered pairs and records progress in `kling_test/videos/status.json`.
+- `review_app.py` lets a human review clips, pick winners, and queue bad clips for retry.
+- `redo_runner.py` turns queued retry feedback into a rewritten prompt and submits new Kling versions when requested.
 - `concat_videos.py` builds `concat_list.txt` and stitches existing segment files into `kling_test/videos/full_movie.mp4`.
 
 ## End-to-End Flow
@@ -37,18 +40,23 @@ flowchart LR
     E --> G["Batch Kling generation\ngenerate_all_videos.py"]
     F --> G
     G --> H["Segment outputs\nkling_test/videos/seg_*.mp4\nstatus.json"]
-    H --> I["Concat list + ffmpeg stitch\nconcat_videos.py"]
-    I --> J["Final movie\nkling_test/videos/full_movie.mp4"]
+    H --> I["Human review + winner selection\nreview_app.py"]
+    I --> J["Redo queue + prompt rewrite\nredo_runner.py"]
+    J --> G
+    I --> K["Concat list + ffmpeg stitch\nconcat_videos.py"]
+    K --> L["Final movie\nkling_test/videos/full_movie.mp4"]
 
     classDef src fill:#f4efe1,stroke:#7c5f18,color:#1f1a12,stroke-width:2px;
     classDef img fill:#dbeafe,stroke:#1d4ed8,color:#0f172a,stroke-width:2px;
     classDef video fill:#dcfce7,stroke:#15803d,color:#052e16,stroke-width:2px;
     classDef out fill:#fee2e2,stroke:#b91c1c,color:#450a0a,stroke-width:2px;
+    classDef review fill:#ede9fe,stroke:#6d28d9,color:#2e1065,stroke-width:2px;
 
     class A src;
     class B,C,D,E,F,G img;
-    class H,I video;
-    class J out;
+    class H,K video;
+    class I,J review;
+    class L out;
 ```
 
 ## Artifact Flow
@@ -79,11 +87,19 @@ flowchart TD
         D6["kling_test/videos/status.json"]
     end
 
-    subgraph s5["Stage 5 - Final Stitch"]
-        E1["concat_videos.py"]
-        E2["tools/ffmpeg.exe\nor PATH ffmpeg"]
-        E3["concat_list.txt"]
-        E4["full_movie.mp4"]
+    subgraph s5["Stage 5 - Review And Retries"]
+        E1["review_app.py"]
+        E2["redo_runner.py"]
+        E3["pipeline_runs/<run_id>/reviews.json"]
+        E4["pipeline_runs/<run_id>/redo_queue.json"]
+        E5["pipeline_runs/<run_id>/winners.json"]
+    end
+
+    subgraph s6["Stage 6 - Final Stitch"]
+        F1["concat_videos.py"]
+        F2["tools/ffmpeg.exe\nor PATH ffmpeg"]
+        F3["concat_list.txt"]
+        F4["full_movie.mp4"]
     end
 
     A1 --> B1
@@ -99,22 +115,31 @@ flowchart TD
     D3 --> D5
     D3 --> D6
     D5 --> E1
-    C2 --> E1
-    E2 --> E1
     E1 --> E3
     E1 --> E4
+    E1 --> E5
+    E4 --> E2
+    E2 --> D5
+    D5 --> E1
+    D5 --> F1
+    C2 --> F1
+    F2 --> F1
+    F1 --> F3
+    F1 --> F4
 
     classDef stage1 fill:#fef3c7,stroke:#b45309,color:#451a03,stroke-width:2px;
     classDef stage2 fill:#dbeafe,stroke:#1d4ed8,color:#172554,stroke-width:2px;
     classDef stage3 fill:#e9d5ff,stroke:#7e22ce,color:#3b0764,stroke-width:2px;
     classDef stage4 fill:#dcfce7,stroke:#15803d,color:#14532d,stroke-width:2px;
-    classDef stage5 fill:#fee2e2,stroke:#b91c1c,color:#7f1d1d,stroke-width:2px;
+    classDef stage5 fill:#fde68a,stroke:#b45309,color:#78350f,stroke-width:2px;
+    classDef stage6 fill:#fee2e2,stroke:#b91c1c,color:#7f1d1d,stroke-width:2px;
 
     class A1 stage1;
     class B1,B2,B3 stage2;
     class C1,C2 stage3;
     class D1,D2,D3,D4,D5,D6 stage4;
-    class E1,E2,E3,E4 stage5;
+    class E1,E2,E3,E4,E5 stage5;
+    class F1,F2,F3,F4 stage6;
 ```
 
 ## Main Stages
@@ -203,7 +228,38 @@ Related scripts:
 - `generate_videos_v2.py` is a variant-testing path for prompt styles.
 - `generate_all_videos.py` is the main batch path for the full movie.
 
-### Stage 5: Final Stitch
+### Stage 5: Review And Redo Loop
+
+Primary tools: `review_app.py`, `redo_runner.py`
+
+Purpose:
+- Review generated Kling segments inside a local Streamlit app.
+- Mark a version as approved, redo, or needs discussion.
+- Save structured review feedback into JSON.
+- Preview and run queued retries from the app.
+- Rewrite retry prompts from review feedback with Gemini when available, or fall back to rule-based prompt repair.
+- Generate a new version like `seg_<pair>_v2.mp4` and move the queue item to `waiting_review`.
+
+Input:
+- `kling_test/videos/seg_*.mp4`
+- `image_pair_prompts.py`
+- `pipeline_runs/<run_id>/reviews.json`
+- `pipeline_runs/<run_id>/redo_queue.json`
+- Gemini and Kling credentials from `.env` when live retries are run
+
+Output:
+- `pipeline_runs/<run_id>/reviews.json`
+- `pipeline_runs/<run_id>/redo_queue.json`
+- `pipeline_runs/<run_id>/winners.json`
+- versioned retry clips such as `kling_test/videos/seg_17_to_18_v2.mp4`
+
+Behavior details:
+- The app preview shows `prompt_mode` as either `llm_rewrite` or `rule_based`.
+- A successful retry changes a queue item from `queued` to `waiting_review`.
+- `waiting_review` items stay visible but are not submitted again.
+- Once the new version is reviewed, the old waiting entry is removed so the queue does not loop forever.
+
+### Stage 6: Final Stitch
 
 Primary script: `concat_videos.py`
 
@@ -238,6 +294,10 @@ Behavior details:
 | `generate_videos.py` | Kling generation | Generates a small early set of pairs manually | `kling_test/*.jpg` | `segment_*.mp4` | Early test path |
 | `generate_videos_v2.py` | Kling generation | Generates prompt-style variants for small comparisons | `kling_test/*.jpg` | variant mp4 files | Experimental path |
 | `generate_all_videos.py` | Kling generation | Runs the resumable batch movie generation loop | `kling_test/*.jpg`, `.env`, prompt map | `seg_*.mp4`, `status.json` | Main production path |
+| `review_models.py` | Review | Defines review, redo, and winner state records | app state | in-memory models | Shared review data schema |
+| `review_store.py` | Review | Reads and writes reviews, redo queue, and winners | `pipeline_runs/<run_id>/*.json` | updated JSON state | Local review state layer |
+| `review_app.py` | Review | Streamlit UI for reviewing clips, queueing redos, and picking winners | `seg_*.mp4`, frame jpgs, review JSON | updated review JSON | Main human review tool |
+| `redo_runner.py` | Review / Kling retry | Previews queued retries, rewrites prompts, and submits retry versions | redo queue, pair prompts, `.env` | `seg_*_vN.mp4`, updated redo queue | Uses Gemini rewrite when available |
 | `concat_videos.py` | Stitch | Builds concat list and creates the full movie | `seg_*.mp4`, image sequence, ffmpeg | `full_movie.mp4` | Final assembly step |
 | `qa_report.py` | QA | Builds a comparison report for manual inspection | selected image sets | report artifact | Support tooling |
 
@@ -251,6 +311,7 @@ Behavior details:
 | `outpainted/scores.json` | stage record for 4:3 generation runs |
 | `kling_test/` | numbered 16:9 frames for the story sequence |
 | `kling_test/videos/` | Kling clip outputs, concat list, and final movie |
+| `pipeline_runs/<run_id>/` | review state for human feedback, retry queue, and winners |
 | `tools/` | local ffmpeg binary when auto-downloaded |
 | `_cursor/` | Cursor transcripts, tools, assets, and terminal history used to reconstruct project history |
 
@@ -268,6 +329,19 @@ The movie pipeline is resumable at the Kling stage.
 - `generate_all_videos.py` persists pair status in `status.json`.
 - Re-running the script skips pairs already marked `ok`.
 - Failed or incomplete pairs can be retried without recreating successful outputs.
+
+The review loop is also resumable.
+- `review_app.py` persists reviews, redo queue state, and winners under `pipeline_runs/<run_id>/`.
+- `redo_runner.py` only submits items with `status = queued`.
+- After a successful retry, the item moves to `waiting_review` and is not re-submitted automatically.
+
+### Retry Prompt Rewrite
+
+The current retry flow has two prompt-repair modes:
+- `llm_rewrite`: Gemini rewrites the retry prompt from the base pair prompt plus the reviewer feedback.
+- `rule_based`: the local fallback appends deterministic repair instructions when Gemini is unavailable.
+
+The app exposes the active mode in the redo preview table through the `prompt_mode` field.
 
 ### Ordering Rules
 
