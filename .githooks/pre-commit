@@ -1,0 +1,52 @@
+#!/bin/sh
+
+set -eu
+
+staged_file_list="$(mktemp)"
+match_file="$(mktemp)"
+trap 'rm -f "$staged_file_list" "$match_file"' EXIT INT TERM
+
+git diff --cached --name-only --diff-filter=ACMR -z >"$staged_file_list"
+if [ ! -s "$staged_file_list" ]; then
+  exit 0
+fi
+
+token_prefix_regex="(AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9_-]{16,})"
+assignment_regex="((openai_api_key|api[_-]?key|client[_-]?secret|access[_-]?token|refresh[_-]?token|password)[[:space:]]*[:=][[:space:]]*((\"[^\"]{8,}\")|('[^']{8,}')|[A-Za-z0-9._-]{8,})|Authorization:[[:space:]]*Bearer[[:space:]]+[A-Za-z0-9._-]{12,})"
+
+failed=0
+
+while IFS= read -r -d '' file; do
+  case "$file" in
+    .env|.env.*|*/.env|*/.env.*|\
+    logs/*|log/*|*/logs/*|*/log/*|\
+    _cursor/*|*/_cursor/*|__pycache__/*|*/__pycache__/*|\
+    *.log|*.out|*.err|*.trace|*.stackdump|*.jsonl|\
+    *.pem|*.key|*.p12|*.pfx)
+      printf '%s\n' "pre-commit: blocked staged file '$file' (secret/log/artifact path)." >&2
+      failed=1
+      continue
+      ;;
+  esac
+
+  if git show ":$file" 2>/dev/null | tr -d '\000' | grep -anE "$token_prefix_regex" >"$match_file" 2>/dev/null; then
+    printf '%s\n' "pre-commit: possible secret detected in '$file':" >&2
+    cat "$match_file" >&2
+    failed=1
+    continue
+  fi
+
+  if git show ":$file" 2>/dev/null | tr -d '\000' | grep -aniE "$assignment_regex" >"$match_file" 2>/dev/null; then
+    printf '%s\n' "pre-commit: possible secret detected in '$file':" >&2
+    cat "$match_file" >&2
+    failed=1
+    continue
+  fi
+done < "$staged_file_list"
+
+if [ "$failed" -ne 0 ]; then
+  printf '%s\n' "pre-commit: commit blocked. Remove secrets/logs from the index and retry." >&2
+  exit 1
+fi
+
+exit 0

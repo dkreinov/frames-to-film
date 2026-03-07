@@ -1,9 +1,12 @@
 .env
+.env.*
 _cursor/
 __pycache__/
 outpainted/
 kling_test/
 tools/
+logs/
+log/
 
 *.jpg
 *.jpeg
@@ -14,5 +17,16 @@ tools/
 *.html
 *.pyc
 *.exe
+*.log
+*.out
+*.err
+*.trace
+*.stackdump
+*.jsonl
+*.pem
+*.key
+*.p12
+*.pfx
 
 work_log.md
+*_work_log.md
