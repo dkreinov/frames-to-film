@@ -33,6 +33,9 @@ def ensure_review_files(run_id: str = DEFAULT_RUN_ID) -> ReviewPaths:
         _write_json(paths.review_file, {"run_id": run_id, "reviews": []})
     if not paths.redo_queue_file.exists():
         _write_json(paths.redo_queue_file, {"run_id": run_id, "redo_requests": []})
+    winners_file = _winners_file(paths.run_dir)
+    if not winners_file.exists():
+        _write_json(winners_file, {"run_id": run_id, "winners": {}})
     return paths
 
 
@@ -154,6 +157,42 @@ def queue_redo(request: RedoRequest, run_id: str = DEFAULT_RUN_ID) -> None:
     )
 
 
+def remove_redo_request(pair_id: str, source_version: int, run_id: str = DEFAULT_RUN_ID) -> None:
+    redo_requests = load_redo_queue(run_id)
+    filtered = [
+        item
+        for item in redo_requests
+        if not (item.pair_id == pair_id and item.source_version == source_version)
+    ]
+    paths = ensure_review_files(run_id)
+    _write_json(
+        paths.redo_queue_file,
+        {
+            "run_id": run_id,
+            "redo_requests": [item.to_dict() for item in filtered],
+        },
+    )
+
+
+def load_winners(run_id: str = DEFAULT_RUN_ID) -> dict[str, int]:
+    paths = ensure_review_files(run_id)
+    payload = _read_json(_winners_file(paths.run_dir))
+    return {str(key): int(value) for key, value in payload.get("winners", {}).items()}
+
+
+def save_winner(pair_id: str, version: int, run_id: str = DEFAULT_RUN_ID) -> None:
+    winners = load_winners(run_id)
+    winners[pair_id] = version
+    paths = ensure_review_files(run_id)
+    _write_json(
+        _winners_file(paths.run_dir),
+        {
+            "run_id": run_id,
+            "winners": winners,
+        },
+    )
+
+
 def latest_clip_versions(pairs: Iterable[ClipPair]) -> dict[str, ClipVersion]:
     latest: dict[str, ClipVersion] = {}
     for pair in pairs:
@@ -175,3 +214,7 @@ def _read_json(path: Path) -> dict:
 def _write_json(path: Path, payload: dict) -> None:
     with path.open("w", encoding="utf-8") as handle:
         json.dump(payload, handle, indent=2)
+
+
+def _winners_file(run_dir: Path) -> Path:
+    return run_dir / "winners.json"
