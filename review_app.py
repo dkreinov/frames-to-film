@@ -7,6 +7,7 @@ import streamlit as st
 from redo_runner import preview_redo_queue, redo_request_key, run_redo_queue
 from review_models import DECISIONS, ISSUE_TAGS, RedoRequest, ReviewRecord
 from review_store import (
+    accept_review_version,
     DEFAULT_RUN_ID,
     discover_clip_pairs,
     ensure_review_files,
@@ -81,6 +82,11 @@ def main() -> None:
         for item in redo_requests
         if item.status == "queued"
     }
+    waiting_review_lookup = {
+        (item.pair_id, item.target_version): item
+        for item in redo_requests
+        if item.status == "waiting_review" and item.target_version is not None
+    }
     pair_rows = build_pair_rows(pairs, review_lookup, queued_redo_lookup, winners)
 
     selected_pair = select_pair(pairs, pair_rows, status_filter)
@@ -91,7 +97,14 @@ def main() -> None:
         with left_col:
             render_inbox(pair_rows, status_filter, selected_pair.pair_id)
         with right_col:
-            render_review_panel(selected_pair, review_lookup, queued_redo_lookup, winners, run_id)
+            render_review_panel(
+                selected_pair,
+                review_lookup,
+                queued_redo_lookup,
+                waiting_review_lookup,
+                winners,
+                run_id,
+            )
 
     with queue_tab:
         render_redo_queue(redo_requests, review_lookup, winners, run_id)
@@ -263,7 +276,7 @@ def render_inbox(pair_rows, status_filter: str, selected_pair_id: str) -> None:
     st.dataframe(rows, use_container_width=True, hide_index=True)
 
 
-def render_review_panel(selected_pair, review_lookup, redo_lookup, winners, run_id: str) -> None:
+def render_review_panel(selected_pair, review_lookup, redo_lookup, waiting_review_lookup, winners, run_id: str) -> None:
     st.subheader(pair_label(selected_pair.pair_id))
 
     version_numbers = [item.version for item in selected_pair.versions]
@@ -289,6 +302,7 @@ def render_review_panel(selected_pair, review_lookup, redo_lookup, winners, run_
     winner_version = winners.get(selected_pair.pair_id)
     review = review_lookup.get((selected_pair.pair_id, current_clip.version))
     queued_redo = redo_lookup.get((selected_pair.pair_id, current_clip.version))
+    waiting_review = waiting_review_lookup.get((selected_pair.pair_id, current_clip.version))
     current_status = pair_status(selected_pair.pair_id, current_clip.version, review_lookup, redo_lookup)
 
     render_status_banner(current_status, winner_version, current_clip.version)
@@ -325,9 +339,19 @@ def render_review_panel(selected_pair, review_lookup, redo_lookup, winners, run_
         else:
             compare_versions(selected_pair)
 
-        if st.button("Mark selected version as winner", use_container_width=True):
+        winner_button_label = "Mark selected version as winner"
+        if waiting_review is not None:
+            winner_button_label = "Accept selected version and clear waiting review"
+
+        if st.button(winner_button_label, use_container_width=True):
             save_winner(selected_pair.pair_id, current_clip.version, run_id=run_id)
-            st.success(f"Saved v{current_clip.version} as the winner for {selected_pair.pair_id}.")
+            if waiting_review is not None:
+                accept_review_version(selected_pair.pair_id, current_clip.version, run_id=run_id)
+                st.success(
+                    f"Accepted v{current_clip.version} as the winner for {selected_pair.pair_id} and cleared the waiting-review entry."
+                )
+            else:
+                st.success(f"Saved v{current_clip.version} as the winner for {selected_pair.pair_id}.")
             st.rerun()
 
     with review_tab:
@@ -339,6 +363,8 @@ def render_review_panel(selected_pair, review_lookup, redo_lookup, winners, run_
             )
         if queued_redo is not None:
             st.warning("This version is currently in the redo queue.")
+        if waiting_review is not None:
+            st.info("This retry version is waiting for review. You can accept it from the compare tab or save an Approve review here.")
 
         with st.expander("Current clip details", expanded=False):
             st.write(f"File: `{current_clip.filename}`")

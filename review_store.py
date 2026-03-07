@@ -174,6 +174,24 @@ def remove_redo_waiting_review(pair_id: str, target_version: int, run_id: str = 
     save_redo_requests(filtered, run_id)
 
 
+def accept_review_version(pair_id: str, version: int, run_id: str = DEFAULT_RUN_ID, reviewed_by: str = "local-user") -> None:
+    existing_review = next(
+        (item for item in load_reviews(run_id) if item.pair_id == pair_id and item.version == version),
+        None,
+    )
+    approved_review = ReviewRecord(
+        pair_id=pair_id,
+        version=version,
+        decision="approve",
+        rating=existing_review.rating if existing_review else None,
+        issues=[],
+        note=existing_review.note if existing_review else "",
+        reviewed_by=reviewed_by,
+    )
+    save_review(approved_review, run_id)
+    remove_redo_waiting_review(pair_id, version, run_id)
+
+
 def save_redo_requests(redo_requests: Iterable[RedoRequest], run_id: str = DEFAULT_RUN_ID) -> None:
     paths = ensure_review_files(run_id)
     _write_json(
