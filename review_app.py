@@ -184,6 +184,11 @@ def select_pair(pairs, pair_rows, status_filter: str):
     if not visible_pair_ids:
         visible_pair_ids = pair_ids
 
+    pending_pair_id = st.session_state.pop("pending_selected_pair_choice", None)
+    if pending_pair_id in visible_pair_ids:
+        st.session_state.selected_pair_id = pending_pair_id
+        st.session_state.selected_pair_choice = pending_pair_id
+
     if "selected_pair_id" not in st.session_state:
         st.session_state.selected_pair_id = visible_pair_ids[0]
 
@@ -692,8 +697,7 @@ def next_pair_to_review(pair_rows, current_pair_id: str):
 
 
 def set_selected_pair(pair_id: str) -> None:
-    st.session_state.selected_pair_id = pair_id
-    st.session_state.selected_pair_choice = pair_id
+    st.session_state.pending_selected_pair_choice = pair_id
 
 
 def pair_label(pair_id: str) -> str:
