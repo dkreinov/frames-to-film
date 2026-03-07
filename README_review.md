@@ -36,6 +36,12 @@ If this machine does not expose `python` directly, use the full interpreter path
 C:\Users\nishtiak\AppData\Local\Programs\Python\Python312\python.exe -m pip install -r requirements-review.txt
 ```
 
+The review app now also includes the in-app Kling retry runner, so the review environment installs:
+
+- `streamlit`
+- `requests`
+- `python-dotenv`
+
 ## Run
 
 If `python` works in your shell:
@@ -66,6 +72,8 @@ The `Redo queue` tab now has two controls:
 
 - `Preview queued retries`: shows the next version number, output filename, and retry prompt before anything is submitted
 - `Run queued retries`: sends only `queued` items to Kling
+
+To actually run queued retries, your `.env` must contain valid Kling credentials.
 
 Important behavior:
 
