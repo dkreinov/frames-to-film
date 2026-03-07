@@ -54,8 +54,19 @@ ISSUE_INSTRUCTIONS = {
 }
 
 
-def queued_redo_requests(run_id: str = DEFAULT_RUN_ID):
-    return [item for item in load_redo_queue(run_id) if item.status == "queued"]
+def redo_request_key(pair_id: str, source_version: int) -> str:
+    return f"{pair_id}|{source_version}"
+
+
+def queued_redo_requests(run_id: str = DEFAULT_RUN_ID, selected_keys: set[str] | None = None):
+    queued_items = [item for item in load_redo_queue(run_id) if item.status == "queued"]
+    if not selected_keys:
+        return queued_items
+    return [
+        item
+        for item in queued_items
+        if redo_request_key(item.pair_id, item.source_version) in selected_keys
+    ]
 
 
 def build_retry_prompt(pair_id: str, issues: list[str], note: str) -> tuple[str, str]:
@@ -170,9 +181,12 @@ def next_retry_version(pair_id: str, videos_dir: Path = VIDEOS_DIR) -> int:
     return highest_version + 1
 
 
-def preview_redo_queue(run_id: str = DEFAULT_RUN_ID) -> list[dict[str, str | int]]:
+def preview_redo_queue(
+    run_id: str = DEFAULT_RUN_ID,
+    selected_keys: set[str] | None = None,
+) -> list[dict[str, str | int]]:
     previews = []
-    for item in queued_redo_requests(run_id):
+    for item in queued_redo_requests(run_id, selected_keys):
         target_version = next_retry_version(item.pair_id)
         output_file = f"seg_{item.pair_id}_v{target_version}.mp4"
         retry_prompt, prompt_mode = build_retry_prompt(item.pair_id, item.issues, item.note)
@@ -190,9 +204,12 @@ def preview_redo_queue(run_id: str = DEFAULT_RUN_ID) -> list[dict[str, str | int
     return previews
 
 
-def run_redo_queue(run_id: str = DEFAULT_RUN_ID) -> list[dict[str, str | int]]:
+def run_redo_queue(
+    run_id: str = DEFAULT_RUN_ID,
+    selected_keys: set[str] | None = None,
+) -> list[dict[str, str | int]]:
     results = []
-    queued_items = queued_redo_requests(run_id)
+    queued_items = queued_redo_requests(run_id, selected_keys)
     if not queued_items:
         return results
 

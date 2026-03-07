@@ -4,7 +4,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from redo_runner import preview_redo_queue, run_redo_queue
+from redo_runner import preview_redo_queue, redo_request_key, run_redo_queue
 from review_models import DECISIONS, ISSUE_TAGS, RedoRequest, ReviewRecord
 from review_store import (
     DEFAULT_RUN_ID,
@@ -462,23 +462,45 @@ def render_redo_queue(redo_requests, review_lookup, winners, run_id: str) -> Non
 
     st.caption("Queued items can be sent to Kling. Waiting review items already produced a new version and will not be sent again.")
 
+    selected_queue_keys = []
+    if queued_requests:
+        options = [redo_request_key(item.pair_id, item.source_version) for item in queued_requests]
+        labels = {
+            redo_request_key(item.pair_id, item.source_version): (
+                f"{item.pair_id} from v{item.source_version}"
+            )
+            for item in queued_requests
+        }
+        selected_queue_keys = st.multiselect(
+            "Queued items to run",
+            options=options,
+            default=options,
+            format_func=lambda key: labels[key],
+            help="Choose exactly which queued retries to preview or run.",
+        )
+
     control_cols = st.columns([1, 1, 1.2], gap="large")
     if control_cols[0].button("Preview queued retries", use_container_width=True):
-        st.session_state.redo_preview = preview_redo_queue(run_id)
+        if not selected_queue_keys:
+            st.warning("Select at least one queued retry to preview.")
+        else:
+            st.session_state.redo_preview = preview_redo_queue(run_id, set(selected_queue_keys))
 
     run_confirmed = control_cols[1].checkbox("Use Kling credits", value=False)
     if control_cols[2].button(
         "Run queued retries",
         use_container_width=True,
-        disabled=not queued_requests,
+        disabled=not queued_requests or not selected_queue_keys,
         type="primary",
     ):
         if not run_confirmed:
             st.warning("Tick 'Use Kling credits' before running queued retries.")
+        elif not selected_queue_keys:
+            st.warning("Select at least one queued retry to run.")
         else:
             try:
                 with st.spinner("Submitting queued retries to Kling..."):
-                    st.session_state.redo_results = run_redo_queue(run_id)
+                    st.session_state.redo_results = run_redo_queue(run_id, set(selected_queue_keys))
                     st.session_state.redo_preview = []
             except Exception as error:
                 st.session_state.redo_run_error = f"Retry run failed: {error}"
