@@ -96,6 +96,10 @@ def main() -> None:
     with queue_tab:
         render_redo_queue(redo_requests, review_lookup, winners, run_id)
 
+    error_message = st.session_state.pop("redo_run_error", "")
+    if error_message:
+        st.error(error_message)
+
 
 def inject_styles() -> None:
     st.markdown(
@@ -472,9 +476,12 @@ def render_redo_queue(redo_requests, review_lookup, winners, run_id: str) -> Non
         if not run_confirmed:
             st.warning("Tick 'Use Kling credits' before running queued retries.")
         else:
-            with st.spinner("Submitting queued retries to Kling..."):
-                st.session_state.redo_results = run_redo_queue(run_id)
-                st.session_state.redo_preview = []
+            try:
+                with st.spinner("Submitting queued retries to Kling..."):
+                    st.session_state.redo_results = run_redo_queue(run_id)
+                    st.session_state.redo_preview = []
+            except Exception as error:
+                st.session_state.redo_run_error = f"Retry run failed: {error}"
             st.rerun()
 
     preview_rows = st.session_state.get("redo_preview", [])

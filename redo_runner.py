@@ -101,6 +101,7 @@ def run_redo_queue(run_id: str = DEFAULT_RUN_ID) -> list[dict[str, str | int]]:
 
     token = get_jwt()
     token_time = time.time()
+    VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
 
     for item in queued_items:
         if time.time() - token_time > 1500:
@@ -115,14 +116,23 @@ def run_redo_queue(run_id: str = DEFAULT_RUN_ID) -> list[dict[str, str | int]]:
         output_path = VIDEOS_DIR / output_file
         retry_prompt = build_retry_prompt(item.pair_id, item.issues, item.note)
 
-        task_id, error = submit_video(token, start_path, end_path, retry_prompt)
-        if not task_id:
+        try:
+            task_id, error = submit_video(token, start_path, end_path, retry_prompt)
+            if not task_id:
+                raise RuntimeError(error or "submit failed")
+
+            video_url = poll_task(token, task_id)
+            if not video_url:
+                raise RuntimeError("poll failed")
+
+            download_video(video_url, output_path)
+        except Exception as error:
             save_redo_result(
                 item.pair_id,
                 item.source_version,
                 "failed",
                 run_id,
-                error=error or "submit failed",
+                error=str(error),
                 retry_prompt=retry_prompt,
             )
             results.append(
@@ -131,33 +141,11 @@ def run_redo_queue(run_id: str = DEFAULT_RUN_ID) -> list[dict[str, str | int]]:
                     "source_version": item.source_version,
                     "target_version": target_version,
                     "status": "failed",
-                    "error": error or "submit failed",
+                    "error": str(error),
                 }
             )
             continue
 
-        video_url = poll_task(token, task_id)
-        if not video_url:
-            save_redo_result(
-                item.pair_id,
-                item.source_version,
-                "failed",
-                run_id,
-                error="poll failed",
-                retry_prompt=retry_prompt,
-            )
-            results.append(
-                {
-                    "pair_id": item.pair_id,
-                    "source_version": item.source_version,
-                    "target_version": target_version,
-                    "status": "failed",
-                    "error": "poll failed",
-                }
-            )
-            continue
-
-        download_video(video_url, output_path)
         save_redo_result(
             item.pair_id,
             item.source_version,
@@ -240,14 +228,17 @@ def submit_video(token: str, start_path: Path, end_path: Path, prompt: str) -> t
         "cfg_scale": 0.5,
         "enable_audio": False,
     }
-    response = requests.post(
-        f"{API_BASE}/v1/videos/image2video",
-        headers=headers,
-        json=payload,
-        verify=False,
-        timeout=180,
-    )
-    data = response.json()
+    try:
+        response = requests.post(
+            f"{API_BASE}/v1/videos/image2video",
+            headers=headers,
+            json=payload,
+            verify=False,
+            timeout=180,
+        )
+        data = response.json()
+    except Exception as error:
+        return None, str(error)
     if data.get("code") != 0:
         return None, data.get("message", "unknown error")
     return data["data"]["task_id"], None
@@ -284,4 +275,5 @@ def poll_task(token: str, task_id: str) -> str | None:
 
 def download_video(url: str, output_path: Path) -> None:
     response = requests.get(url, verify=False, timeout=120)
+    response.raise_for_status()
     output_path.write_bytes(response.content)
