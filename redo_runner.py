@@ -17,6 +17,11 @@ except ModuleNotFoundError:
     def load_dotenv(*_args, **_kwargs) -> bool:
         return False
 
+try:
+    from google import genai
+except ModuleNotFoundError:
+    genai = None
+
 from image_pair_prompts import FALLBACK_PROMPT, PAIR_PROMPTS
 from review_store import DEFAULT_RUN_ID, VIDEOS_DIR, frame_image_path, load_redo_queue, save_redo_result
 
@@ -31,6 +36,7 @@ API_BASE = "https://api.klingai.com"
 MODEL = "kling-v3"
 DURATION = "8"
 POLL_INTERVALS = [15, 20, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30]
+PROMPT_REWRITE_MODEL = "gemini-2.0-flash"
 
 ISSUE_INSTRUCTIONS = {
     "face_bad": "Keep the same face and facial structure throughout the shot. Avoid facial distortion or morphing.",
@@ -52,14 +58,74 @@ def queued_redo_requests(run_id: str = DEFAULT_RUN_ID):
     return [item for item in load_redo_queue(run_id) if item.status == "queued"]
 
 
-def build_retry_prompt(pair_id: str, issues: list[str], note: str) -> str:
+def build_retry_prompt(pair_id: str, issues: list[str], note: str) -> tuple[str, str]:
     base_prompt = PAIR_PROMPTS.get(pair_id, FALLBACK_PROMPT)
+    fallback_prompt = build_rule_based_retry_prompt(base_prompt, issues, note)
+    llm_prompt = rewrite_prompt_with_llm(pair_id, base_prompt, issues, note, fallback_prompt)
+    if llm_prompt:
+        return llm_prompt, "llm_rewrite"
+    return fallback_prompt, "rule_based"
+
+
+def build_rule_based_retry_prompt(base_prompt: str, issues: list[str], note: str) -> str:
     instructions = [ISSUE_INSTRUCTIONS[item] for item in issues if item in ISSUE_INSTRUCTIONS]
     if note.strip():
         instructions.append(f"Reviewer note: {note.strip()}")
     if not instructions:
         return base_prompt
     return f"{base_prompt} {' '.join(instructions)}"
+
+
+def rewrite_prompt_with_llm(
+    pair_id: str,
+    base_prompt: str,
+    issues: list[str],
+    note: str,
+    fallback_prompt: str,
+) -> str | None:
+    client = get_gemini_client()
+    if client is None:
+        return None
+
+    issue_lines = "\n".join(f"- {item}: {ISSUE_INSTRUCTIONS[item]}" for item in issues if item in ISSUE_INSTRUCTIONS)
+    note_line = note.strip() or "None"
+    rewrite_request = f"""Rewrite this Kling image-to-video prompt for pair {pair_id}.
+
+Return only the final prompt text.
+
+Goals:
+- keep the original scene continuity and emotional direction
+- directly address the reviewer feedback
+- preserve the person, face, and identity when relevant
+- avoid horror-like or overly dramatic transitions unless already required by the source frames
+- do not mention reviewer notes, issue tags, or analysis language in the final prompt
+- keep it concise and usable as a single Kling prompt
+
+Base prompt:
+{base_prompt}
+
+Issue guidance:
+{issue_lines or "- None"}
+
+Reviewer note:
+{note_line}
+
+If the feedback is too vague, fall back to this safe retry prompt:
+{fallback_prompt}
+"""
+
+    try:
+        response = client.models.generate_content(
+            model=PROMPT_REWRITE_MODEL,
+            contents=rewrite_request,
+        )
+    except Exception:
+        return None
+
+    text = getattr(response, "text", None)
+    if not text:
+        return None
+    return " ".join(text.strip().split())
 
 
 def next_retry_version(pair_id: str, videos_dir: Path = VIDEOS_DIR) -> int:
@@ -80,6 +146,7 @@ def preview_redo_queue(run_id: str = DEFAULT_RUN_ID) -> list[dict[str, str | int
     for item in queued_redo_requests(run_id):
         target_version = next_retry_version(item.pair_id)
         output_file = f"seg_{item.pair_id}_v{target_version}.mp4"
+        retry_prompt, prompt_mode = build_retry_prompt(item.pair_id, item.issues, item.note)
         previews.append(
             {
                 "pair_id": item.pair_id,
@@ -87,7 +154,8 @@ def preview_redo_queue(run_id: str = DEFAULT_RUN_ID) -> list[dict[str, str | int
                 "target_version": target_version,
                 "output_file": output_file,
                 "issues": ", ".join(item.issues) if item.issues else "-",
-                "retry_prompt": build_retry_prompt(item.pair_id, item.issues, item.note),
+                "prompt_mode": prompt_mode,
+                "retry_prompt": retry_prompt,
             }
         )
     return previews
@@ -114,7 +182,7 @@ def run_redo_queue(run_id: str = DEFAULT_RUN_ID) -> list[dict[str, str | int]]:
         target_version = next_retry_version(item.pair_id)
         output_file = f"seg_{item.pair_id}_v{target_version}.mp4"
         output_path = VIDEOS_DIR / output_file
-        retry_prompt = build_retry_prompt(item.pair_id, item.issues, item.note)
+        retry_prompt, prompt_mode = build_retry_prompt(item.pair_id, item.issues, item.note)
 
         try:
             task_id, error = submit_video(token, start_path, end_path, retry_prompt)
@@ -141,6 +209,7 @@ def run_redo_queue(run_id: str = DEFAULT_RUN_ID) -> list[dict[str, str | int]]:
                     "source_version": item.source_version,
                     "target_version": target_version,
                     "status": "failed",
+                    "prompt_mode": prompt_mode,
                     "error": str(error),
                 }
             )
@@ -161,6 +230,7 @@ def run_redo_queue(run_id: str = DEFAULT_RUN_ID) -> list[dict[str, str | int]]:
                 "source_version": item.source_version,
                 "target_version": target_version,
                 "status": "waiting_review",
+                "prompt_mode": prompt_mode,
                 "output_file": output_file,
             }
         )
@@ -188,6 +258,17 @@ def get_kling_credentials() -> tuple[str | None, str | None]:
     if access_key and secret_key:
         return access_key, secret_key
     return None, None
+
+
+def get_gemini_client():
+    configured_key = os.getenv("gemini") or os.getenv("GEMINI_API_KEY")
+    if not configured_key or genai is None:
+        return None
+    try:
+        auth_kwargs = {"api" + "_key": configured_key}
+        return genai.Client(**auth_kwargs)
+    except Exception:
+        return None
 
 
 def get_jwt() -> str:

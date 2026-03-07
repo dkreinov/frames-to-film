@@ -494,6 +494,7 @@ def render_redo_queue(redo_requests, review_lookup, winners, run_id: str) -> Non
                     "from": f"v{item['source_version']}",
                     "to": f"v{item['target_version']}",
                     "output_file": item["output_file"],
+                    "prompt_mode": item["prompt_mode"],
                     "issues": item["issues"],
                 }
                 for item in preview_rows

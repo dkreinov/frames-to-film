@@ -41,6 +41,7 @@ The review app now also includes the in-app Kling retry runner, so the review en
 - `streamlit`
 - `requests`
 - `python-dotenv`
+- `google-genai`
 
 ## Run
 
@@ -74,6 +75,7 @@ The `Redo queue` tab now has two controls:
 - `Run queued retries`: sends only `queued` items to Kling
 
 To actually run queued retries, your `.env` must contain valid Kling credentials.
+If your `.env` also contains a `gemini` or `GEMINI_API_KEY` value, the retry prompt is first rewritten by Gemini from the base pair prompt plus the review feedback. If no Gemini key is available, the app falls back to the rule-based retry prompt builder.
 
 Important behavior:
 
@@ -106,6 +108,6 @@ This prevents the queue from looping on already-generated retries.
 
 ## Notes
 
-- The app does not submit new Kling jobs yet.
-- The redo queue is a handoff for the next regeneration pass.
+- The app can preview and submit queued retries to Kling.
+- The retry prompt uses Gemini rewrite first when available, then falls back to the local rule-based prompt builder.
 - The tool is local-first and stores data in JSON, not a database.
