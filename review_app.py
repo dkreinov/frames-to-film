@@ -1081,66 +1081,6 @@ def render_redo_queue(redo_requests, review_lookup, winners, run_id: str) -> Non
             help="Choose exactly which queued retries to preview or run.",
         )
 
-    if selected_queue_keys:
-        st.markdown("**Prompt override**")
-        st.caption(
-            "Paste a custom prompt from any LLM. If you apply the override, "
-            "this retry will use it instead of the automatic rewrite."
-        )
-        for key in selected_queue_keys:
-            item = queued_request_by_key[key]
-            with st.expander(f"{item.pair_id} custom prompt", expanded=False):
-                override_key = f"prompt-override-{item.pair_id}-{item.source_version}"
-                draft_prompt = st.text_area(
-                    "Custom prompt override",
-                    value=item.prompt_override,
-                    key=override_key,
-                    height=140,
-                    placeholder="Paste the exact prompt to use for this retry.",
-                )
-                if item.prompt_override:
-                    st.info("A manual prompt override is active for this retry.")
-                else:
-                    st.caption("No manual override is active. The automatic rewrite will be used.")
-
-                override_cols = st.columns(2, gap="medium")
-                if override_cols[0].button(
-                    "Apply prompt override",
-                    key=f"apply-override-{item.pair_id}-{item.source_version}",
-                    use_container_width=True,
-                ):
-                    if draft_prompt.strip():
-                        set_redo_prompt_override(
-                            item.pair_id,
-                            item.source_version,
-                            draft_prompt,
-                            run_id=run_id,
-                        )
-                        st.session_state.redo_preview = []
-                        st.session_state.redo_results = []
-                        st.session_state.redo_run_error = ""
-                        st.session_state.review_notice = (
-                            f"Applied a manual prompt override for {item.pair_id}."
-                        )
-                        st.rerun()
-                    else:
-                        st.warning("Paste a custom prompt first, or use Clear prompt override.")
-
-                if override_cols[1].button(
-                    "Clear prompt override",
-                    key=f"clear-override-{item.pair_id}-{item.source_version}",
-                    use_container_width=True,
-                    disabled=not item.prompt_override,
-                ):
-                    set_redo_prompt_override(item.pair_id, item.source_version, "", run_id=run_id)
-                    st.session_state.redo_preview = []
-                    st.session_state.redo_results = []
-                    st.session_state.redo_run_error = ""
-                    st.session_state.review_notice = (
-                        f"Cleared the manual prompt override for {item.pair_id}."
-                    )
-                    st.rerun()
-
     control_cols = st.columns([1, 1, 1.2], gap="large")
     if control_cols[0].button("Preview queued retries", use_container_width=True):
         if not selected_queue_keys:
@@ -1188,7 +1128,63 @@ def render_redo_queue(redo_requests, review_lookup, winners, run_id: str) -> Non
         )
         for item in preview_rows:
             with st.expander(f"{item['pair_id']} retry prompt", expanded=False):
-                st.write(item["retry_prompt"])
+                queue_key = redo_request_key(item["pair_id"], item["source_version"])
+                queued_item = queued_request_by_key.get(queue_key)
+                active_override = queued_item.prompt_override if queued_item else ""
+                edit_default = active_override or item["retry_prompt"]
+
+                st.caption(
+                    "Edit this prompt if you want. The prompt stays automatic until you press the override button."
+                )
+                edited_prompt = st.text_area(
+                    "Editable retry prompt",
+                    value=edit_default,
+                    key=f"editable-override-{item['pair_id']}-{item['source_version']}",
+                    height=160,
+                )
+
+                if active_override:
+                    st.info("Manual override is active for this retry.")
+                else:
+                    st.caption("Automatic rewrite is active for this retry.")
+
+                prompt_cols = st.columns(2, gap="medium")
+                if prompt_cols[0].button(
+                    "Use edited prompt as override",
+                    key=f"use-edited-override-{item['pair_id']}-{item['source_version']}",
+                    use_container_width=True,
+                ):
+                    if edited_prompt.strip():
+                        set_redo_prompt_override(
+                            item["pair_id"],
+                            item["source_version"],
+                            edited_prompt,
+                            run_id=run_id,
+                        )
+                        st.session_state.redo_preview = preview_redo_queue(run_id, set(selected_queue_keys))
+                        st.session_state.redo_results = []
+                        st.session_state.redo_run_error = ""
+                        st.session_state.review_notice = (
+                            f"Manual prompt override is now active for {item['pair_id']}."
+                        )
+                        st.rerun()
+                    else:
+                        st.warning("Edit the prompt first, or return to the automatic prompt.")
+
+                if prompt_cols[1].button(
+                    "Return to automatic prompt",
+                    key=f"clear-edited-override-{item['pair_id']}-{item['source_version']}",
+                    use_container_width=True,
+                    disabled=not active_override,
+                ):
+                    set_redo_prompt_override(item["pair_id"], item["source_version"], "", run_id=run_id)
+                    st.session_state.redo_preview = preview_redo_queue(run_id, set(selected_queue_keys))
+                    st.session_state.redo_results = []
+                    st.session_state.redo_run_error = ""
+                    st.session_state.review_notice = (
+                        f"Automatic prompt restored for {item['pair_id']}."
+                    )
+                    st.rerun()
 
     result_rows = st.session_state.get("redo_results", [])
     if result_rows:
