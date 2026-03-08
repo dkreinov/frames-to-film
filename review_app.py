@@ -289,6 +289,36 @@ def inject_styles() -> None:
             background: linear-gradient(180deg, #d06a38 0%, #9f3520 100%) !important;
             color: #ffffff !important;
         }
+        [data-testid="stButton"] > button:disabled,
+        [data-testid="stFormSubmitButton"] > button:disabled,
+        button[kind="primary"]:disabled {
+            background: linear-gradient(180deg, #f3e7d8 0%, #ead7c2 100%) !important;
+            border-color: #d8b896 !important;
+            box-shadow: none !important;
+            color: #8b5e34 !important;
+            opacity: 1 !important;
+        }
+        [data-testid="stSidebar"] [data-testid="stButton"] > button {
+            background: linear-gradient(180deg, #fff3df 0%, #f4d6ad 100%);
+            border: 1px solid #d8a468;
+            box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
+            color: #5f2b11;
+            font-weight: 700;
+        }
+        [data-testid="stSidebar"] [data-testid="stButton"] > button *,
+        [data-testid="stSidebar"] [data-testid="stFormSubmitButton"] > button * {
+            color: inherit !important;
+        }
+        [data-testid="stSidebar"] [data-testid="stButton"] > button:hover {
+            background: linear-gradient(180deg, #fff7ea 0%, #f8dfbb 100%);
+            border-color: #e3af74;
+            color: #7c2d12;
+        }
+        [data-testid="stSidebar"] [data-testid="stButton"] > button:disabled {
+            background: linear-gradient(180deg, rgba(255, 247, 237, 0.18) 0%, rgba(255, 237, 213, 0.14) 100%) !important;
+            border-color: rgba(245, 158, 11, 0.18) !important;
+            color: rgba(255, 243, 224, 0.72) !important;
+        }
         [data-testid="stExpander"] {
             background: rgba(255, 252, 248, 0.9);
             border: 1px solid #efd9c6;
