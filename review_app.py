@@ -96,8 +96,16 @@ def main() -> None:
     )
     inject_styles()
 
-    st.title("Olga Movie Review")
-    st.caption("Review clips, pick the winning version, and queue retries for weak segments.")
+    st.markdown(
+        """
+        <div class="hero-banner">
+            <div class="hero-kicker">AI film review desk</div>
+            <h1>Olga Movie Review</h1>
+            <p>Review clips, compare rebuilt versions, and queue smarter retries without losing story continuity.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     review_notice = st.session_state.pop("review_notice", "")
     if review_notice:
         st.success(review_notice)
@@ -157,12 +165,48 @@ def inject_styles() -> None:
     st.markdown(
         """
         <style>
+        .stApp {
+            background:
+                radial-gradient(circle at top left, rgba(255, 237, 213, 0.75), transparent 28%),
+                radial-gradient(circle at top right, rgba(254, 226, 226, 0.65), transparent 24%),
+                linear-gradient(180deg, #fffdf8 0%, #fff8f1 100%);
+        }
+        [data-testid="stSidebar"] {
+            background: linear-gradient(180deg, #fff8ec 0%, #fffaf3 100%);
+            border-right: 1px solid #f1ddc6;
+        }
         .block-container {
             max-width: 100%;
             padding-top: 1rem;
             padding-right: 1.25rem;
             padding-bottom: 1rem;
             padding-left: 1.25rem;
+        }
+        .hero-banner {
+            background: linear-gradient(135deg, rgba(255, 248, 236, 0.98) 0%, rgba(255, 255, 255, 0.98) 56%, rgba(255, 238, 230, 0.98) 100%);
+            border: 1px solid #edd5bd;
+            border-radius: 24px;
+            box-shadow: 0 18px 45px rgba(127, 29, 29, 0.08);
+            margin-bottom: 1rem;
+            padding: 1.2rem 1.4rem 1rem;
+        }
+        .hero-banner h1 {
+            color: #1f2937;
+            letter-spacing: -0.03em;
+            margin: 0.1rem 0 0.25rem;
+        }
+        .hero-banner p {
+            color: #6b7280;
+            font-size: 1rem;
+            margin: 0;
+            max-width: 58rem;
+        }
+        .hero-kicker {
+            color: #9a3412;
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
         }
         h1 {
             margin-top: 0;
@@ -175,21 +219,74 @@ def inject_styles() -> None:
         [data-testid="stTabs"] {
             margin-top: 0.35rem;
         }
+        [data-baseweb="tab-list"] {
+            gap: 0.4rem;
+        }
+        [data-baseweb="tab"] {
+            background: rgba(255, 250, 243, 0.9);
+            border: 1px solid #efd9c6;
+            border-radius: 999px 999px 0 0;
+            padding: 0.35rem 0.9rem;
+        }
+        [aria-selected="true"][data-baseweb="tab"] {
+            background: linear-gradient(180deg, #fff2e2 0%, #fff8f0 100%);
+            border-color: #e6b17e;
+            color: #9a3412;
+        }
         [data-testid="stMetric"] {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
+            background: rgba(255, 251, 245, 0.92);
+            border: 1px solid #edd5bd;
+            border-radius: 14px;
+            box-shadow: 0 8px 24px rgba(120, 53, 15, 0.06);
             padding: 0.55rem 0.8rem;
         }
         [data-testid="stMetric"] label,
         [data-testid="stMetric"] p {
             margin-bottom: 0;
         }
+        [data-testid="stButton"] > button,
+        [data-testid="stFormSubmitButton"] > button {
+            background: linear-gradient(180deg, #fffaf4 0%, #fff3e6 100%);
+            border: 1px solid #e7c8a9;
+            border-radius: 14px;
+            box-shadow: 0 8px 18px rgba(154, 52, 18, 0.08);
+            color: #7c2d12;
+            font-weight: 600;
+        }
+        [data-testid="stButton"] > button:hover,
+        [data-testid="stFormSubmitButton"] > button:hover {
+            border-color: #dd9d67;
+            color: #9a3412;
+        }
+        button[kind="primary"] {
+            background: linear-gradient(180deg, #ef6c3d 0%, #dc5a30 100%) !important;
+            border-color: #cf4c23 !important;
+            color: #fffaf5 !important;
+        }
+        button[kind="primary"]:hover {
+            background: linear-gradient(180deg, #f07a4f 0%, #df6138 100%) !important;
+            color: #ffffff !important;
+        }
+        [data-testid="stExpander"] {
+            background: rgba(255, 252, 248, 0.9);
+            border: 1px solid #efd9c6;
+            border-radius: 18px;
+            overflow: hidden;
+        }
+        [data-testid="stExpander"] details summary {
+            background: rgba(255, 248, 239, 0.92);
+        }
+        [data-testid="stForm"] {
+            background: rgba(255, 252, 248, 0.88);
+            border: 1px solid #efd9c6;
+            border-radius: 18px;
+            padding: 0.85rem 0.95rem 0.4rem;
+        }
         .review-guide {
-            border: 1px solid #d9dde7;
-            border-radius: 12px;
+            border: 1px solid #efd9c6;
+            border-radius: 14px;
             padding: 0.75rem 0.9rem;
-            background: #f8fafc;
+            background: linear-gradient(180deg, #fff8f0 0%, #fffdf8 100%);
             margin-bottom: 0.8rem;
         }
         .review-summary {
@@ -199,12 +296,13 @@ def inject_styles() -> None:
             margin: 0.45rem 0 0.8rem;
         }
         .review-chip {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
+            background: rgba(255, 251, 245, 0.96);
+            border: 1px solid #edd5bd;
             border-radius: 999px;
-            color: #334155;
+            color: #7c2d12;
             font-size: 0.88rem;
-            padding: 0.3rem 0.65rem;
+            font-weight: 600;
+            padding: 0.32rem 0.72rem;
             white-space: nowrap;
         }
         .status-pill {
@@ -217,29 +315,31 @@ def inject_styles() -> None:
             margin-bottom: 0.5rem;
         }
         .status-unreviewed {
-            background: #edf2f7;
-            color: #334155;
+            background: #f3f4f6;
+            color: #374151;
         }
         .status-approved {
-            background: #dcfce7;
+            background: #d7f7df;
             color: #166534;
         }
         .status-redo {
-            background: #fef3c7;
-            color: #92400e;
+            background: #ffe5bf;
+            color: #9a3412;
         }
         .status-discussion {
-            background: #dbeafe;
+            background: #e4ebff;
             color: #1d4ed8;
         }
         .compare-focus-shell {
-            border: 1px solid #d9dde7;
-            border-radius: 16px;
+            border: 1px solid #efd9c6;
+            border-radius: 20px;
+            box-shadow: 0 18px 40px rgba(120, 53, 15, 0.08);
             padding: 0.85rem 1rem;
-            background: #ffffff;
+            background: linear-gradient(180deg, rgba(255, 251, 245, 0.98) 0%, rgba(255, 255, 255, 0.98) 100%);
             margin: 0.25rem 0 0.8rem;
         }
         .compare-card-label {
+            color: #7c2d12;
             font-size: 0.9rem;
             font-weight: 600;
             margin-bottom: 0.35rem;
