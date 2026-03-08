@@ -44,6 +44,16 @@ ISSUE_LABELS = {
     "prompt_ignored": "Prompt ignored",
 }
 
+STATUS_LABELS = {
+    "Needs review": "Unreviewed",
+    "Redo queued": "Needs redo",
+    "Approved": "Approved",
+    "Needs discussion": "Needs discussion",
+    "waiting_review": "New version ready",
+    "queued": "Queued to rerun",
+    "failed": "Retry failed",
+}
+
 STATUS_FILTERS = [
     "All clips",
     "Rebuilt clips",
@@ -52,6 +62,15 @@ STATUS_FILTERS = [
     "Approved",
     "Needs discussion",
 ]
+
+FILTER_LABELS = {
+    "All clips": "All clips",
+    "Rebuilt clips": "Rebuilt clips",
+    "Needs review": "Unreviewed",
+    "Redo queue": "Needs redo",
+    "Approved": "Approved",
+    "Needs discussion": "Needs discussion",
+}
 
 
 def main() -> None:
@@ -164,7 +183,12 @@ def sidebar_controls() -> tuple[str, str]:
     run_id = st.sidebar.text_input("Run ID", value=DEFAULT_RUN_ID).strip() or DEFAULT_RUN_ID
 
     st.sidebar.header("Inbox Filter")
-    status_filter = st.sidebar.selectbox("Show", options=STATUS_FILTERS, index=0)
+    status_filter = st.sidebar.selectbox(
+        "Show",
+        options=STATUS_FILTERS,
+        index=0,
+        format_func=lambda item: FILTER_LABELS[item],
+    )
 
     st.sidebar.header("How to use")
     st.sidebar.markdown(
@@ -199,8 +223,10 @@ def select_pair(pairs, pair_rows, status_filter: str):
     if st.session_state.selected_pair_choice not in visible_pair_ids:
         st.session_state.selected_pair_choice = st.session_state.selected_pair_id
 
-    button_cols = st.sidebar.columns(2)
     current_index = visible_pair_ids.index(st.session_state.selected_pair_id)
+    render_sidebar_queue_summary(pair_rows, visible_pair_ids, current_index)
+
+    button_cols = st.sidebar.columns(2)
     if button_cols[0].button("Previous", use_container_width=True, disabled=current_index == 0):
         set_selected_pair(visible_pair_ids[current_index - 1])
         st.rerun()
@@ -214,7 +240,7 @@ def select_pair(pairs, pair_rows, status_filter: str):
 
     next_review_pair = next_pair_needing_review(filtered_pair_ids, st.session_state.selected_pair_id)
     if st.sidebar.button(
-        "Jump to next needs review",
+        "Jump to next unreviewed",
         use_container_width=True,
         disabled=next_review_pair is None,
     ) and next_review_pair is not None:
@@ -269,10 +295,10 @@ def render_inbox(pair_rows, status_filter: str, selected_pair_id: str) -> None:
     unreviewed = count_rows(pair_rows, "Needs review")
 
     metric_cols = st.columns(4)
-    metric_cols[0].metric("Needs review", unreviewed)
+    metric_cols[0].metric("Unreviewed", unreviewed)
     metric_cols[1].metric("Approved", approved)
-    metric_cols[2].metric("Redo queue", redo)
-    metric_cols[3].metric("Discuss", discussion)
+    metric_cols[2].metric("Needs redo", redo)
+    metric_cols[3].metric("Needs discussion", discussion)
 
     rows = []
     for item in visible_rows:
@@ -284,7 +310,7 @@ def render_inbox(pair_rows, status_filter: str, selected_pair_id: str) -> None:
                 "winner": f"v{item['winner_version']}" if item["winner_version"] else "-",
                 "versions": item["version_count"],
                 "rebuilt": "Yes" if item["rebuilt"] else "-",
-                "status": item["status"],
+                "status": display_status(item["status"]),
                 "rating": item["rating"],
             }
         )
@@ -483,7 +509,7 @@ def render_status_banner(status: str, winner_version: int | None, selected_versi
         "Redo queued": "status-pill status-redo",
         "Needs discussion": "status-pill status-discussion",
     }
-    badge = f'<span class="{classes[status]}">{status}</span>'
+    badge = f'<span class="{classes[status]}">{display_status(status)}</span>'
     winner_text = "This version is not marked as the winner yet."
     if winner_version == selected_version:
         winner_text = "This version is currently marked as the winner."
@@ -526,11 +552,11 @@ def render_redo_queue(redo_requests, review_lookup, winners, run_id: str) -> Non
     failed_requests = [item for item in redo_requests if item.status == "failed"]
 
     metric_cols = st.columns(3)
-    metric_cols[0].metric("Queued", len(queued_requests))
-    metric_cols[1].metric("Waiting review", len(waiting_review_requests))
-    metric_cols[2].metric("Failed", len(failed_requests))
+    metric_cols[0].metric("Queued to rerun", len(queued_requests))
+    metric_cols[1].metric("New version ready", len(waiting_review_requests))
+    metric_cols[2].metric("Retry failed", len(failed_requests))
 
-    st.caption("Queued items can be sent to Kling. Waiting review items already produced a new version and will not be sent again.")
+    st.caption("Queued items can be sent to Kling. New version ready items already produced a retry and are waiting for review.")
 
     selected_queue_keys = []
     if queued_requests:
@@ -603,15 +629,15 @@ def render_redo_queue(redo_requests, review_lookup, winners, run_id: str) -> Non
         st.markdown("**Last retry run**")
         st.dataframe(result_rows, use_container_width=True, hide_index=True)
 
-    st.markdown("**Queued for Kling**")
+    st.markdown("**Queued to rerun**")
     render_redo_request_table(queued_requests, review_lookup, winners)
 
     if waiting_review_requests:
-        st.markdown("**Waiting for review**")
+        st.markdown("**New version ready**")
         render_redo_request_table(waiting_review_requests, review_lookup, winners)
 
     if failed_requests:
-        st.markdown("**Failed**")
+        st.markdown("**Retry failed**")
         render_redo_request_table(failed_requests, review_lookup, winners)
 
 
@@ -624,7 +650,7 @@ def render_redo_request_table(redo_requests, review_lookup, winners) -> None:
                 "pair": item.pair_id,
                 "source_version": f"v{item.source_version}",
                 "target_version": f"v{item.target_version}" if item.target_version else "-",
-                "status": item.status,
+                "status": display_status(item.status),
                 "issues": ", ".join(ISSUE_LABELS[tag] for tag in item.issues) if item.issues else "-",
                 "note": item.note or "-",
                 "winner": f"v{winners[item.pair_id]}" if item.pair_id in winners else "-",
@@ -666,6 +692,23 @@ def pair_status(pair_id: str, version: int, review_lookup, redo_lookup) -> str:
 
 def count_rows(pair_rows, status: str) -> int:
     return sum(1 for item in pair_rows if item["status"] == status)
+
+
+def display_status(status: str) -> str:
+    return STATUS_LABELS.get(status, status)
+
+
+def render_sidebar_queue_summary(pair_rows, visible_pair_ids, current_index: int) -> None:
+    unreviewed = count_rows(pair_rows, "Needs review")
+    redo = count_rows(pair_rows, "Redo queued")
+    rebuilt = sum(1 for item in pair_rows if item["rebuilt"])
+
+    st.sidebar.markdown("**Queue summary**")
+    summary_cols = st.sidebar.columns(2)
+    summary_cols[0].metric("Left", unreviewed)
+    summary_cols[1].metric("Needs redo", redo)
+    st.sidebar.caption(f"Rebuilt clips: {rebuilt}")
+    st.sidebar.caption(f"Showing clip {current_index + 1} of {len(visible_pair_ids)} in this filter.")
 
 
 def next_pair_needing_review(pair_rows, current_pair_id: str):

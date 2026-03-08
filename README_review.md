@@ -68,9 +68,13 @@ C:\Users\nishtiak\AppData\Local\Programs\Python\Python312\python.exe -m streamli
 7. Open the `Redo queue` tab to see the clips that should be regenerated next.
 
 Tip:
+- The sidebar labels are reviewer-focused:
+  - `Unreviewed` means the clip still needs a first pass
+  - `Needs redo` means the latest version has already been marked for another generation pass
+  - `New version ready` in the redo queue means a retried clip came back and is ready to judge
 - Use the sidebar filter `Rebuilt clips` to show only pairs that already have a retried version like `v2` or `v3`.
 
-If a retried version is still listed under `Waiting for review`, open that pair, select the retried version, and use `Accept selected version and clear waiting review`. That saves an `Approve` review for the retry and removes the stale waiting entry.
+If a retried version is still listed under `New version ready`, open that pair, select the retried version, and use `Accept selected version and clear waiting review`. That saves an `Approve` review for the retry and removes the stale waiting entry.
 
 ## Run Queued Retries From The App
 
