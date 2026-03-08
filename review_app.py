@@ -124,6 +124,7 @@ def main() -> None:
             winners,
             run_id,
             pair_rows,
+            progress_counts(pair_rows),
         )
         with st.expander("Inbox overview", expanded=False):
             render_inbox(pair_rows, status_filter, selected_pair.pair_id)
@@ -327,6 +328,7 @@ def render_review_panel(
     winners,
     run_id: str,
     pair_rows,
+    progress,
 ) -> None:
     st.subheader(pair_label(selected_pair.pair_id))
 
@@ -377,6 +379,11 @@ def render_review_panel(
 
     with main_cols[1]:
         render_status_banner(current_status, winner_version, current_clip.version)
+
+        progress_cols = st.columns(3)
+        progress_cols[0].metric("Reviewed", f"{progress['reviewed']} / {progress['total']}")
+        progress_cols[1].metric("Still unreviewed", progress["unreviewed"])
+        progress_cols[2].metric("Needs redo", progress["redo"])
 
         meta_cols = st.columns(2)
         meta_cols[0].metric("Selected version", f"v{current_clip.version}")
@@ -505,14 +512,23 @@ def render_review_panel(
                     remove_redo_request(selected_pair.pair_id, current_clip.version, run_id=run_id)
 
                 if decision == "approve":
+                    remaining_unreviewed = remaining_unreviewed_after_save(pair_rows, selected_pair.pair_id)
                     next_pair_id = next_pair_to_review(pair_rows, selected_pair.pair_id)
                     if next_pair_id is not None:
                         set_selected_pair(next_pair_id)
                         st.session_state.review_notice = (
-                            f"Saved approval for {selected_pair.pair_id}. Moved to {next_pair_id}."
+                            f"Approved {selected_pair.pair_id}. {remaining_unreviewed} clips still unreviewed. Moved to {next_pair_id}."
                         )
                     else:
-                        st.session_state.review_notice = f"Saved approval for {selected_pair.pair_id}."
+                        st.session_state.review_notice = (
+                            f"Approved {selected_pair.pair_id}. {remaining_unreviewed} clips still unreviewed."
+                        )
+                elif decision == "redo":
+                    st.session_state.review_notice = (
+                        f"Queued redo for {selected_pair.pair_id}. {progress['redo'] + 1} clips now need another pass."
+                    )
+                elif decision == "needs_discussion":
+                    st.session_state.review_notice = f"Saved discussion note for {selected_pair.pair_id}."
                 else:
                     st.session_state.review_notice = "Review saved."
                 st.rerun()
@@ -710,6 +726,31 @@ def pair_status(pair_id: str, version: int, review_lookup, redo_lookup) -> str:
 
 def count_rows(pair_rows, status: str) -> int:
     return sum(1 for item in pair_rows if item["status"] == status)
+
+
+def progress_counts(pair_rows) -> dict[str, int]:
+    total = len(pair_rows)
+    unreviewed = count_rows(pair_rows, "Needs review")
+    approved = count_rows(pair_rows, "Approved")
+    redo = count_rows(pair_rows, "Redo queued")
+    discussion = count_rows(pair_rows, "Needs discussion")
+    reviewed = total - unreviewed
+    return {
+        "total": total,
+        "reviewed": reviewed,
+        "unreviewed": unreviewed,
+        "approved": approved,
+        "redo": redo,
+        "discussion": discussion,
+    }
+
+
+def remaining_unreviewed_after_save(pair_rows, current_pair_id: str) -> int:
+    remaining = count_rows(pair_rows, "Needs review")
+    current_row = next((item for item in pair_rows if item["pair_id"] == current_pair_id), None)
+    if current_row is not None and current_row["status"] == "Needs review":
+        return max(0, remaining - 1)
+    return remaining
 
 
 def display_status(status: str) -> str:

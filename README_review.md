@@ -73,6 +73,7 @@ Tip:
   - `Needs redo` means the latest version has already been marked for another generation pass
   - `New version ready` in the redo queue means a retried clip came back and is ready to judge
 - The main review panel now hides technical details under `Advanced review options` so the decision controls stay visible.
+- The review panel shows progress counters and save messages such as how many clips are still unreviewed and which clip you moved to next.
 - Use the sidebar filter `Rebuilt clips` to show only pairs that already have a retried version like `v2` or `v3`.
 
 If a retried version is still listed under `New version ready`, open that pair, select the retried version, and use the accept button for that version. That saves an `Approve` review for the retry and removes the stale waiting entry.
