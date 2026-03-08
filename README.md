@@ -41,3 +41,5 @@ Run the app:
 ```powershell
 python -m streamlit run review_app.py
 ```
+
+The review UI now includes rebuilt-version compare mode with up to 4 videos, a larger focused compare view, and shared compare playback controls where the browser allows them. See `docs/review-app.md` for the full workflow.

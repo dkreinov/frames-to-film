@@ -64,8 +64,15 @@ C:\Users\nishtiak\AppData\Local\Programs\Python\Python312\python.exe -m streamli
 3. If the clip is usable, choose `Approve`. The primary button becomes `Approve and next`.
 4. If the clip should be regenerated, choose `Redo`, select issue tags, and add a note if needed.
 5. If you are unsure, choose `Needs discussion`.
-6. If multiple versions exist, the app opens a clearer side-by-side compare section. Review the versions there, then use the accept button for the selected version.
-7. Open the `Redo queue` tab to see the clips that should be regenerated next.
+6. If multiple versions exist, open `Compare versions side by side` to compare them before picking a winner.
+7. The compare picker supports up to 4 versions:
+   - 1 version: large single preview
+   - 2 versions: side by side
+   - 3 or 4 versions: a 2x2 compare grid
+8. Use `Open large compare view` when you want the compare videos to take over most of the review tab. Use `Back to review details` to return.
+9. The compare toolbar also attempts shared `Play all`, `Pause all`, `Restart all`, and `Fullscreen compare` controls for the visible compare videos.
+10. If your browser blocks shared media controls, use each player's native controls and fullscreen button instead.
+11. Open the `Redo queue` tab to see the clips that should be regenerated next.
 
 Tip:
 - The sidebar labels are reviewer-focused:
@@ -75,6 +82,7 @@ Tip:
 - The main review panel now hides technical details under `Advanced review options` so the decision controls stay visible.
 - The review panel shows progress counters and save messages such as how many clips are still unreviewed and which clip you moved to next.
 - Use the sidebar filter `Rebuilt clips` to show only pairs that already have a retried version like `v2` or `v3`.
+- The compare controls are local to the compare area. If the shared playback buttons do not work in your browser, the fallback is still safe: focused compare mode plus each video's built-in playback and fullscreen controls.
 
 If a retried version is still listed under `New version ready`, open that pair, select the retried version, and use the accept button for that version. That saves an `Approve` review for the retry and removes the stale waiting entry.
 

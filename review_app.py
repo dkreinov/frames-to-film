@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 from redo_runner import preview_redo_queue, redo_request_key, run_redo_queue
 from review_models import DECISIONS, ISSUE_TAGS, RedoRequest, ReviewRecord
@@ -230,6 +232,18 @@ def inject_styles() -> None:
             background: #dbeafe;
             color: #1d4ed8;
         }
+        .compare-focus-shell {
+            border: 1px solid #d9dde7;
+            border-radius: 16px;
+            padding: 0.85rem 1rem;
+            background: #ffffff;
+            margin: 0.25rem 0 0.8rem;
+        }
+        .compare-card-label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 0.35rem;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -398,6 +412,10 @@ def render_review_panel(
     version_numbers = [item.version for item in selected_pair.versions]
     version_labels = {item.version: f"v{item.version} - {item.filename}" for item in selected_pair.versions}
     default_version = selected_pair.latest_version().version
+    compare_focus_pair_id = st.session_state.get("compare_focus_pair_id")
+    if compare_focus_pair_id == selected_pair.pair_id:
+        render_compare_focus_mode(selected_pair, version_labels)
+        return
     if "selected_version_by_pair" not in st.session_state:
         st.session_state.selected_version_by_pair = {}
 
@@ -471,7 +489,7 @@ def render_review_panel(
         else:
             st.caption("Multiple versions available. Compare them if you need to choose a winner.")
             with st.expander("Compare versions side by side", expanded=waiting_review is not None):
-                compare_versions(selected_pair)
+                compare_versions(selected_pair, selected_version, version_labels)
 
         winner_button_label = "Mark selected version as winner"
         if waiting_review is not None:
@@ -628,30 +646,206 @@ def render_status_banner(status: str, winner_version: int | None, selected_versi
         winner_text = f"Winner is v{winner_version}."
     st.markdown(f"{badge} {winner_text}", unsafe_allow_html=True)
 
+def render_compare_focus_mode(selected_pair, version_labels) -> None:
+    st.markdown('<div class="compare-focus-shell">', unsafe_allow_html=True)
+    header_cols = st.columns([1, 1], gap="medium")
+    header_cols[0].markdown("**Focused compare mode**")
+    if header_cols[1].button("Back to review details", use_container_width=True):
+        st.session_state.compare_focus_pair_id = None
+        st.rerun()
+    st.caption("Review controls are hidden here so the compare videos can use more of the page.")
+    compare_versions(selected_pair, selected_pair.latest_version().version, version_labels, focused=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-def compare_versions(selected_pair) -> None:
+
+def compare_versions(selected_pair, selected_version: int, version_labels, focused: bool = False) -> None:
     version_numbers = [item.version for item in selected_pair.versions]
-    compare_cols = st.columns(2, gap="large")
-    left_version = compare_cols[0].selectbox(
-        "Compare from",
-        options=version_numbers,
-        index=0,
-        format_func=lambda version: f"v{version}",
-        key=f"left-version-{selected_pair.pair_id}",
-    )
-    right_version = compare_cols[1].selectbox(
-        "Compare to",
-        options=version_numbers,
-        index=min(1, len(version_numbers) - 1),
-        format_func=lambda version: f"v{version}",
-        key=f"right-version-{selected_pair.pair_id}",
-    )
-
     version_map = {item.version: item for item in selected_pair.versions}
-    compare_cols[0].caption(f"v{left_version} - {version_map[left_version].filename}")
-    compare_cols[0].video(str(Path(version_map[left_version].video_path)))
-    compare_cols[1].caption(f"v{right_version} - {version_map[right_version].filename}")
-    compare_cols[1].video(str(Path(version_map[right_version].video_path)))
+    selected_versions = compare_version_selection(selected_pair.pair_id, version_numbers, selected_version)
+
+    control_cols = st.columns([2.2, 1, 1], gap="medium")
+    selected_versions = control_cols[0].multiselect(
+        "Compare versions",
+        options=version_numbers,
+        default=selected_versions,
+        format_func=lambda version: version_labels[version],
+        max_selections=4,
+        key=f"compare-versions-{selected_pair.pair_id}",
+        help="Choose up to four versions to compare side by side.",
+    )
+    selected_versions = normalized_compare_selection(selected_versions, version_numbers, selected_version)
+    st.session_state.compare_versions_by_pair[selected_pair.pair_id] = selected_versions
+
+    if focused:
+        if control_cols[1].button("Exit large compare view", use_container_width=True):
+            st.session_state.compare_focus_pair_id = None
+            st.rerun()
+    else:
+        if control_cols[1].button("Open large compare view", use_container_width=True):
+            st.session_state.compare_focus_pair_id = selected_pair.pair_id
+            st.rerun()
+
+    control_cols[2].caption(f"{len(selected_versions)} selected")
+    marker_id = compare_marker_id(selected_pair.pair_id, focused)
+    render_compare_sync_controls(marker_id, focused)
+    render_compare_videos(marker_id, [version_map[version] for version in selected_versions])
+
+
+def compare_version_selection(pair_id: str, version_numbers: list[int], selected_version: int) -> list[int]:
+    if "compare_versions_by_pair" not in st.session_state:
+        st.session_state.compare_versions_by_pair = {}
+    saved_versions = st.session_state.compare_versions_by_pair.get(pair_id)
+    if saved_versions:
+        return normalized_compare_selection(saved_versions, version_numbers, selected_version)
+    return default_compare_versions(version_numbers, selected_version)
+
+
+def default_compare_versions(version_numbers: list[int], selected_version: int) -> list[int]:
+    if len(version_numbers) == 1:
+        return [version_numbers[0]]
+    if selected_version not in version_numbers:
+        return version_numbers[-2:]
+    selected_index = version_numbers.index(selected_version)
+    if selected_index == 0:
+        return version_numbers[:2]
+    return [version_numbers[selected_index - 1], selected_version]
+
+
+def normalized_compare_selection(selected_versions: list[int], version_numbers: list[int], selected_version: int) -> list[int]:
+    valid_versions = [version for version in version_numbers if version in selected_versions]
+    if not valid_versions:
+        return default_compare_versions(version_numbers, selected_version)
+    return valid_versions[:4]
+
+
+def compare_marker_id(pair_id: str, focused: bool) -> str:
+    suffix = "focus" if focused else "inline"
+    return f"compare-{pair_id.replace('_', '-')}-{suffix}"
+
+
+def render_compare_sync_controls(marker_id: str, focused: bool) -> None:
+    height = 78 if focused else 72
+    mode_label = "focused compare" if focused else "compare"
+    script = f"""
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 0.5rem 0;">
+      <button onclick="controlCompare('play')" style="padding:0.4rem 0.8rem;border-radius:999px;border:1px solid #d9dde7;background:#ffffff;cursor:pointer;">Play all</button>
+      <button onclick="controlCompare('pause')" style="padding:0.4rem 0.8rem;border-radius:999px;border:1px solid #d9dde7;background:#ffffff;cursor:pointer;">Pause all</button>
+      <button onclick="controlCompare('restart')" style="padding:0.4rem 0.8rem;border-radius:999px;border:1px solid #d9dde7;background:#ffffff;cursor:pointer;">Restart all</button>
+      <button onclick="controlCompare('fullscreen')" style="padding:0.4rem 0.8rem;border-radius:999px;border:1px solid #d9dde7;background:#ffffff;cursor:pointer;">Fullscreen compare</button>
+      <span id="compare-status" style="font-size:0.82rem;color:#475569;">Use the buttons above or each player's native controls.</span>
+    </div>
+    <script>
+    const markerId = {json.dumps(marker_id)};
+    const modeLabel = {json.dumps(mode_label)};
+    function getCompareNodes() {{
+      try {{
+        const doc = window.parent.document;
+        const start = doc.getElementById(`${{markerId}}-start`);
+        const end = doc.getElementById(`${{markerId}}-end`);
+        if (!start || !end) {{
+          return {{start: null, end: null, videos: [], container: null}};
+        }}
+        const videos = [];
+        let node = start.nextElementSibling;
+        while (node && node !== end) {{
+          videos.push(...node.querySelectorAll('video'));
+          node = node.nextElementSibling;
+        }}
+        return {{
+          start,
+          end,
+          videos,
+          container: start.closest('[data-testid="stVerticalBlock"]')
+        }};
+      }} catch (error) {{
+        return {{start: null, end: null, videos: [], container: null, error}};
+      }}
+    }}
+    function setStatus(message) {{
+      const label = document.getElementById('compare-status');
+      if (label) {{
+        label.textContent = message;
+      }}
+    }}
+    async function controlCompare(action) {{
+      const {{videos, container, error}} = getCompareNodes();
+      if (error) {{
+        setStatus(`Shared controls are unavailable in this browser. Use each player's controls instead.`);
+        return;
+      }}
+      if (!videos.length) {{
+        setStatus(`No videos found in this ${{modeLabel}} view yet.`);
+        return;
+      }}
+      if (action === 'pause') {{
+        videos.forEach((video) => video.pause());
+        setStatus(`Paused ${{videos.length}} video(s).`);
+        return;
+      }}
+      if (action === 'restart') {{
+        videos.forEach((video) => {{
+          video.pause();
+          video.currentTime = 0;
+        }});
+        const results = await Promise.allSettled(videos.map((video) => video.play()));
+        const failed = results.filter((result) => result.status === 'rejected').length;
+        setStatus(failed ? `Restarted ${{videos.length - failed}} video(s). Some browsers blocked autoplay.` : `Restarted ${{videos.length}} video(s) from the beginning.`);
+        return;
+      }}
+      if (action === 'play') {{
+        videos.forEach((video) => {{
+          if (video.currentTime < 0.05) {{
+            video.currentTime = 0;
+          }}
+        }});
+        const results = await Promise.allSettled(videos.map((video) => video.play()));
+        const failed = results.filter((result) => result.status === 'rejected').length;
+        setStatus(failed ? `Played ${{videos.length - failed}} video(s). Some browsers blocked autoplay.` : `Playing ${{videos.length}} video(s) together.`);
+        return;
+      }}
+      if (action === 'fullscreen') {{
+        if (container && container.requestFullscreen) {{
+          await container.requestFullscreen();
+          setStatus(`Opened the ${{modeLabel}} in fullscreen.`);
+        }} else {{
+          setStatus(`Fullscreen is unavailable here. Use each player's native fullscreen button.`);
+        }}
+      }}
+    }}
+    </script>
+    """
+    components.html(script, height=height)
+
+
+def render_compare_videos(marker_id: str, selected_versions) -> None:
+    st.markdown(f"<div id='{marker_id}-start'></div>", unsafe_allow_html=True)
+    total_versions = len(selected_versions)
+
+    if total_versions == 1:
+        render_compare_card(selected_versions[0], full_width=True)
+    elif total_versions == 2:
+        compare_cols = st.columns(2, gap="large")
+        for column, clip in zip(compare_cols, selected_versions, strict=False):
+            with column:
+                render_compare_card(clip)
+    else:
+        for row_start in range(0, total_versions, 2):
+            row_clips = selected_versions[row_start : row_start + 2]
+            compare_cols = st.columns(2, gap="large")
+            for index, clip in enumerate(row_clips):
+                with compare_cols[index]:
+                    render_compare_card(clip)
+    st.markdown(f"<div id='{marker_id}-end'></div>", unsafe_allow_html=True)
+
+
+def render_compare_card(clip, full_width: bool = False) -> None:
+    st.markdown(
+        f"<div class='compare-card-label'>v{clip.version} - {clip.filename}</div>",
+        unsafe_allow_html=True,
+    )
+    st.video(str(Path(clip.video_path)))
+    if full_width:
+        st.caption("Use the player's native fullscreen button for the largest single-video view.")
 
 
 def render_redo_queue(redo_requests, review_lookup, winners, run_id: str) -> None:
