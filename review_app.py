@@ -190,6 +190,21 @@ def inject_styles() -> None:
             background: #f8fafc;
             margin-bottom: 0.8rem;
         }
+        .review-summary {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.45rem;
+            margin: 0.45rem 0 0.8rem;
+        }
+        .review-chip {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 999px;
+            color: #334155;
+            font-size: 0.88rem;
+            padding: 0.3rem 0.65rem;
+            white-space: nowrap;
+        }
         .status-pill {
             display: inline-block;
             padding: 0.2rem 0.65rem;
@@ -434,17 +449,19 @@ def render_review_panel(
     with main_cols[1]:
         render_status_banner(current_status, winner_version, current_clip.version)
 
-        progress_cols = st.columns(3)
-        progress_cols[0].metric("Reviewed", f"{progress['reviewed']} / {progress['total']}")
-        progress_cols[1].metric("Still unreviewed", progress["unreviewed"])
-        progress_cols[2].metric("Needs redo", progress["redo"])
-
-        meta_cols = st.columns(2)
-        meta_cols[0].metric("Selected version", f"v{current_clip.version}")
-        meta_cols[1].metric("Winner", f"v{winner_version}" if winner_version else "Not set")
-        frame_cols = st.columns(2)
-        frame_cols[0].metric("Start frame", selected_pair.start_frame_id)
-        frame_cols[1].metric("End frame", selected_pair.end_frame_id)
+        st.markdown(
+            (
+                '<div class="review-summary">'
+                f'<span class="review-chip">Reviewed {progress["reviewed"]}/{progress["total"]}</span>'
+                f'<span class="review-chip">Unreviewed {progress["unreviewed"]}</span>'
+                f'<span class="review-chip">Needs redo {progress["redo"]}</span>'
+                f'<span class="review-chip">Selected v{current_clip.version}</span>'
+                f'<span class="review-chip">Winner {f"v{winner_version}" if winner_version else "not set"}</span>'
+                f'<span class="review-chip">Frames {selected_pair.start_frame_id} -> {selected_pair.end_frame_id}</span>'
+                "</div>"
+            ),
+            unsafe_allow_html=True,
+        )
 
         st.markdown(
             """
