@@ -740,6 +740,19 @@ def render_compare_sync_controls(marker_id: str, focused: bool) -> None:
     function getCompareNodes() {{
       try {{
         const doc = window.parent.document;
+        const frame = window.frameElement;
+        const frameContainer = frame?.parentElement?.parentElement;
+        if (frameContainer) {{
+          const scopedVideos = Array.from(frameContainer.querySelectorAll('video'));
+          if (scopedVideos.length) {{
+            return {{
+              start: null,
+              end: null,
+              videos: scopedVideos,
+              container: frameContainer
+            }};
+          }}
+        }}
         const start = doc.getElementById(`${{markerId}}-start`);
         const end = doc.getElementById(`${{markerId}}-end`);
         if (!start || !end) {{
