@@ -174,6 +174,20 @@ def remove_redo_waiting_review(pair_id: str, target_version: int, run_id: str = 
     save_redo_requests(filtered, run_id)
 
 
+def set_redo_prompt_override(
+    pair_id: str,
+    source_version: int,
+    prompt_override: str,
+    run_id: str = DEFAULT_RUN_ID,
+) -> None:
+    redo_requests = load_redo_queue(run_id)
+    for item in redo_requests:
+        if item.pair_id == pair_id and item.source_version == source_version:
+            item.prompt_override = prompt_override.strip()
+            break
+    save_redo_requests(redo_requests, run_id)
+
+
 def accept_review_version(pair_id: str, version: int, run_id: str = DEFAULT_RUN_ID, reviewed_by: str = "local-user") -> None:
     existing_review = next(
         (item for item in load_reviews(run_id) if item.pair_id == pair_id and item.version == version),

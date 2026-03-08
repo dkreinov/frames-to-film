@@ -93,6 +93,8 @@ The `Redo queue` tab now has two controls:
 - `Preview queued retries`: shows the next version number, output filename, and retry prompt before anything is submitted
 - `Run queued retries`: sends only `queued` items to Kling
 - `Queued items to run`: lets you choose which queued retries to preview or run, so you do not have to spend credits on the whole queue at once
+- `Apply prompt override`: saves a pasted custom prompt for a selected queued retry and makes it override the automatic rewrite
+- `Clear prompt override`: removes the saved manual prompt and returns that retry to the automatic rewrite flow
 
 To actually run queued retries, your `.env` must contain valid Kling credentials.
 If your `.env` also contains a `gemini` or `GEMINI_API_KEY` value, the retry prompt is first rewritten by Gemini from the base pair prompt plus the review feedback. If no Gemini key is available, the app falls back to the rule-based retry prompt builder.
@@ -102,6 +104,7 @@ Important behavior:
 - after a retry succeeds, that queue item changes from `queued` to `waiting_review`
 - `waiting_review` items stay visible in the app, but they are not sent to Kling again
 - once the new version is reviewed in the app, the old `waiting_review` entry is removed automatically
+- when a queued retry has a saved prompt override, preview and run use that manual prompt instead of the Gemini or rule-based rewrite
 
 This prevents the queue from looping on already-generated retries.
 

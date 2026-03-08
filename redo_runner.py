@@ -69,7 +69,16 @@ def queued_redo_requests(run_id: str = DEFAULT_RUN_ID, selected_keys: set[str] |
     ]
 
 
-def build_retry_prompt(pair_id: str, issues: list[str], note: str) -> tuple[str, str]:
+def build_retry_prompt(
+    pair_id: str,
+    issues: list[str],
+    note: str,
+    prompt_override: str = "",
+) -> tuple[str, str]:
+    manual_prompt = prompt_override.strip()
+    if manual_prompt:
+        return manual_prompt, "manual_override"
+
     base_prompt = PAIR_PROMPTS.get(pair_id, FALLBACK_PROMPT)
     fallback_prompt = build_rule_based_retry_prompt(base_prompt, issues, note)
     llm_prompt = rewrite_prompt_with_llm(pair_id, base_prompt, issues, note, fallback_prompt)
@@ -189,7 +198,12 @@ def preview_redo_queue(
     for item in queued_redo_requests(run_id, selected_keys):
         target_version = next_retry_version(item.pair_id)
         output_file = f"seg_{item.pair_id}_v{target_version}.mp4"
-        retry_prompt, prompt_mode = build_retry_prompt(item.pair_id, item.issues, item.note)
+        retry_prompt, prompt_mode = build_retry_prompt(
+            item.pair_id,
+            item.issues,
+            item.note,
+            item.prompt_override,
+        )
         previews.append(
             {
                 "pair_id": item.pair_id,
@@ -228,7 +242,12 @@ def run_redo_queue(
         target_version = next_retry_version(item.pair_id)
         output_file = f"seg_{item.pair_id}_v{target_version}.mp4"
         output_path = VIDEOS_DIR / output_file
-        retry_prompt, prompt_mode = build_retry_prompt(item.pair_id, item.issues, item.note)
+        retry_prompt, prompt_mode = build_retry_prompt(
+            item.pair_id,
+            item.issues,
+            item.note,
+            item.prompt_override,
+        )
 
         try:
             task_id, error = submit_video(token, start_path, end_path, retry_prompt)

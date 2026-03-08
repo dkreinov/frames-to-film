@@ -84,6 +84,7 @@ class RedoRequest:
     source_version: int
     issues: list[str] = field(default_factory=list)
     note: str = ""
+    prompt_override: str = ""
     status: str = "queued"
     queued_at: str = field(default_factory=utc_now_iso)
     target_version: int | None = None

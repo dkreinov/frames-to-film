@@ -21,6 +21,7 @@ from review_store import (
     remove_redo_request,
     remove_redo_waiting_review,
     save_review,
+    set_redo_prompt_override,
     save_winner,
 )
 
@@ -1060,6 +1061,7 @@ def render_redo_queue(redo_requests, review_lookup, winners, run_id: str) -> Non
     st.caption("Queued items can be sent to Kling. New version ready items already produced a retry and are waiting for review.")
 
     selected_queue_keys = []
+    queued_request_by_key = {}
     if queued_requests:
         options = [redo_request_key(item.pair_id, item.source_version) for item in queued_requests]
         labels = {
@@ -1068,6 +1070,9 @@ def render_redo_queue(redo_requests, review_lookup, winners, run_id: str) -> Non
             )
             for item in queued_requests
         }
+        queued_request_by_key = {
+            redo_request_key(item.pair_id, item.source_version): item for item in queued_requests
+        }
         selected_queue_keys = st.multiselect(
             "Queued items to run",
             options=options,
@@ -1075,6 +1080,66 @@ def render_redo_queue(redo_requests, review_lookup, winners, run_id: str) -> Non
             format_func=lambda key: labels[key],
             help="Choose exactly which queued retries to preview or run.",
         )
+
+    if selected_queue_keys:
+        st.markdown("**Prompt override**")
+        st.caption(
+            "Paste a custom prompt from any LLM. If you apply the override, "
+            "this retry will use it instead of the automatic rewrite."
+        )
+        for key in selected_queue_keys:
+            item = queued_request_by_key[key]
+            with st.expander(f"{item.pair_id} custom prompt", expanded=False):
+                override_key = f"prompt-override-{item.pair_id}-{item.source_version}"
+                draft_prompt = st.text_area(
+                    "Custom prompt override",
+                    value=item.prompt_override,
+                    key=override_key,
+                    height=140,
+                    placeholder="Paste the exact prompt to use for this retry.",
+                )
+                if item.prompt_override:
+                    st.info("A manual prompt override is active for this retry.")
+                else:
+                    st.caption("No manual override is active. The automatic rewrite will be used.")
+
+                override_cols = st.columns(2, gap="medium")
+                if override_cols[0].button(
+                    "Apply prompt override",
+                    key=f"apply-override-{item.pair_id}-{item.source_version}",
+                    use_container_width=True,
+                ):
+                    if draft_prompt.strip():
+                        set_redo_prompt_override(
+                            item.pair_id,
+                            item.source_version,
+                            draft_prompt,
+                            run_id=run_id,
+                        )
+                        st.session_state.redo_preview = []
+                        st.session_state.redo_results = []
+                        st.session_state.redo_run_error = ""
+                        st.session_state.review_notice = (
+                            f"Applied a manual prompt override for {item.pair_id}."
+                        )
+                        st.rerun()
+                    else:
+                        st.warning("Paste a custom prompt first, or use Clear prompt override.")
+
+                if override_cols[1].button(
+                    "Clear prompt override",
+                    key=f"clear-override-{item.pair_id}-{item.source_version}",
+                    use_container_width=True,
+                    disabled=not item.prompt_override,
+                ):
+                    set_redo_prompt_override(item.pair_id, item.source_version, "", run_id=run_id)
+                    st.session_state.redo_preview = []
+                    st.session_state.redo_results = []
+                    st.session_state.redo_run_error = ""
+                    st.session_state.review_notice = (
+                        f"Cleared the manual prompt override for {item.pair_id}."
+                    )
+                    st.rerun()
 
     control_cols = st.columns([1, 1, 1.2], gap="large")
     if control_cols[0].button("Preview queued retries", use_container_width=True):
@@ -1154,6 +1219,7 @@ def render_redo_request_table(redo_requests, review_lookup, winners) -> None:
                 "status": display_status(item.status),
                 "issues": ", ".join(ISSUE_LABELS[tag] for tag in item.issues) if item.issues else "-",
                 "note": item.note or "-",
+                "prompt_source": "Manual override" if item.prompt_override else "Auto rewrite",
                 "winner": f"v{winners[item.pair_id]}" if item.pair_id in winners else "-",
                 "decision": DECISION_LABELS.get(review.decision, "-") if review else "-",
                 "output_file": item.output_file or "-",
