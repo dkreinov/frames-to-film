@@ -61,7 +61,7 @@ C:\Users\nishtiak\AppData\Local\Programs\Python\Python312\python.exe -m streamli
 
 1. Open the app and pick a clip from the sidebar.
 2. Watch the clip and compare it with the start and end frames.
-3. If the clip is usable, choose `Approve`.
+3. If the clip is usable, choose `Approve`. The primary button becomes `Approve and next`.
 4. If the clip should be regenerated, choose `Redo`, select issue tags, and add a note if needed.
 5. If you are unsure, choose `Needs discussion`.
 6. If multiple versions exist, use `Compare versions` and mark the winning version.
@@ -72,6 +72,7 @@ Tip:
   - `Unreviewed` means the clip still needs a first pass
   - `Needs redo` means the latest version has already been marked for another generation pass
   - `New version ready` in the redo queue means a retried clip came back and is ready to judge
+- The main review panel now hides technical details under `Advanced review options` so the decision controls stay visible.
 - Use the sidebar filter `Rebuilt clips` to show only pairs that already have a retried version like `v2` or `v3`.
 
 If a retried version is still listed under `New version ready`, open that pair, select the retried version, and use `Accept selected version and clear waiting review`. That saves an `Approve` review for the retry and removes the stale waiting entry.

@@ -388,7 +388,7 @@ def render_review_panel(
         st.markdown(
             """
             <div class="review-guide">
-            Approve if the clip is ready for the final cut. Choose Redo only when the next pass needs to fix a clear problem.
+            Decide if this version is good enough, needs another try, or should be discussed.
             </div>
             """,
             unsafe_allow_html=True,
@@ -424,11 +424,7 @@ def render_review_panel(
         if queued_redo is not None:
             st.warning("This version is currently in the redo queue.")
         if waiting_review is not None:
-            st.info("This retry version is waiting for review. You can accept it from the compare tab or save an Approve review here.")
-
-        with st.expander("Current clip details", expanded=False):
-            st.write(f"File: `{current_clip.filename}`")
-            st.write(f"Path: `{current_clip.video_path}`")
+            st.info("This retried version is back. Approve it here or accept it as the winner above.")
 
         with st.form(key=f"review-form-{selected_pair.pair_id}-{current_clip.version}"):
             decision = st.radio(
@@ -444,23 +440,40 @@ def render_review_panel(
             rating_value = st.select_slider("Quality rating", options=rating_options, value=saved_rating)
 
             issue_defaults = review.issues if review else []
-            issues = st.multiselect(
-                "What went wrong?",
-                options=list(ISSUE_TAGS),
-                default=issue_defaults,
-                format_func=lambda item: ISSUE_LABELS[item],
-                placeholder="Choose one or more issue tags",
-            )
+            note_default = review.note if review else ""
+            issues: list[str] = issue_defaults
+            note = note_default
+            if decision != "approve":
+                issues = st.multiselect(
+                    "What went wrong?",
+                    options=list(ISSUE_TAGS),
+                    default=issue_defaults,
+                    format_func=lambda item: ISSUE_LABELS[item],
+                    placeholder="Choose one or more issue tags",
+                )
 
-            note = st.text_area(
-                "Optional note",
-                value=review.note if review else "",
-                placeholder="Example: face morphs in the middle, transition is too dramatic.",
-                height=120,
-            )
+                note = st.text_area(
+                    "Optional note",
+                    value=note_default,
+                    placeholder="Example: face morphs in the middle, transition is too dramatic.",
+                    height=90,
+                )
+            else:
+                st.caption("Approved clips do not need issue tags or notes.")
+                issues = []
+                note = ""
 
-            reviewed_by = st.text_input("Reviewer", value=review.reviewed_by if review else "local-user")
-            submitted = st.form_submit_button("Save review", type="primary", use_container_width=True)
+            with st.expander("Advanced review options", expanded=False):
+                reviewed_by = st.text_input("Reviewer", value=review.reviewed_by if review else "local-user")
+                st.write(f"File: `{current_clip.filename}`")
+                st.write(f"Path: `{current_clip.video_path}`")
+
+            submit_label = "Approve and next" if decision == "approve" else "Save review"
+            if decision == "redo":
+                submit_label = "Queue redo"
+            if decision == "needs_discussion":
+                submit_label = "Save discussion"
+            submitted = st.form_submit_button(submit_label, type="primary", use_container_width=True)
 
             if submitted:
                 record = ReviewRecord(
