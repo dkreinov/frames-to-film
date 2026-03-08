@@ -72,6 +72,13 @@ FILTER_LABELS = {
     "Needs discussion": "Needs discussion",
 }
 
+STATUS_SHORT_LABELS = {
+    "Needs review": "[ ]",
+    "Redo queued": "[R]",
+    "Approved": "[OK]",
+    "Needs discussion": "[?]",
+}
+
 
 def main() -> None:
     st.set_page_config(
@@ -211,12 +218,13 @@ def sidebar_controls() -> tuple[str, str]:
     st.sidebar.header("Review Run")
     run_id = st.sidebar.text_input("Run ID", value=DEFAULT_RUN_ID).strip() or DEFAULT_RUN_ID
 
-    st.sidebar.header("Inbox Filter")
-    status_filter = st.sidebar.selectbox(
+    st.sidebar.header("Quick view")
+    status_filter = st.sidebar.radio(
         "Show",
         options=STATUS_FILTERS,
         index=STATUS_FILTERS.index("Needs review"),
         format_func=lambda item: FILTER_LABELS[item],
+        label_visibility="collapsed",
     )
 
     st.sidebar.header("How to use")
@@ -280,9 +288,10 @@ def select_pair(pairs, pair_rows, status_filter: str):
     current_row = pair_row_lookup[st.session_state.selected_pair_id]
     st.sidebar.markdown("**Current clip**")
     st.sidebar.caption(
-        f"{pair_label(st.session_state.selected_pair_id)} | "
-        f"{display_status(current_row['status'])} | v{current_row['latest_version']}"
+        f"{st.session_state.selected_pair_id} | {display_status(current_row['status'])} | "
+        f"{version_summary(current_row)}"
     )
+    st.sidebar.caption("[ ] Unreviewed  [R] Needs redo  [OK] Approved  [?] Discussion")
 
     selected_pair_id = st.sidebar.radio(
         "Queue",
@@ -795,8 +804,17 @@ def display_status(status: str) -> str:
 
 
 def queue_option_label(pair_id: str, row: dict[str, str | int | bool | None]) -> str:
-    winner_text = f"winner v{row['winner_version']}" if row["winner_version"] else f"v{row['latest_version']}"
-    return f"{pair_id} | {display_status(str(row['status']))} | {winner_text}"
+    return f"{status_short(str(row['status']))} {pair_id} {version_summary(row)}"
+
+
+def status_short(status: str) -> str:
+    return STATUS_SHORT_LABELS.get(status, "[ ]")
+
+
+def version_summary(row: dict[str, str | int | bool | None]) -> str:
+    if row["winner_version"]:
+        return f"w:v{row['winner_version']}"
+    return f"v{row['latest_version']}"
 
 
 def render_sidebar_queue_summary(pair_rows, visible_pair_ids, current_index: int) -> None:
