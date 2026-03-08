@@ -41,22 +41,60 @@ def sort_key(filename):
 
 
 def get_kling_credentials():
-    """Read active Kling keys. Use KLING_ACTIVE=N with KLING_N_ACCESS_KEY/SECRET_KEY, or plain KLING_ACCESS_KEY/SECRET_KEY."""
+    """Read active Kling keys, tolerating case variants and numbered account rotation."""
+
+    def getenv_case_insensitive(name):
+        value = os.getenv(name)
+        if value:
+            return value
+
+        target = name.upper()
+        for key, candidate in os.environ.items():
+            if key.upper() == target and candidate:
+                return candidate
+        return None
+
+    def get_numbered_pair(index):
+        return (
+            getenv_case_insensitive(f'KLING_{index}_ACCESS_KEY'),
+            getenv_case_insensitive(f'KLING_{index}_SECRET_KEY'),
+        )
+
     active = os.getenv('KLING_ACTIVE', '').strip()
     if active:
-        ak = os.getenv(f'KLING_{active}_ACCESS_KEY')
-        sk = os.getenv(f'KLING_{active}_SECRET_KEY')
+        ak, sk = get_numbered_pair(active)
         if ak and sk:
             return ak, sk
-    ak = os.getenv('KLING_ACCESS_KEY')
-    sk = os.getenv('KLING_SECRET_KEY')
+
+    numbered_accounts = {}
+    for key, value in os.environ.items():
+        if not value:
+            continue
+        match = re.fullmatch(r'KLING_(\d+)_(ACCESS|SECRET)_KEY', key.upper())
+        if not match:
+            continue
+        account = numbered_accounts.setdefault(int(match.group(1)), {})
+        account[match.group(2)] = value
+
+    for index in sorted(numbered_accounts, reverse=True):
+        account = numbered_accounts[index]
+        ak = account.get('ACCESS')
+        sk = account.get('SECRET')
+        if ak and sk:
+            return ak, sk
+
+    ak = getenv_case_insensitive('KLING_ACCESS_KEY')
+    sk = getenv_case_insensitive('KLING_SECRET_KEY')
     return (ak, sk) if (ak and sk) else (None, None)
 
 
 def get_jwt():
     ak, sk = get_kling_credentials()
     if not ak or not sk:
-        sys.exit("ERROR: Set KLING_ACCESS_KEY/KLING_SECRET_KEY or KLING_ACTIVE=N and KLING_N_ACCESS_KEY/KLING_N_SECRET_KEY in .env")
+        sys.exit(
+            "ERROR: Set KLING_ACTIVE=4 with KLING_4_ACCESS_KEY/KLING_4_SECRET_KEY, "
+            "or set KLING_ACCESS_KEY/KLING_SECRET_KEY in .env."
+        )
 
     def b64url(data):
         return base64.urlsafe_b64encode(data).rstrip(b'=').decode()

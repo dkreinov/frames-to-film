@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import time
 from pathlib import Path
 
@@ -314,16 +315,50 @@ def split_pair_id(pair_id: str) -> tuple[str, str]:
     return start, end
 
 
+def _getenv_case_insensitive(name: str) -> str | None:
+    value = os.getenv(name)
+    if value:
+        return value
+
+    target = name.upper()
+    for key, candidate in os.environ.items():
+        if key.upper() == target and candidate:
+            return candidate
+    return None
+
+
+def _get_numbered_kling_credentials(index: str) -> tuple[str | None, str | None]:
+    access_key = _getenv_case_insensitive(f"KLING_{index}_ACCESS_KEY")
+    secret_key = _getenv_case_insensitive(f"KLING_{index}_SECRET_KEY")
+    return access_key, secret_key
+
+
 def get_kling_credentials() -> tuple[str | None, str | None]:
     active = os.getenv("KLING_ACTIVE", "").strip()
     if active:
-        access_key = os.getenv(f"KLING_{active}_ACCESS_KEY")
-        secret_key = os.getenv(f"KLING_{active}_SECRET_KEY")
+        access_key, secret_key = _get_numbered_kling_credentials(active)
         if access_key and secret_key:
             return access_key, secret_key
 
-    access_key = os.getenv("KLING_ACCESS_KEY")
-    secret_key = os.getenv("KLING_SECRET_KEY")
+    numbered_accounts: dict[int, dict[str, str]] = {}
+    for key, value in os.environ.items():
+        if not value:
+            continue
+        match = re.fullmatch(r"KLING_(\d+)_(ACCESS|SECRET)_KEY", key.upper())
+        if not match:
+            continue
+        account = numbered_accounts.setdefault(int(match.group(1)), {})
+        account[match.group(2)] = value
+
+    for index in sorted(numbered_accounts, reverse=True):
+        account = numbered_accounts[index]
+        access_key = account.get("ACCESS")
+        secret_key = account.get("SECRET")
+        if access_key and secret_key:
+            return access_key, secret_key
+
+    access_key = _getenv_case_insensitive("KLING_ACCESS_KEY")
+    secret_key = _getenv_case_insensitive("KLING_SECRET_KEY")
     if access_key and secret_key:
         return access_key, secret_key
     return None, None
@@ -343,7 +378,10 @@ def get_gemini_client():
 def get_jwt() -> str:
     access_key, secret_key = get_kling_credentials()
     if not access_key or not secret_key:
-        raise RuntimeError("Set Kling credentials in .env before running queued retries.")
+        raise RuntimeError(
+            "Set KLING_ACTIVE=4 with KLING_4_ACCESS_KEY/KLING_4_SECRET_KEY, "
+            "or set KLING_ACCESS_KEY/KLING_SECRET_KEY in .env before running queued retries."
+        )
 
     def b64url(data: bytes) -> str:
         return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
