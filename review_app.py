@@ -226,6 +226,19 @@ def inject_styles() -> None:
         [data-testid="stSidebar"] [role="radiogroup"] label[data-baseweb="radio"] p {
             color: #f5e1cc !important;
         }
+        [data-testid="stSidebar"] [data-testid="stMetric"],
+        [data-testid="stSidebar"] [data-testid="stMetric"] *,
+        [data-testid="stSidebar"] [data-testid="stTextInputRootContent"],
+        [data-testid="stSidebar"] [data-testid="stTextInputRootContent"] * {
+            color: #4b2e1a !important;
+        }
+        [data-testid="stSidebar"] [data-testid="stMetric"] label {
+            color: #7c5a3a !important;
+        }
+        [data-testid="stSidebar"] [data-testid="stMetricValue"] {
+            color: #7c2d12 !important;
+            font-weight: 700 !important;
+        }
         h1 {
             margin-top: 0;
             margin-bottom: 0.25rem;
