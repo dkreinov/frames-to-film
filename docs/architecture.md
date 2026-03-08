@@ -68,7 +68,7 @@ flowchart TD
     end
 
     subgraph s2["Stage 2 - 4:3 Still Preparation"]
-        B1["prepare_images.py\nlegacy blur-pad preview"]
+        B1["legacy/image_prep/prepare_images.py\nlegacy blur-pad preview"]
         B2["outpaint_images.py\ncurrent 4:3 generation path"]
         B3["outpainted/*.jpg"]
     end
@@ -79,8 +79,8 @@ flowchart TD
     end
 
     subgraph s4["Stage 4 - Kling Segments"]
-        D1["generate_videos.py\nsmall/manual test path"]
-        D2["generate_videos_v2.py\nvariant experiment path"]
+        D1["legacy/video_generation/generate_videos.py\nsmall/manual test path"]
+        D2["legacy/video_generation/generate_videos_v2.py\nvariant experiment path"]
         D3["generate_all_videos.py\nmain resumable batch path"]
         D4["image_pair_prompts.py"]
         D5["kling_test/videos/seg_*.mp4"]
@@ -175,7 +175,7 @@ Important note:
 - In other words, the current main flow for this stage is generation-focused, not judge-gated.
 
 Legacy companion:
-- `prepare_images.py` remains as a blur-pad fallback and quick preview path.
+- `legacy/image_prep/prepare_images.py` remains as a blur-pad fallback and quick preview path.
 - It is not the preferred path for the movie flow because blur-padded edges can create transition artifacts in Kling.
 
 ### Stage 3: 16:9 Story Frame Expansion
@@ -224,8 +224,8 @@ Behavior details:
 - Records submit failures and poll failures without losing prior successes.
 
 Related scripts:
-- `generate_videos.py` is the earlier small/manual script for the first pairs.
-- `generate_videos_v2.py` is a variant-testing path for prompt styles.
+- `legacy/video_generation/generate_videos.py` is the earlier small/manual script for the first pairs.
+- `legacy/video_generation/generate_videos_v2.py` is a variant-testing path for prompt styles.
 - `generate_all_videos.py` is the main batch path for the full movie.
 
 ### Stage 5: Review And Redo Loop
@@ -286,20 +286,20 @@ Behavior details:
 
 | Tool | Stage | What it does | Main input | Main output | Notes |
 |---|---|---|---|---|---|
-| `analyze_images.py` | Analysis | Inventories dimensions, EXIF orientation, and face-related metadata | root images | console output | Diagnostic only |
-| `prepare_images.py` | 4:3 prep | Creates blur-padded 4:3 previews | root images | `processed/*.jpg` | Legacy fallback |
+| `legacy/image_prep/analyze_images.py` | Analysis | Inventories dimensions, EXIF orientation, and face-related metadata | root images | console output | Diagnostic only |
+| `legacy/image_prep/prepare_images.py` | 4:3 prep | Creates blur-padded 4:3 previews | root images | `processed/*.jpg` | Legacy fallback |
 | `outpaint_images.py` | 4:3 prep | Produces 4:3 landscape stills from mixed-orientation sources | root images | `outpainted/*.jpg` | Contains inactive judge helpers in current checked-in flow |
 | `outpaint_16_9.py` | 16:9 prep | Extends numbered 4:3 stills to 16:9 Kling-ready frames | `outpainted/*.jpg` | `kling_test/*.jpg` | Main bridge into the video pipeline |
 | `image_pair_prompts.py` | Kling prompts | Stores pair-specific cinematic prompts | pair keys | prompt strings | Used by `generate_all_videos.py` |
-| `generate_videos.py` | Kling generation | Generates a small early set of pairs manually | `kling_test/*.jpg` | `segment_*.mp4` | Early test path |
-| `generate_videos_v2.py` | Kling generation | Generates prompt-style variants for small comparisons | `kling_test/*.jpg` | variant mp4 files | Experimental path |
+| `legacy/video_generation/generate_videos.py` | Kling generation | Generates a small early set of pairs manually | `kling_test/*.jpg` | `segment_*.mp4` | Early test path |
+| `legacy/video_generation/generate_videos_v2.py` | Kling generation | Generates prompt-style variants for small comparisons | `kling_test/*.jpg` | variant mp4 files | Experimental path |
 | `generate_all_videos.py` | Kling generation | Runs the resumable batch movie generation loop | `kling_test/*.jpg`, `.env`, prompt map | `seg_*.mp4`, `status.json` | Main production path |
 | `review_models.py` | Review | Defines review, redo, and winner state records | app state | in-memory models | Shared review data schema |
 | `review_store.py` | Review | Reads and writes reviews, redo queue, and winners | `pipeline_runs/<run_id>/*.json` | updated JSON state | Local review state layer |
 | `review_app.py` | Review | Streamlit UI for reviewing clips, queueing redos, and picking winners | `seg_*.mp4`, frame jpgs, review JSON | updated review JSON | Main human review tool |
 | `redo_runner.py` | Review / Kling retry | Previews queued retries, rewrites prompts, and submits retry versions | redo queue, pair prompts, `.env` | `seg_*_vN.mp4`, updated redo queue | Uses Gemini rewrite when available |
 | `concat_videos.py` | Stitch | Builds concat list and creates the full movie | `seg_*.mp4`, image sequence, ffmpeg | `full_movie.mp4` | Final assembly step |
-| `qa_report.py` | QA | Builds a comparison report for manual inspection | selected image sets | report artifact | Support tooling |
+| `legacy/image_prep/qa_report.py` | QA | Builds a comparison report for manual inspection | selected image sets | report artifact | Support tooling |
 
 ## File And Directory Roles
 

@@ -4,8 +4,10 @@ import cv2
 from io import BytesIO
 from PIL import Image
 
-SRC_DIR = os.path.dirname(os.path.abspath(__file__))
-PROC_DIR = os.path.join(SRC_DIR, "processed")
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", ".."))
+SRC_DIR = ROOT_DIR
+PROC_DIR = os.path.join(ROOT_DIR, "processed")
 REPORT_PATH = os.path.join(PROC_DIR, "qa_report.html")
 EXTENSIONS = {'.jpg', '.jpeg', '.png'}
 THUMB_W = 500

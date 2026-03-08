@@ -14,9 +14,10 @@ from dotenv import load_dotenv
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-load_dotenv(os.path.join(SCRIPT_DIR, '.env'))
+ROOT_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", ".."))
+load_dotenv(os.path.join(ROOT_DIR, '.env'))
 
-IMG_DIR = os.path.join(SCRIPT_DIR, "kling_test")
+IMG_DIR = os.path.join(ROOT_DIR, "kling_test")
 VID_DIR = os.path.join(IMG_DIR, "videos")
 
 API_BASE = "https://api.klingai.com"

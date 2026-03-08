@@ -8,8 +8,10 @@ import os
 import sys
 from PIL import Image, ImageOps
 
-SRC_DIR = os.path.dirname(os.path.abspath(__file__))
-STRIPS_DIR = os.path.join(SRC_DIR, "strips")
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", ".."))
+SRC_DIR = ROOT_DIR
+STRIPS_DIR = os.path.join(ROOT_DIR, "strips")
 
 TARGET_W, TARGET_H = 4032, 3024
 STRIP_WIDTH = 300

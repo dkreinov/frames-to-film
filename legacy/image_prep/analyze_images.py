@@ -2,7 +2,9 @@ import os
 import cv2
 from PIL import Image, ExifTags
 
-SRC_DIR = os.path.dirname(os.path.abspath(__file__))
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", ".."))
+SRC_DIR = ROOT_DIR
 EXTENSIONS = {'.jpg', '.jpeg', '.png'}
 
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')

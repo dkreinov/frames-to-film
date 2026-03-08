@@ -2,8 +2,10 @@ import os
 import sys
 from PIL import Image, ImageOps, ImageFilter, ImageEnhance
 
-SRC_DIR = os.path.dirname(os.path.abspath(__file__))
-OUT_DIR = os.path.join(SRC_DIR, "processed")
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", ".."))
+SRC_DIR = ROOT_DIR
+OUT_DIR = os.path.join(ROOT_DIR, "processed")
 TARGET_W, TARGET_H = 4032, 3024
 TARGET_RATIO = TARGET_W / TARGET_H  # 1.333...
 RATIO_TOLERANCE = 0.01

@@ -4,6 +4,9 @@ _cursor/
 __pycache__/
 outpainted/
 kling_test/
+pipeline_runs/
+processed/
+strips/
 tools/
 logs/
 log/
