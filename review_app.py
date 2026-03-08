@@ -99,7 +99,6 @@ def main() -> None:
     st.markdown(
         """
         <div class="hero-banner">
-            <div class="hero-kicker">AI film review desk</div>
             <h1>Olga Movie Review</h1>
             <p>Review clips, compare rebuilt versions, and queue smarter retries without losing story continuity.</p>
         </div>
@@ -179,7 +178,7 @@ def inject_styles() -> None:
         }
         .block-container {
             max-width: 100%;
-            padding-top: 1rem;
+            padding-top: 0.45rem;
             padding-right: 1.25rem;
             padding-bottom: 1rem;
             padding-left: 1.25rem;
@@ -188,28 +187,22 @@ def inject_styles() -> None:
             background:
                 linear-gradient(135deg, rgba(20, 24, 33, 0.96) 0%, rgba(39, 25, 18, 0.95) 54%, rgba(114, 47, 34, 0.90) 100%);
             border: 1px solid rgba(245, 158, 11, 0.22);
-            border-radius: 24px;
-            box-shadow: 0 24px 50px rgba(17, 24, 39, 0.24);
-            margin-bottom: 1rem;
-            padding: 1.35rem 1.5rem 1.1rem;
+            border-radius: 18px;
+            box-shadow: 0 18px 38px rgba(17, 24, 39, 0.18);
+            margin-bottom: 0.45rem;
+            padding: 0.9rem 1.35rem 0.8rem;
         }
         .hero-banner h1 {
             color: #fff7ed;
             letter-spacing: -0.03em;
-            margin: 0.1rem 0 0.25rem;
+            line-height: 1.02;
+            margin: 0 0 0.18rem;
         }
         .hero-banner p {
             color: rgba(255, 237, 213, 0.82);
-            font-size: 1rem;
+            font-size: 0.96rem;
             margin: 0;
             max-width: 58rem;
-        }
-        .hero-kicker {
-            color: #fdba74;
-            font-size: 0.78rem;
-            font-weight: 700;
-            letter-spacing: 0.16em;
-            text-transform: uppercase;
         }
         [data-testid="stSidebar"] h2,
         [data-testid="stSidebar"] p,
@@ -248,7 +241,7 @@ def inject_styles() -> None:
             margin-bottom: 0.75rem;
         }
         [data-testid="stTabs"] {
-            margin-top: 0.35rem;
+            margin-top: 0.05rem;
         }
         [data-baseweb="tab-list"] {
             gap: 0.4rem;
