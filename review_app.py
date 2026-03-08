@@ -170,6 +170,12 @@ def inject_styles() -> None:
                 radial-gradient(circle at top right, rgba(220, 38, 38, 0.10), transparent 22%),
                 linear-gradient(180deg, #fbf7f1 0%, #f6efe7 100%);
         }
+        [data-testid="stHeader"] {
+            display: none;
+        }
+        [data-testid="stToolbar"] {
+            display: none;
+        }
         [data-testid="stSidebar"] {
             background:
                 linear-gradient(180deg, rgba(31, 41, 55, 0.97) 0%, rgba(55, 65, 81, 0.95) 100%),
@@ -178,7 +184,7 @@ def inject_styles() -> None:
         }
         .block-container {
             max-width: 100%;
-            padding-top: 0.45rem;
+            padding-top: 0.15rem;
             padding-right: 1.25rem;
             padding-bottom: 1rem;
             padding-left: 1.25rem;
