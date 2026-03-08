@@ -79,6 +79,10 @@ def build_retry_prompt(
     if manual_prompt:
         return manual_prompt, "manual_override"
 
+    return generate_automatic_retry_prompt(pair_id, issues, note)
+
+
+def generate_automatic_retry_prompt(pair_id: str, issues: list[str], note: str) -> tuple[str, str]:
     base_prompt = PAIR_PROMPTS.get(pair_id, FALLBACK_PROMPT)
     fallback_prompt = build_rule_based_retry_prompt(base_prompt, issues, note)
     llm_prompt = rewrite_prompt_with_llm(pair_id, base_prompt, issues, note, fallback_prompt)
