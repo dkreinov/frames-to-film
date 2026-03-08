@@ -141,12 +141,40 @@ def inject_styles() -> None:
     st.markdown(
         """
         <style>
+        .block-container {
+            max-width: 100%;
+            padding-top: 1rem;
+            padding-right: 1.25rem;
+            padding-bottom: 1rem;
+            padding-left: 1.25rem;
+        }
+        h1 {
+            margin-top: 0;
+            margin-bottom: 0.25rem;
+        }
+        h3 {
+            margin-top: 0.35rem;
+            margin-bottom: 0.75rem;
+        }
+        [data-testid="stTabs"] {
+            margin-top: 0.35rem;
+        }
+        [data-testid="stMetric"] {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 0.55rem 0.8rem;
+        }
+        [data-testid="stMetric"] label,
+        [data-testid="stMetric"] p {
+            margin-bottom: 0;
+        }
         .review-guide {
             border: 1px solid #d9dde7;
             border-radius: 12px;
-            padding: 0.9rem 1rem;
+            padding: 0.75rem 0.9rem;
             background: #f8fafc;
-            margin-bottom: 1rem;
+            margin-bottom: 0.8rem;
         }
         .status-pill {
             display: inline-block;
