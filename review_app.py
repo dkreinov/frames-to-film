@@ -233,6 +233,7 @@ def select_pair(pairs, pair_rows, status_filter: str):
     filtered_pair_ids = filtered_rows(pair_rows, status_filter)
     pair_ids = [pair.pair_id for pair in pairs]
     visible_pair_ids = [row["pair_id"] for row in filtered_pair_ids]
+    pair_row_lookup = {item["pair_id"]: item for item in pair_rows}
 
     if not visible_pair_ids:
         visible_pair_ids = pair_ids
@@ -276,11 +277,19 @@ def select_pair(pairs, pair_rows, status_filter: str):
         set_selected_pair(next_review_pair)
         st.rerun()
 
-    selected_pair_id = st.sidebar.selectbox(
-        "Clip",
+    current_row = pair_row_lookup[st.session_state.selected_pair_id]
+    st.sidebar.markdown("**Current clip**")
+    st.sidebar.caption(
+        f"{pair_label(st.session_state.selected_pair_id)} | "
+        f"{display_status(current_row['status'])} | v{current_row['latest_version']}"
+    )
+
+    selected_pair_id = st.sidebar.radio(
+        "Queue",
         options=visible_pair_ids,
         key="selected_pair_choice",
-        format_func=pair_label,
+        format_func=lambda pair_id: queue_option_label(pair_id, pair_row_lookup[pair_id]),
+        label_visibility="collapsed",
     )
     st.session_state.selected_pair_id = selected_pair_id
     return next(pair for pair in pairs if pair.pair_id == selected_pair_id)
@@ -783,6 +792,11 @@ def remaining_unreviewed_after_save(pair_rows, current_pair_id: str) -> int:
 
 def display_status(status: str) -> str:
     return STATUS_LABELS.get(status, status)
+
+
+def queue_option_label(pair_id: str, row: dict[str, str | int | bool | None]) -> str:
+    winner_text = f"winner v{row['winner_version']}" if row["winner_version"] else f"v{row['latest_version']}"
+    return f"{pair_id} | {display_status(str(row['status']))} | {winner_text}"
 
 
 def render_sidebar_queue_summary(pair_rows, visible_pair_ids, current_index: int) -> None:
