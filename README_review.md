@@ -64,7 +64,7 @@ C:\Users\nishtiak\AppData\Local\Programs\Python\Python312\python.exe -m streamli
 3. If the clip is usable, choose `Approve`. The primary button becomes `Approve and next`.
 4. If the clip should be regenerated, choose `Redo`, select issue tags, and add a note if needed.
 5. If you are unsure, choose `Needs discussion`.
-6. If multiple versions exist, use `Compare versions` and mark the winning version.
+6. If multiple versions exist, the app opens a clearer side-by-side compare section. Review the versions there, then use the accept button for the selected version.
 7. Open the `Redo queue` tab to see the clips that should be regenerated next.
 
 Tip:
@@ -75,7 +75,7 @@ Tip:
 - The main review panel now hides technical details under `Advanced review options` so the decision controls stay visible.
 - Use the sidebar filter `Rebuilt clips` to show only pairs that already have a retried version like `v2` or `v3`.
 
-If a retried version is still listed under `New version ready`, open that pair, select the retried version, and use `Accept selected version and clear waiting review`. That saves an `Approve` review for the retry and removes the stale waiting entry.
+If a retried version is still listed under `New version ready`, open that pair, select the retried version, and use the accept button for that version. That saves an `Approve` review for the retry and removes the stale waiting entry.
 
 ## Run Queued Retries From The App
 

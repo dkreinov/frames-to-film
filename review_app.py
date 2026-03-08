@@ -397,12 +397,15 @@ def render_review_panel(
         if len(selected_pair.versions) == 1:
             st.caption("Only one version exists for this pair right now.")
         else:
-            with st.expander("Compare versions", expanded=False):
+            st.info("This pair has multiple versions. Compare them, then accept the best one.")
+            with st.expander("Compare versions side by side", expanded=True):
                 compare_versions(selected_pair)
 
         winner_button_label = "Mark selected version as winner"
         if waiting_review is not None:
-            winner_button_label = "Accept selected version and clear waiting review"
+            winner_button_label = f"Accept v{current_clip.version} and clear new-version-ready state"
+        elif len(selected_pair.versions) > 1:
+            winner_button_label = f"Accept v{current_clip.version} as the winner"
 
         if st.button(winner_button_label, use_container_width=True):
             save_winner(selected_pair.pair_id, current_clip.version, run_id=run_id)
@@ -535,14 +538,14 @@ def compare_versions(selected_pair) -> None:
     version_numbers = [item.version for item in selected_pair.versions]
     compare_cols = st.columns(2, gap="large")
     left_version = compare_cols[0].selectbox(
-        "Left version",
+        "Compare from",
         options=version_numbers,
         index=0,
         format_func=lambda version: f"v{version}",
         key=f"left-version-{selected_pair.pair_id}",
     )
     right_version = compare_cols[1].selectbox(
-        "Right version",
+        "Compare to",
         options=version_numbers,
         index=min(1, len(version_numbers) - 1),
         format_func=lambda version: f"v{version}",
@@ -550,7 +553,9 @@ def compare_versions(selected_pair) -> None:
     )
 
     version_map = {item.version: item for item in selected_pair.versions}
+    compare_cols[0].caption(f"v{left_version} - {version_map[left_version].filename}")
     compare_cols[0].video(str(Path(version_map[left_version].video_path)))
+    compare_cols[1].caption(f"v{right_version} - {version_map[right_version].filename}")
     compare_cols[1].video(str(Path(version_map[right_version].video_path)))
 
 
