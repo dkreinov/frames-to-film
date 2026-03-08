@@ -841,8 +841,7 @@ def compare_versions(selected_pair, selected_version: int, version_labels, focus
     version_map = {item.version: item for item in selected_pair.versions}
     selected_versions = compare_version_selection(selected_pair.pair_id, version_numbers, selected_version)
 
-    control_cols = st.columns([2.65, 1.45, 0.9], gap="medium")
-    selected_versions = control_cols[0].multiselect(
+    selected_versions = st.multiselect(
         "Compare versions",
         options=version_numbers,
         default=selected_versions,
@@ -854,16 +853,17 @@ def compare_versions(selected_pair, selected_version: int, version_labels, focus
     selected_versions = normalized_compare_selection(selected_versions, version_numbers, selected_version)
     st.session_state.compare_versions_by_pair[selected_pair.pair_id] = selected_versions
 
+    action_cols = st.columns([1.1, 0.42], gap="small")
     if focused:
-        if control_cols[1].button("Exit compare view", use_container_width=False):
+        if action_cols[0].button("Exit compare view", use_container_width=True):
             st.session_state.compare_focus_pair_id = None
             st.rerun()
     else:
-        if control_cols[1].button("Open compare view", use_container_width=False):
+        if action_cols[0].button("Open compare view", use_container_width=True):
             st.session_state.compare_focus_pair_id = selected_pair.pair_id
             st.rerun()
 
-    control_cols[2].markdown(
+    action_cols[1].markdown(
         f"<div class='compare-count'>{len(selected_versions)} selected</div>",
         unsafe_allow_html=True,
     )
