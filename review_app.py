@@ -44,6 +44,12 @@ ISSUE_LABELS = {
     "prompt_ignored": "Prompt ignored",
 }
 
+ISSUE_GROUPS = [
+    ("Face and identity", ["face_bad", "identity_drift", "hands_body_bad", "emotion_wrong"]),
+    ("Transition and motion", ["transition_bad", "too_fast", "too_slow"]),
+    ("Scene and style", ["scenario_wrong", "background_wrong", "style_mismatch", "prompt_ignored", "artifacts"]),
+]
+
 STATUS_LABELS = {
     "Needs review": "Unreviewed",
     "Redo queued": "Needs redo",
@@ -482,14 +488,16 @@ def render_review_panel(
         if waiting_review is not None:
             st.info("This retried version is back. Approve it here or accept it as the winner above.")
 
+        decision = st.radio(
+            "Decision",
+            options=DECISIONS,
+            index=DECISIONS.index(review.decision) if review else 0,
+            format_func=lambda item: DECISION_LABELS[item],
+            horizontal=True,
+            key=f"decision-{selected_pair.pair_id}-{current_clip.version}",
+        )
+
         with st.form(key=f"review-form-{selected_pair.pair_id}-{current_clip.version}"):
-            decision = st.radio(
-                "Decision",
-                options=DECISIONS,
-                index=DECISIONS.index(review.decision) if review else 0,
-                format_func=lambda item: DECISION_LABELS[item],
-                horizontal=True,
-            )
 
             rating_options = ["-"] + [str(number) for number in range(1, 6)]
             saved_rating = str(review.rating) if review and review.rating is not None else "5"
@@ -500,13 +508,8 @@ def render_review_panel(
             issues: list[str] = issue_defaults
             note = note_default
             if decision != "approve":
-                issues = st.multiselect(
-                    "What went wrong?",
-                    options=list(ISSUE_TAGS),
-                    default=issue_defaults,
-                    format_func=lambda item: ISSUE_LABELS[item],
-                    placeholder="Choose one or more issue tags",
-                )
+                st.caption("What needs fixing?")
+                issues = render_issue_group_inputs(selected_pair.pair_id, current_clip.version, issue_defaults)
 
                 note = st.text_area(
                     "Optional note",
@@ -805,6 +808,22 @@ def display_status(status: str) -> str:
 
 def queue_option_label(pair_id: str, row: dict[str, str | int | bool | None]) -> str:
     return f"{status_short(str(row['status']))} {pair_id} {version_summary(row)}"
+
+
+def render_issue_group_inputs(pair_id: str, version: int, issue_defaults: list[str]) -> list[str]:
+    selected: list[str] = []
+    for group_name, group_issues in ISSUE_GROUPS:
+        defaults = [item for item in issue_defaults if item in group_issues]
+        group_selected = st.multiselect(
+            group_name,
+            options=group_issues,
+            default=defaults,
+            format_func=lambda item: ISSUE_LABELS[item],
+            key=f"issues-{pair_id}-{version}-{group_name}",
+            placeholder="Choose any that apply",
+        )
+        selected.extend(group_selected)
+    return selected
 
 
 def status_short(status: str) -> str:
