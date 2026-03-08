@@ -167,13 +167,15 @@ def inject_styles() -> None:
         <style>
         .stApp {
             background:
-                radial-gradient(circle at top left, rgba(255, 237, 213, 0.75), transparent 28%),
-                radial-gradient(circle at top right, rgba(254, 226, 226, 0.65), transparent 24%),
-                linear-gradient(180deg, #fffdf8 0%, #fff8f1 100%);
+                radial-gradient(circle at top left, rgba(180, 83, 9, 0.18), transparent 24%),
+                radial-gradient(circle at top right, rgba(220, 38, 38, 0.10), transparent 22%),
+                linear-gradient(180deg, #fbf7f1 0%, #f6efe7 100%);
         }
         [data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #fff8ec 0%, #fffaf3 100%);
-            border-right: 1px solid #f1ddc6;
+            background:
+                linear-gradient(180deg, rgba(31, 41, 55, 0.97) 0%, rgba(55, 65, 81, 0.95) 100%),
+                linear-gradient(180deg, #231815 0%, #2f241f 100%);
+            border-right: 1px solid rgba(245, 158, 11, 0.18);
         }
         .block-container {
             max-width: 100%;
@@ -183,30 +185,46 @@ def inject_styles() -> None:
             padding-left: 1.25rem;
         }
         .hero-banner {
-            background: linear-gradient(135deg, rgba(255, 248, 236, 0.98) 0%, rgba(255, 255, 255, 0.98) 56%, rgba(255, 238, 230, 0.98) 100%);
-            border: 1px solid #edd5bd;
+            background:
+                linear-gradient(135deg, rgba(20, 24, 33, 0.96) 0%, rgba(39, 25, 18, 0.95) 54%, rgba(114, 47, 34, 0.90) 100%);
+            border: 1px solid rgba(245, 158, 11, 0.22);
             border-radius: 24px;
-            box-shadow: 0 18px 45px rgba(127, 29, 29, 0.08);
+            box-shadow: 0 24px 50px rgba(17, 24, 39, 0.24);
             margin-bottom: 1rem;
-            padding: 1.2rem 1.4rem 1rem;
+            padding: 1.35rem 1.5rem 1.1rem;
         }
         .hero-banner h1 {
-            color: #1f2937;
+            color: #fff7ed;
             letter-spacing: -0.03em;
             margin: 0.1rem 0 0.25rem;
         }
         .hero-banner p {
-            color: #6b7280;
+            color: rgba(255, 237, 213, 0.82);
             font-size: 1rem;
             margin: 0;
             max-width: 58rem;
         }
         .hero-kicker {
-            color: #9a3412;
+            color: #fdba74;
             font-size: 0.78rem;
             font-weight: 700;
             letter-spacing: 0.16em;
             text-transform: uppercase;
+        }
+        [data-testid="stSidebar"] h2,
+        [data-testid="stSidebar"] p,
+        [data-testid="stSidebar"] label,
+        [data-testid="stSidebar"] span,
+        [data-testid="stSidebar"] div {
+            color: #f8e7d3;
+        }
+        [data-testid="stSidebar"] input {
+            background: rgba(255, 248, 240, 0.08) !important;
+            border: 1px solid rgba(251, 191, 36, 0.16) !important;
+            color: #fff7ed !important;
+        }
+        [data-testid="stSidebar"] [role="radiogroup"] label[data-baseweb="radio"] p {
+            color: #f5e1cc !important;
         }
         h1 {
             margin-top: 0;
@@ -246,25 +264,29 @@ def inject_styles() -> None:
         }
         [data-testid="stButton"] > button,
         [data-testid="stFormSubmitButton"] > button {
-            background: linear-gradient(180deg, #fffaf4 0%, #fff3e6 100%);
-            border: 1px solid #e7c8a9;
+            background: linear-gradient(180deg, #fffaf4 0%, #fff1df 100%);
+            border: 1px solid #ddb791;
             border-radius: 14px;
-            box-shadow: 0 8px 18px rgba(154, 52, 18, 0.08);
+            box-shadow: 0 10px 22px rgba(120, 53, 15, 0.10);
             color: #7c2d12;
             font-weight: 600;
+            min-height: 46px;
+            padding: 0.65rem 1rem;
+            white-space: nowrap;
         }
         [data-testid="stButton"] > button:hover,
         [data-testid="stFormSubmitButton"] > button:hover {
-            border-color: #dd9d67;
+            background: linear-gradient(180deg, #fff5e8 0%, #ffe8cf 100%);
+            border-color: #d48a50;
             color: #9a3412;
         }
         button[kind="primary"] {
-            background: linear-gradient(180deg, #ef6c3d 0%, #dc5a30 100%) !important;
-            border-color: #cf4c23 !important;
+            background: linear-gradient(180deg, #c85a2b 0%, #8f2d18 100%) !important;
+            border-color: #7f1d1d !important;
             color: #fffaf5 !important;
         }
         button[kind="primary"]:hover {
-            background: linear-gradient(180deg, #f07a4f 0%, #df6138 100%) !important;
+            background: linear-gradient(180deg, #d06a38 0%, #9f3520 100%) !important;
             color: #ffffff !important;
         }
         [data-testid="stExpander"] {
@@ -331,11 +353,11 @@ def inject_styles() -> None:
             color: #1d4ed8;
         }
         .compare-focus-shell {
-            border: 1px solid #efd9c6;
+            border: 1px solid rgba(180, 83, 9, 0.18);
             border-radius: 20px;
-            box-shadow: 0 18px 40px rgba(120, 53, 15, 0.08);
+            box-shadow: 0 22px 48px rgba(17, 24, 39, 0.14);
             padding: 0.85rem 1rem;
-            background: linear-gradient(180deg, rgba(255, 251, 245, 0.98) 0%, rgba(255, 255, 255, 0.98) 100%);
+            background: linear-gradient(180deg, rgba(255, 250, 245, 0.98) 0%, rgba(255, 255, 255, 0.99) 100%);
             margin: 0.25rem 0 0.8rem;
         }
         .compare-card-label {
@@ -343,6 +365,20 @@ def inject_styles() -> None:
             font-size: 0.9rem;
             font-weight: 600;
             margin-bottom: 0.35rem;
+        }
+        .compare-count {
+            align-items: center;
+            background: rgba(255, 245, 235, 0.96);
+            border: 1px solid #e7c8a9;
+            border-radius: 999px;
+            color: #9a3412;
+            display: inline-flex;
+            font-size: 0.82rem;
+            font-weight: 700;
+            justify-content: center;
+            min-height: 46px;
+            min-width: 100px;
+            padding: 0 0.85rem;
         }
         </style>
         """,
@@ -763,7 +799,7 @@ def compare_versions(selected_pair, selected_version: int, version_labels, focus
     version_map = {item.version: item for item in selected_pair.versions}
     selected_versions = compare_version_selection(selected_pair.pair_id, version_numbers, selected_version)
 
-    control_cols = st.columns([2.2, 1, 1], gap="medium")
+    control_cols = st.columns([2.65, 1.45, 0.9], gap="medium")
     selected_versions = control_cols[0].multiselect(
         "Compare versions",
         options=version_numbers,
@@ -777,15 +813,18 @@ def compare_versions(selected_pair, selected_version: int, version_labels, focus
     st.session_state.compare_versions_by_pair[selected_pair.pair_id] = selected_versions
 
     if focused:
-        if control_cols[1].button("Exit large compare view", use_container_width=True):
+        if control_cols[1].button("Exit compare view", use_container_width=False):
             st.session_state.compare_focus_pair_id = None
             st.rerun()
     else:
-        if control_cols[1].button("Open large compare view", use_container_width=True):
+        if control_cols[1].button("Open compare view", use_container_width=False):
             st.session_state.compare_focus_pair_id = selected_pair.pair_id
             st.rerun()
 
-    control_cols[2].caption(f"{len(selected_versions)} selected")
+    control_cols[2].markdown(
+        f"<div class='compare-count'>{len(selected_versions)} selected</div>",
+        unsafe_allow_html=True,
+    )
     marker_id = compare_marker_id(selected_pair.pair_id, focused)
     render_compare_sync_controls(marker_id, focused)
     render_compare_videos(marker_id, [version_map[version] for version in selected_versions])
