@@ -2,8 +2,18 @@
 
 Each key maps a transition pair (e.g. "3_to_4") to a short,
 camera-first cinematic prompt optimised for Kling 3.0 start+end-frame
-video generation.  Kling infers motion from the two frames; the prompt
-guides camera movement, mood and lighting rather than scene content.
+video generation. Kling infers motion from the two frames; the prompt
+should guide camera movement, transition behavior, and continuity rather
+than inventing a new scene.
+
+Canonical prompt shape for future rewrites:
+1. Camera move.
+2. Frame-to-frame transition behavior.
+3. Subject or identity continuity when needed.
+4. Scene, lighting, and style continuity.
+
+See docs/prompt-writing-rules.md for the exact writing rules, transition
+variants, and future face-consistency guidance.
 """
 
 FALLBACK_PROMPT = (
