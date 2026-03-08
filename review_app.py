@@ -249,13 +249,7 @@ def sidebar_controls() -> tuple[str, str]:
         label_visibility="collapsed",
     )
 
-    st.sidebar.header("How to use")
-    st.sidebar.markdown(
-        "1. Pick a clip.\n"
-        "2. Watch it and compare it to the start and end frames.\n"
-        "3. Approve it or request a redo.\n"
-        "4. Use the redo queue as the handoff for the next generation pass."
-    )
+    st.sidebar.caption("Pick a clip, review it, then save or queue a redo.")
     return run_id, status_filter
 
 
@@ -411,7 +405,7 @@ def render_review_panel(
     if selected_version not in version_numbers:
         selected_version = default_version
 
-    main_cols = st.columns([1.35, 1], gap="large")
+    main_cols = st.columns([1.55, 0.9], gap="large")
 
     with main_cols[1]:
         selected_version = st.selectbox(
@@ -475,8 +469,8 @@ def render_review_panel(
         if len(selected_pair.versions) == 1:
             st.caption("Only one version exists for this pair right now.")
         else:
-            st.info("This pair has multiple versions. Compare them, then accept the best one.")
-            with st.expander("Compare versions side by side", expanded=True):
+            st.caption("Multiple versions available. Compare them if you need to choose a winner.")
+            with st.expander("Compare versions side by side", expanded=waiting_review is not None):
                 compare_versions(selected_pair)
 
         winner_button_label = "Mark selected version as winner"
