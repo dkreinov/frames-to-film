@@ -215,7 +215,7 @@ def sidebar_controls() -> tuple[str, str]:
     status_filter = st.sidebar.selectbox(
         "Show",
         options=STATUS_FILTERS,
-        index=0,
+        index=STATUS_FILTERS.index("Needs review"),
         format_func=lambda item: FILTER_LABELS[item],
     )
 
