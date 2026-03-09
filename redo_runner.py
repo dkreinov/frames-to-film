@@ -333,7 +333,13 @@ def _get_numbered_kling_credentials(index: str) -> tuple[str | None, str | None]
     return access_key, secret_key
 
 
+def reload_kling_env() -> None:
+    load_dotenv(SCRIPT_DIR.parent / ".env", override=True)
+    load_dotenv(SCRIPT_DIR / ".env", override=True)
+
+
 def get_kling_credentials() -> tuple[str | None, str | None]:
+    reload_kling_env()
     active = os.getenv("KLING_ACTIVE", "").strip()
     if active:
         access_key, secret_key = _get_numbered_kling_credentials(active)

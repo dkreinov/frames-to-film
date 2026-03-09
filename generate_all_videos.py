@@ -40,8 +40,14 @@ def sort_key(filename):
     return (9999, base)
 
 
+def reload_kling_env():
+    load_dotenv(os.path.join(SCRIPT_DIR, '..', '.env'), override=True)
+    load_dotenv(os.path.join(SCRIPT_DIR, '.env'), override=True)
+
+
 def get_kling_credentials():
     """Read active Kling keys, tolerating case variants and numbered account rotation."""
+    reload_kling_env()
 
     def getenv_case_insensitive(name):
         value = os.getenv(name)
