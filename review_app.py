@@ -98,6 +98,7 @@ STATUS_SHORT_LABELS = {
 ROOT_DIR = Path(__file__).resolve().parent
 OUTPAINTED_DIR = ROOT_DIR / "outpainted"
 RAW_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
+DEFAULT_EXTENSION_OUTPUT_DIR = "kling_test/manual_extends"
 
 
 def main() -> None:
@@ -243,8 +244,24 @@ def discover_extension_sources(source_dir: Path) -> list[Path]:
     )
 
 
-def extension_target_path(source_path: Path, workflow: str) -> Path:
-    return ROOT_DIR / "kling_test" / source_path.name
+def resolve_extension_output_dir(folder_text: str) -> Path | None:
+    folder_text = folder_text.strip().replace("\\", "/")
+    if not folder_text:
+        folder_text = DEFAULT_EXTENSION_OUTPUT_DIR
+    relative_path = Path(folder_text)
+    if relative_path.is_absolute():
+        return None
+
+    output_dir = (ROOT_DIR / relative_path).resolve()
+    try:
+        output_dir.relative_to(ROOT_DIR.resolve())
+    except ValueError:
+        return None
+    return output_dir
+
+
+def extension_target_path(source_path: Path, output_dir: Path) -> Path:
+    return output_dir / source_path.name
 
 
 def extension_prompt_for_image(filename: str, workflow: str) -> str:
@@ -268,7 +285,7 @@ def save_uploaded_extension(uploaded_file, target_path: Path) -> None:
 
 def render_extend_images_tab() -> None:
     st.subheader("Extend images")
-    st.caption("Use the existing 16:9 outpaint prompt, generate in Gemini Web, then upload the finished image into kling_test.")
+    st.caption("Use the existing 16:9 outpaint prompt, generate in Gemini Web, then upload the finished image into your chosen output folder.")
     workflow = "16:9 from 4:3 images"
 
     image_folders = discover_image_folders()
@@ -283,6 +300,15 @@ def render_extend_images_tab() -> None:
         format_func=lambda path: str(path.relative_to(ROOT_DIR)) if path != ROOT_DIR else ".",
         help="Choose which folder of images to browse.",
     )
+    output_folder_text = st.text_input(
+        "Output folder",
+        value=DEFAULT_EXTENSION_OUTPUT_DIR,
+        help="Images are treated as the same item only when the same filename already exists in this chosen output folder.",
+    )
+    output_dir = resolve_extension_output_dir(output_folder_text)
+    if output_dir is None:
+        st.error("Output folder must be a relative path inside this project.")
+        return
 
     source_paths = discover_extension_sources(selected_folder)
     if not source_paths:
@@ -312,11 +338,11 @@ def render_extend_images_tab() -> None:
     rows = []
     for name in selected_names:
         source_path = source_lookup[name]
-        target_path = extension_target_path(source_path, workflow)
+        target_path = extension_target_path(source_path, output_dir)
         rows.append(
             {
                 "image": name,
-                "source": source_path.parent.name or ".",
+                "source": str(source_path.parent.relative_to(ROOT_DIR)) if source_path.parent != ROOT_DIR else ".",
                 "target": str(target_path.relative_to(ROOT_DIR)),
                 "status": "Ready" if target_path.exists() else "Needs extension",
             }
@@ -325,8 +351,10 @@ def render_extend_images_tab() -> None:
 
     active_name = st.selectbox("Active image", options=selected_names)
     source_path = source_lookup[active_name]
-    target_path = extension_target_path(source_path, workflow)
-    prompt_key = f"extend_prompt::{workflow}::{active_name}"
+    target_path = extension_target_path(source_path, output_dir)
+    source_key = str(source_path.relative_to(ROOT_DIR)).replace("\\", "/")
+    output_key = str(output_dir.relative_to(ROOT_DIR)).replace("\\", "/")
+    prompt_key = f"extend_prompt::{workflow}::{source_key}::{output_key}"
     if prompt_key not in st.session_state:
         st.session_state[prompt_key] = extension_prompt_for_image(active_name, workflow)
 
@@ -349,12 +377,12 @@ def render_extend_images_tab() -> None:
             "Overwrite existing saved result",
             value=False,
             disabled=not target_path.exists(),
-            key=f"extend_overwrite::{workflow}::{active_name}",
+            key=f"extend_overwrite::{workflow}::{source_key}::{output_key}",
         )
         uploaded_result = st.file_uploader(
             "Upload the extended image from Gemini",
             type=["jpg", "jpeg", "png"],
-            key=f"extend_upload::{workflow}::{active_name}",
+            key=f"extend_upload::{workflow}::{source_key}::{output_key}",
         )
         save_disabled = uploaded_result is None or (target_path.exists() and not overwrite)
         if target_path.exists() and not overwrite:
