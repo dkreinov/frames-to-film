@@ -230,10 +230,6 @@ def discover_image_folders() -> list[Path]:
     return folders
 
 
-def default_extension_folder(workflow: str) -> Path:
-    return ROOT_DIR if workflow == "4:3 from raw images" else OUTPAINTED_DIR
-
-
 def discover_extension_sources(source_dir: Path) -> list[Path]:
     if not source_dir.exists():
         return []
@@ -248,15 +244,11 @@ def discover_extension_sources(source_dir: Path) -> list[Path]:
 
 
 def extension_target_path(source_path: Path, workflow: str) -> Path:
-    if workflow == "4:3 from raw images":
-        return OUTPAINTED_DIR / source_path.name
     return ROOT_DIR / "kling_test" / source_path.name
 
 
 def extension_prompt_for_image(filename: str, workflow: str) -> str:
-    four_three_prompts, four_three_fallback, sixteen_nine_prompt = load_extension_prompt_catalog()
-    if workflow == "4:3 from raw images":
-        return four_three_prompts.get(filename, four_three_fallback)
+    _, _, sixteen_nine_prompt = load_extension_prompt_catalog()
     return sixteen_nine_prompt
 
 
@@ -276,16 +268,11 @@ def save_uploaded_extension(uploaded_file, target_path: Path) -> None:
 
 def render_extend_images_tab() -> None:
     st.subheader("Extend images")
-    st.caption("Use the existing outpaint prompts, generate in Gemini Web, then upload the finished extension back into the pipeline.")
-
-    workflow = st.radio(
-        "Workflow",
-        options=["4:3 from raw images", "16:9 from 4:3 images"],
-        horizontal=True,
-    )
+    st.caption("Use the existing 16:9 outpaint prompt, generate in Gemini Web, then upload the finished image into kling_test.")
+    workflow = "16:9 from 4:3 images"
 
     image_folders = discover_image_folders()
-    default_folder = default_extension_folder(workflow)
+    default_folder = OUTPAINTED_DIR
     folder_options = [path for path in image_folders if path.exists()]
     if default_folder not in folder_options:
         folder_options.insert(0, default_folder)

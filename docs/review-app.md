@@ -116,15 +116,14 @@ This prevents the queue from looping on already-generated retries.
 
 The `Extend images` tab is for the manual Gemini Web workflow:
 
-- choose `4:3 from raw images` to prepare files for `outpainted/`
-- choose `16:9 from 4:3 images` to prepare files for `kling_test/`
+- browse source images, typically from `outpainted/`
 - choose a source folder and pick one or more images from the preview gallery
 - open Gemini Web from the app
-- use the prefilled prompt shown for the active image
+- use the prefilled 16:9 prompt shown for the active image
 - download the finished image from Gemini
 - upload that finished image back into the app
 
-The app saves the uploaded result into the correct pipeline folder with the expected filename, so the rest of the pipeline can pick it up.
+The app saves the uploaded result into `kling_test/` with the expected filename, so the rest of the pipeline can pick it up.
 
 ## Review Decisions
 
