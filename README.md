@@ -43,3 +43,17 @@ python -m streamlit run review_app.py
 ```
 
 The review UI now includes rebuilt-version compare mode with up to 4 videos, a larger focused compare view, and shared compare playback controls where the browser allows them. See `docs/review-app.md` for the full workflow.
+## Gemini Pro Batch Extension
+
+To extend a whole folder through Gemini Web and always finish with `Redo with Pro`, use:
+
+```powershell
+C:\Users\nishtiak\AppData\Local\Programs\Python\Python312\python.exe -m pip install playwright
+C:\Users\nishtiak\AppData\Local\Programs\Python\Python312\python.exe D:\Programming\olga_movie\gemini_pro_extend.py --source-dir D:\Programming\olga_movie\Olia_continue --output-dir D:\Programming\olga_movie\Olia_continue\extend
+```
+
+Notes:
+
+- The script opens a dedicated Chrome profile under [D:\Programming\olga_movie\.gemini_chrome_profile](D:\Programming\olga_movie\.gemini_chrome_profile).
+- On the first run, log into Gemini in that browser window, then press Enter in the terminal.
+- Existing files in the output folder are skipped unless you pass `--force`.
