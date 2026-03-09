@@ -206,8 +206,35 @@ def load_extension_prompt_catalog() -> tuple[dict[str, str], str, str]:
     return four_three_prompts, four_three_fallback, sixteen_nine_prompt
 
 
-def discover_extension_sources(workflow: str) -> list[Path]:
-    source_dir = ROOT_DIR if workflow == "4:3 from raw images" else OUTPAINTED_DIR
+@st.cache_data
+def discover_image_folders() -> list[Path]:
+    excluded = {".git", ".streamlit", "_cursor", "__pycache__", "pipeline_runs", "docs", "tools"}
+    folders: list[Path] = []
+    for path in [ROOT_DIR] + sorted(
+        [
+            candidate
+            for candidate in ROOT_DIR.rglob("*")
+            if candidate.is_dir() and not any(part in excluded for part in candidate.parts)
+        ],
+        key=lambda item: str(item).lower(),
+    ):
+        try:
+            has_images = any(
+                child.is_file() and child.suffix.lower() in RAW_IMAGE_EXTENSIONS
+                for child in path.iterdir()
+            )
+        except OSError:
+            continue
+        if has_images:
+            folders.append(path)
+    return folders
+
+
+def default_extension_folder(workflow: str) -> Path:
+    return ROOT_DIR if workflow == "4:3 from raw images" else OUTPAINTED_DIR
+
+
+def discover_extension_sources(source_dir: Path) -> list[Path]:
     if not source_dir.exists():
         return []
     return sorted(
@@ -257,18 +284,40 @@ def render_extend_images_tab() -> None:
         horizontal=True,
     )
 
-    source_paths = discover_extension_sources(workflow)
+    image_folders = discover_image_folders()
+    default_folder = default_extension_folder(workflow)
+    folder_options = [path for path in image_folders if path.exists()]
+    if default_folder not in folder_options:
+        folder_options.insert(0, default_folder)
+    selected_folder = st.selectbox(
+        "Source folder",
+        options=folder_options,
+        index=folder_options.index(default_folder),
+        format_func=lambda path: str(path.relative_to(ROOT_DIR)) if path != ROOT_DIR else ".",
+        help="Choose which folder of images to browse.",
+    )
+
+    source_paths = discover_extension_sources(selected_folder)
     if not source_paths:
         st.info("No source images were found for this workflow.")
         return
 
     source_lookup = {path.name: path for path in source_paths}
-    selected_names = st.multiselect(
-        "Select images",
-        options=list(source_lookup),
-        default=[],
-        help="Pick one or more source images to prepare for extension.",
-    )
+    st.markdown("**Pick images from this folder**")
+    gallery_cols = st.columns(4)
+    selected_names: list[str] = []
+    folder_key = str(selected_folder.relative_to(ROOT_DIR)) if selected_folder != ROOT_DIR else "."
+    for index, source_path in enumerate(source_paths):
+        col = gallery_cols[index % 4]
+        with col:
+            st.image(str(source_path), caption=source_path.name, use_container_width=True)
+            selected = st.checkbox(
+                f"Use {source_path.name}",
+                key=f"extend_select::{workflow}::{folder_key}::{source_path.name}",
+            )
+            if selected:
+                selected_names.append(source_path.name)
+
     if not selected_names:
         st.info("Select at least one image to prepare a prompt and save an extended result.")
         return

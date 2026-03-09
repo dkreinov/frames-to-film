@@ -118,7 +118,7 @@ The `Extend images` tab is for the manual Gemini Web workflow:
 
 - choose `4:3 from raw images` to prepare files for `outpainted/`
 - choose `16:9 from 4:3 images` to prepare files for `kling_test/`
-- select one or more source images
+- choose a source folder and pick one or more images from the preview gallery
 - open Gemini Web from the app
 - use the prefilled prompt shown for the active image
 - download the finished image from Gemini
