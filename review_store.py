@@ -131,6 +131,8 @@ def save_review(review: ReviewRecord, run_id: str = DEFAULT_RUN_ID) -> None:
             "reviews": [item.to_dict() for item in sorted(filtered, key=_review_sort_key)],
         },
     )
+    if review.decision == "approve":
+        _clear_resolved_redo_requests(review.pair_id, review.version, run_id)
 
 
 def load_redo_queue(run_id: str = DEFAULT_RUN_ID) -> list[RedoRequest]:
@@ -287,3 +289,17 @@ def _write_json(path: Path, payload: dict) -> None:
 
 def _winners_file(run_dir: Path) -> Path:
     return run_dir / "winners.json"
+
+
+def _clear_resolved_redo_requests(pair_id: str, version: int, run_id: str) -> None:
+    redo_requests = load_redo_queue(run_id)
+    filtered = [
+        item
+        for item in redo_requests
+        if not (
+            item.pair_id == pair_id
+            and (item.source_version == version or item.target_version == version)
+        )
+    ]
+    if len(filtered) != len(redo_requests):
+        save_redo_requests(filtered, run_id)
