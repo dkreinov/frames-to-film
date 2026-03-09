@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import ast
 import json
 from pathlib import Path
 
 import streamlit as st
 import streamlit.components.v1 as components
+from PIL import Image
 
 from redo_runner import (
     generate_automatic_retry_prompt,
@@ -93,6 +95,10 @@ STATUS_SHORT_LABELS = {
     "Needs discussion": "[?]",
 }
 
+ROOT_DIR = Path(__file__).resolve().parent
+OUTPAINTED_DIR = ROOT_DIR / "outpainted"
+RAW_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
+
 
 def main() -> None:
     st.set_page_config(
@@ -142,7 +148,7 @@ def main() -> None:
 
     selected_pair = select_pair(pairs, pair_rows, status_filter)
 
-    review_tab, queue_tab = st.tabs(["Review", "Redo queue"])
+    review_tab, queue_tab, extend_tab = st.tabs(["Review", "Redo queue", "Extend images"])
     with review_tab:
         render_review_panel(
             selected_pair,
@@ -161,9 +167,166 @@ def main() -> None:
     with queue_tab:
         render_redo_queue(redo_requests, review_lookup, winners, run_id)
 
+    with extend_tab:
+        render_extend_images_tab()
+
     error_message = st.session_state.pop("redo_run_error", "")
     if error_message:
         st.error(error_message)
+
+
+@st.cache_data
+def load_extension_prompt_catalog() -> tuple[dict[str, str], str, str]:
+    four_three_prompts: dict[str, str] = {}
+    four_three_fallback = ""
+    sixteen_nine_prompt = ""
+
+    outpaint_script = ROOT_DIR / "outpaint_images.py"
+    outpaint_tree = ast.parse(outpaint_script.read_text(encoding="utf-8"))
+    for node in outpaint_tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        for target in node.targets:
+            if not isinstance(target, ast.Name):
+                continue
+            if target.id == "IMAGE_PROMPTS":
+                four_three_prompts = ast.literal_eval(node.value)
+            elif target.id == "FALLBACK_PROMPT":
+                four_three_fallback = ast.literal_eval(node.value)
+
+    wide_script = ROOT_DIR / "outpaint_16_9.py"
+    wide_tree = ast.parse(wide_script.read_text(encoding="utf-8"))
+    for node in wide_tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        for target in node.targets:
+            if isinstance(target, ast.Name) and target.id == "PROMPT":
+                sixteen_nine_prompt = ast.literal_eval(node.value)
+
+    return four_three_prompts, four_three_fallback, sixteen_nine_prompt
+
+
+def discover_extension_sources(workflow: str) -> list[Path]:
+    source_dir = ROOT_DIR if workflow == "4:3 from raw images" else OUTPAINTED_DIR
+    if not source_dir.exists():
+        return []
+    return sorted(
+        [
+            path
+            for path in source_dir.iterdir()
+            if path.is_file() and path.suffix.lower() in RAW_IMAGE_EXTENSIONS
+        ],
+        key=lambda path: path.name.lower(),
+    )
+
+
+def extension_target_path(source_path: Path, workflow: str) -> Path:
+    if workflow == "4:3 from raw images":
+        return OUTPAINTED_DIR / source_path.name
+    return ROOT_DIR / "kling_test" / source_path.name
+
+
+def extension_prompt_for_image(filename: str, workflow: str) -> str:
+    four_three_prompts, four_three_fallback, sixteen_nine_prompt = load_extension_prompt_catalog()
+    if workflow == "4:3 from raw images":
+        return four_three_prompts.get(filename, four_three_fallback)
+    return sixteen_nine_prompt
+
+
+def save_uploaded_extension(uploaded_file, target_path: Path) -> None:
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    image = Image.open(uploaded_file)
+    if target_path.suffix.lower() == ".png":
+        if image.mode not in {"RGB", "RGBA"}:
+            image = image.convert("RGBA" if "A" in image.getbands() else "RGB")
+        image.save(target_path, format="PNG")
+        return
+
+    if image.mode != "RGB":
+        image = image.convert("RGB")
+    image.save(target_path, format="JPEG", quality=95)
+
+
+def render_extend_images_tab() -> None:
+    st.subheader("Extend images")
+    st.caption("Use the existing outpaint prompts, generate in Gemini Web, then upload the finished extension back into the pipeline.")
+
+    workflow = st.radio(
+        "Workflow",
+        options=["4:3 from raw images", "16:9 from 4:3 images"],
+        horizontal=True,
+    )
+
+    source_paths = discover_extension_sources(workflow)
+    if not source_paths:
+        st.info("No source images were found for this workflow.")
+        return
+
+    source_lookup = {path.name: path for path in source_paths}
+    selected_names = st.multiselect(
+        "Select images",
+        options=list(source_lookup),
+        default=[],
+        help="Pick one or more source images to prepare for extension.",
+    )
+    if not selected_names:
+        st.info("Select at least one image to prepare a prompt and save an extended result.")
+        return
+
+    rows = []
+    for name in selected_names:
+        source_path = source_lookup[name]
+        target_path = extension_target_path(source_path, workflow)
+        rows.append(
+            {
+                "image": name,
+                "source": source_path.parent.name or ".",
+                "target": str(target_path.relative_to(ROOT_DIR)),
+                "status": "Ready" if target_path.exists() else "Needs extension",
+            }
+        )
+    st.dataframe(rows, use_container_width=True, hide_index=True)
+
+    active_name = st.selectbox("Active image", options=selected_names)
+    source_path = source_lookup[active_name]
+    target_path = extension_target_path(source_path, workflow)
+    prompt_key = f"extend_prompt::{workflow}::{active_name}"
+    if prompt_key not in st.session_state:
+        st.session_state[prompt_key] = extension_prompt_for_image(active_name, workflow)
+
+    preview_col, action_col = st.columns([1.35, 1])
+    with preview_col:
+        st.image(str(source_path), caption=f"Source: {source_path.name}", use_container_width=True)
+        if target_path.exists():
+            st.image(str(target_path), caption=f"Current saved result: {target_path.name}", use_container_width=True)
+
+    with action_col:
+        st.link_button("Open Gemini Web", "https://gemini.google.com/app", use_container_width=True)
+        st.caption(f"Target save path: `{target_path.relative_to(ROOT_DIR)}`")
+        st.text_area(
+            "Prompt for Gemini",
+            key=prompt_key,
+            height=260,
+            help="You can keep the existing prompt or edit it before using Gemini Web.",
+        )
+        overwrite = st.checkbox(
+            "Overwrite existing saved result",
+            value=False,
+            disabled=not target_path.exists(),
+            key=f"extend_overwrite::{workflow}::{active_name}",
+        )
+        uploaded_result = st.file_uploader(
+            "Upload the extended image from Gemini",
+            type=["jpg", "jpeg", "png"],
+            key=f"extend_upload::{workflow}::{active_name}",
+        )
+        save_disabled = uploaded_result is None or (target_path.exists() and not overwrite)
+        if target_path.exists() and not overwrite:
+            st.info("A saved result already exists. Tick overwrite if you want to replace it.")
+        if st.button("Save uploaded result", use_container_width=True, disabled=save_disabled):
+            save_uploaded_extension(uploaded_result, target_path)
+            st.success(f"Saved {target_path.name} to {target_path.parent.relative_to(ROOT_DIR)}.")
+            st.rerun()
 
 
 def inject_styles() -> None:

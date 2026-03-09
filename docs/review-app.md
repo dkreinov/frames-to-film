@@ -73,6 +73,7 @@ C:\Users\nishtiak\AppData\Local\Programs\Python\Python312\python.exe -m streamli
 9. The compare toolbar also attempts shared `Play all`, `Pause all`, `Restart all`, and `Fullscreen compare` controls for the visible compare videos.
 10. If your browser blocks shared media controls, use each player's native controls and fullscreen button instead.
 11. Open the `Redo queue` tab to see the clips that should be regenerated next.
+12. Open the `Extend images` tab when you want to widen still images for the pipeline without using the Gemini image API directly.
 
 Tip:
 - The sidebar labels are reviewer-focused:
@@ -110,6 +111,20 @@ Important behavior:
 - `Generate new prompt` creates a fresh automatic prompt first, so the user can review or edit it before deciding to override
 
 This prevents the queue from looping on already-generated retries.
+
+## Extend Images With Gemini Web
+
+The `Extend images` tab is for the manual Gemini Web workflow:
+
+- choose `4:3 from raw images` to prepare files for `outpainted/`
+- choose `16:9 from 4:3 images` to prepare files for `kling_test/`
+- select one or more source images
+- open Gemini Web from the app
+- use the prefilled prompt shown for the active image
+- download the finished image from Gemini
+- upload that finished image back into the app
+
+The app saves the uploaded result into the correct pipeline folder with the expected filename, so the rest of the pipeline can pick it up.
 
 ## Review Decisions
 
