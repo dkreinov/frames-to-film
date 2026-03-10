@@ -1493,39 +1493,56 @@ def render_build_movie_tab() -> None:
             st.session_state[current_image_key] = st.session_state[ordered_state_key][0]
             st.session_state[custom_order_key] = False
             st.rerun()
+        nav_cols = st.columns(2, gap="small")
+        if nav_cols[0].button("Previous still", use_container_width=True, disabled=current_index == 0):
+            st.session_state[current_image_key] = ordered_names[current_index - 1]
+            st.rerun()
+        if nav_cols[1].button("Next still", use_container_width=True, disabled=current_index == len(ordered_names) - 1):
+            st.session_state[current_image_key] = ordered_names[current_index + 1]
+            st.rerun()
 
-        current_path = source_lookup[st.session_state[current_image_key]]
-        st.image(
-            load_display_image_bytes(str(current_path), 900, image_cache_key(current_path)),
-            caption=f"Active still: {current_path.name}",
-            use_container_width=True,
+        previous_name = ordered_names[current_index - 1] if current_index > 0 else "Start of sequence"
+        next_name = ordered_names[current_index + 1] if current_index < len(ordered_names) - 1 else "End of sequence"
+        suggested_pair_label = (
+            f"{Path(current_name).stem}_to_{Path(next_name).stem}"
+            if current_index < len(ordered_names) - 1
+            else f"{Path(previous_name).stem}_to_{Path(current_name).stem}"
         )
-
-    with sequence_cols[1]:
-        st.markdown("**Add back images**")
-        excluded_names = [name for name in available_names if name not in ordered_names]
-        if excluded_names:
-            add_name = st.selectbox(
-                "Excluded images",
-                options=excluded_names,
-                key=f"build_add_image::{folder_key_text(selected_folder)}",
-                label_visibility="collapsed",
-            )
-            if st.button("Add to end", use_container_width=True, key=f"build_add_image_button::{folder_key_text(selected_folder)}"):
-                st.session_state[ordered_state_key] = ordered_names + [add_name]
-                st.session_state[current_image_key] = add_name
-                st.session_state[custom_order_key] = True
-                st.rerun()
-        else:
-            st.caption("All images in this folder are already in the sequence.")
-
         st.markdown(
             f"""
             <div class="extend-details-card">
               <div><span>Active still</span><strong>{current_name}</strong></div>
               <div><span>Position</span><strong>{current_index + 1} of {len(ordered_names)}</strong></div>
+              <div><span>Previous</span><strong>{previous_name}</strong></div>
+              <div><span>Next</span><strong>{next_name}</strong></div>
+              <div><span>Suggested transition</span><strong>{suggested_pair_label}</strong></div>
               <div><span>Sequence mode</span><strong>{'Custom order' if st.session_state[custom_order_key] else 'Natural order'}</strong></div>
-              <div><span>Folder</span><strong>{relative_folder_label(selected_folder)}</strong></div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with sequence_cols[1]:
+        with st.expander("Add back images", expanded=False):
+            excluded_names = [name for name in available_names if name not in ordered_names]
+            if excluded_names:
+                add_name = st.selectbox(
+                    "Excluded images",
+                    options=excluded_names,
+                    key=f"build_add_image::{folder_key_text(selected_folder)}",
+                    label_visibility="collapsed",
+                )
+                if st.button("Add to end", use_container_width=True, key=f"build_add_image_button::{folder_key_text(selected_folder)}"):
+                    st.session_state[ordered_state_key] = ordered_names + [add_name]
+                    st.session_state[current_image_key] = add_name
+                    st.session_state[custom_order_key] = True
+                    st.rerun()
+            else:
+                st.caption("All images in this folder are already in the sequence.")
+        st.markdown(
+            f"""
+            <div class="extend-summary-card">
+              <span>Folder</span><strong>{relative_folder_label(selected_folder)}</strong>
             </div>
             """,
             unsafe_allow_html=True,
@@ -1542,6 +1559,7 @@ def render_build_movie_tab() -> None:
                 "prompt": PAIR_PROMPTS.get(pair_key, FALLBACK_PROMPT),
             }
         )
+    suggested_preview_key = pair_rows[min(current_index, len(pair_rows) - 1)]["pair_key"] if pair_rows else ""
 
     selected_pairs_key = f"build_selected_pairs::{folder_key_text(selected_folder)}"
     saved_pair_keys = saved_state.get("selected_pair_keys", [])
@@ -1589,6 +1607,21 @@ def render_build_movie_tab() -> None:
         for row in pair_rows
         if f"seg_{row['pair_key']}.mp4" not in existing_segments
     ]
+    selected_count = len(st.session_state[selected_pairs_key])
+    missing_count = len(missing_pair_keys)
+    pair_summary_cols = st.columns(3, gap="small")
+    pair_summary_cols[0].markdown(
+        f"<div class='extend-summary-card'><span>Selected pairs</span><strong>{selected_count}</strong></div>",
+        unsafe_allow_html=True,
+    )
+    pair_summary_cols[1].markdown(
+        f"<div class='extend-summary-card'><span>Missing segments</span><strong>{missing_count}</strong></div>",
+        unsafe_allow_html=True,
+    )
+    pair_summary_cols[2].markdown(
+        f"<div class='extend-summary-card'><span>Preview focus</span><strong>{suggested_preview_key or 'None'}</strong></div>",
+        unsafe_allow_html=True,
+    )
     pair_action_cols = st.columns(3, gap="small")
     if pair_action_cols[0].button("Select all pairs", use_container_width=True, key=f"build_select_all::{folder_key_text(selected_folder)}"):
         st.session_state[selected_pairs_key] = pair_keys
@@ -1602,12 +1635,13 @@ def render_build_movie_tab() -> None:
         st.session_state[selected_pairs_key] = []
         save_build_tab_state(selected_folder, ordered_names, st.session_state[selected_pairs_key], st.session_state[custom_order_key])
         st.rerun()
-    st.multiselect(
-        "Pairs to generate",
-        options=pair_keys,
-        key=selected_pairs_key,
-        help="Choose which consecutive pairs to send to Kling from this sequence.",
-    )
+    with st.expander("Customize pair selection", expanded=False):
+        st.multiselect(
+            "Pairs to generate",
+            options=pair_keys,
+            key=selected_pairs_key,
+            help="Choose which consecutive pairs to send to Kling from this sequence.",
+        )
     save_build_tab_state(
         selected_folder,
         ordered_names,
@@ -1618,7 +1652,31 @@ def render_build_movie_tab() -> None:
     preview_key = f"build_preview_pair::{folder_key_text(selected_folder)}"
     preview_options = [row["pair_key"] for row in pair_rows]
     if preview_key not in st.session_state or st.session_state[preview_key] not in preview_options:
-        st.session_state[preview_key] = preview_options[0]
+        st.session_state[preview_key] = suggested_preview_key or preview_options[0]
+    preview_index = preview_options.index(st.session_state[preview_key]) if preview_options else 0
+    preview_action_cols = st.columns([1.1, 1.1, 1.3, 1.3, 2.2], gap="small")
+    if preview_action_cols[0].button(
+        "Previous pair",
+        use_container_width=True,
+        key=f"build_preview_previous::{folder_key_text(selected_folder)}",
+        disabled=preview_index == 0,
+    ):
+        st.session_state[preview_key] = preview_options[preview_index - 1]
+        st.rerun()
+    if preview_action_cols[1].button(
+        "Next pair",
+        use_container_width=True,
+        key=f"build_preview_next::{folder_key_text(selected_folder)}",
+        disabled=preview_index == len(preview_options) - 1,
+    ):
+        st.session_state[preview_key] = preview_options[preview_index + 1]
+        st.rerun()
+    if preview_action_cols[2].button("Preview active transition", use_container_width=True, key=f"build_preview_active::{folder_key_text(selected_folder)}"):
+        st.session_state[preview_key] = suggested_preview_key or preview_options[0]
+        st.rerun()
+    if preview_action_cols[3].button("Preview first missing", use_container_width=True, key=f"build_preview_missing::{folder_key_text(selected_folder)}", disabled=not missing_pair_keys):
+        st.session_state[preview_key] = missing_pair_keys[0]
+        st.rerun()
     preview_pair_key = st.selectbox("Preview pair", options=preview_options, key=preview_key)
     preview_row = next(row for row in pair_rows if row["pair_key"] == preview_pair_key)
     preview_cols = st.columns(2, gap="large")
