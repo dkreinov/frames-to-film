@@ -1152,12 +1152,21 @@ def render_extend_images_tab() -> None:
         )
         local_judge_result = st.session_state.get(local_judge_key)
         if local_judge_result:
-            st.caption(
-                f"Local NN judge: {local_judge_result['label']} | overall {local_judge_result['overall_score']:.3f} | "
-                f"face count {local_judge_result['face_count_score']:.3f} | face identity {local_judge_result['face_identity_score']:.3f} | "
-                f"person count {local_judge_result['person_count_score']:.3f} | edge risk {local_judge_result['edge_duplication_risk']:.3f}. "
-                f"{local_judge_result['reason']}"
-            )
+            summary_text = f"{local_judge_result['label']}: {local_judge_result['reason']}"
+            if local_judge_result["label"] == "Good":
+                st.success(summary_text)
+            elif local_judge_result["label"] == "Review":
+                st.warning(summary_text)
+            else:
+                st.error(summary_text)
+            with st.expander("Local NN judge details", expanded=False):
+                st.caption(
+                    f"overall {local_judge_result['overall_score']:.3f} | "
+                    f"face count {local_judge_result['face_count_score']:.3f} | "
+                    f"face identity {local_judge_result['face_identity_score']:.3f} | "
+                    f"person count {local_judge_result['person_count_score']:.3f} | "
+                    f"edge risk {local_judge_result['edge_duplication_risk']:.3f}"
+                )
         if judge_result:
             st.caption(
                 f"Judge score {judge_result['score']:.3f} | face {judge_result['face_score']:.3f} | center {judge_result['center_score']:.3f}. This is a local heuristic, not true face recognition."
