@@ -984,6 +984,9 @@ def render_extend_images_tab() -> None:
         for path in variant_options
     }
     variant_key = f"extend_target_variant::{workflow}::{source_key}::{output_key}"
+    pending_variant_selection = st.session_state.pop("pending_extend_target_variant", None)
+    if pending_variant_selection in variant_options:
+        st.session_state[variant_key] = pending_variant_selection
     if variant_key not in st.session_state or st.session_state[variant_key] not in variant_options:
         st.session_state[variant_key] = variant_options[-1]
     target_path = st.session_state[variant_key]
@@ -1120,7 +1123,7 @@ def render_extend_images_tab() -> None:
                 run_extend_image_api(source_path, save_target_path, st.session_state[prompt_key])
             load_display_image_bytes.clear()
             load_compare_data_uri.clear()
-            st.session_state[variant_key] = save_target_path
+            st.session_state["pending_extend_target_variant"] = save_target_path
             st.success(f"Saved API result to {relative_folder_label(save_target_path)}.")
             st.rerun()
         st.markdown("**Prompt**")
@@ -1151,7 +1154,7 @@ def render_extend_images_tab() -> None:
             save_uploaded_extension(uploaded_result, save_target_path)
             load_display_image_bytes.clear()
             load_compare_data_uri.clear()
-            st.session_state[variant_key] = save_target_path
+            st.session_state["pending_extend_target_variant"] = save_target_path
             st.success(f"Saved {save_target_path.name} to {relative_folder_label(save_target_path.parent)}.")
             st.rerun()
 
