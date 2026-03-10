@@ -13,8 +13,10 @@ import streamlit.components.v1 as components
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from PIL import Image, ImageOps
+from PIL import Image, ImageChops, ImageOps, ImageStat
 
+from extend_image_judge import judge_available as local_judge_available
+from extend_image_judge import judge_extension as run_local_extension_judge
 from outpaint_16_9 import TARGET_ASPECT_RATIO, choose_extension_prompt
 from redo_runner import (
     generate_automatic_retry_prompt,
@@ -254,6 +256,75 @@ def load_compare_data_uri(path_text: str, max_width: int, file_key: str) -> str:
     return f"data:image/jpeg;base64,{encoded}"
 
 
+def average_hash(image: Image.Image, size: int = 8) -> int:
+    gray = image.convert("L").resize((size, size), Image.LANCZOS)
+    pixels = list(gray.getdata())
+    average = sum(pixels) / len(pixels)
+    bits = 0
+    for value in pixels:
+        bits = (bits << 1) | int(value >= average)
+    return bits
+
+
+@st.cache_data
+def face_preservation_judge(
+    source_path_text: str,
+    source_file_key: str,
+    target_path_text: str,
+    target_file_key: str,
+) -> dict[str, float | str]:
+    source_image = ImageOps.exif_transpose(Image.open(source_path_text)).convert("RGB")
+    target_image = ImageOps.exif_transpose(Image.open(target_path_text)).convert("RGB")
+
+    target_height = target_image.height
+    resized_width = max(1, round(source_image.width * target_height / source_image.height))
+    source_resized = source_image.resize((resized_width, target_height), Image.LANCZOS)
+
+    if resized_width >= target_image.width:
+        source_resized = source_image.resize((target_image.width, round(source_image.height * target_image.width / source_image.width)), Image.LANCZOS)
+        crop_top = max(0, (source_resized.height - target_image.height) // 2)
+        source_resized = source_resized.crop((0, crop_top, target_image.width, crop_top + target_image.height))
+        target_center = target_image
+    else:
+        crop_left = (target_image.width - resized_width) // 2
+        target_center = target_image.crop((crop_left, 0, crop_left + resized_width, target_height))
+
+    width, height = source_resized.size
+    face_box = (
+        int(width * 0.14),
+        int(height * 0.06),
+        int(width * 0.86),
+        int(height * 0.60),
+    )
+    source_face = source_resized.crop(face_box)
+    target_face = target_center.crop(face_box)
+
+    face_diff = ImageChops.difference(source_face, target_face)
+    face_rms = sum(ImageStat.Stat(face_diff).rms) / 3
+    face_hash_distance = bin(average_hash(source_face) ^ average_hash(target_face)).count("1") / 64
+
+    center_diff = ImageChops.difference(source_resized, target_center)
+    center_rms = sum(ImageStat.Stat(center_diff).rms) / 3
+
+    face_score = (face_rms / 255) * 0.65 + face_hash_distance * 0.35
+    center_score = center_rms / 255
+    total_score = face_score * 0.75 + center_score * 0.25
+
+    if total_score <= 0.12:
+        label = "Likely preserved"
+    elif total_score <= 0.2:
+        label = "Possible drift"
+    else:
+        label = "Likely changed"
+
+    return {
+        "label": label,
+        "score": round(total_score, 3),
+        "face_score": round(face_score, 3),
+        "center_score": round(center_score, 3),
+    }
+
+
 def resolve_extension_output_dir(folder_text: str) -> Path | None:
     folder_text = folder_text.strip().replace("\\", "/")
     if not folder_text:
@@ -302,6 +373,7 @@ def save_extend_tab_state(
     only_missing: bool,
     active_image: str,
     swap_compare_sides: bool,
+    local_judge_enabled: bool,
 ) -> None:
     EXTEND_TAB_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -310,6 +382,7 @@ def save_extend_tab_state(
         "only_missing": only_missing,
         "active_image": active_image,
         "swap_compare_sides": swap_compare_sides,
+        "local_judge_enabled": local_judge_enabled,
     }
     EXTEND_TAB_STATE_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
@@ -411,6 +484,51 @@ def run_extend_image_api(source_path: Path, target_path: Path, prompt: str) -> N
 
     target_path.parent.mkdir(parents=True, exist_ok=True)
     upscale_extend_result(result_image).save(target_path, format="JPEG", quality=95)
+
+
+def run_ai_face_judge(source_path: Path, target_path: Path) -> dict[str, str | int]:
+    source_image = ImageOps.exif_transpose(Image.open(source_path)).convert("RGB")
+    target_image = ImageOps.exif_transpose(Image.open(target_path)).convert("RGB")
+    client = get_extend_api_client()
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=[
+            """
+Compare the original photo and the extended photo.
+Treat the original photo as ground truth.
+Focus only on whether any people changed in a bad way in the extended photo.
+
+Check for:
+- changed face or identity
+- scary or uncanny face
+- duplicated or cloned person
+- altered pose, body, arms, hands, or clothing
+- invented extra people near the edges
+
+Important rules:
+- If the extended photo shows more people than the original, verdict must be fail.
+- If a person appears duplicated at the left or right edge, verdict must be fail.
+- If any face looks uncanny, scary, warped, or clearly different from the original, verdict must be fail.
+- Use warning only for mild uncertainty.
+- Use pass only when the same people are preserved cleanly.
+
+Return strict JSON with this shape:
+{"verdict":"pass|warning|fail","score":0-100,"reason":"short plain sentence"}
+""".strip(),
+            source_image,
+            target_image,
+        ],
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+        ),
+    )
+    text = response.text.strip()
+    result = json.loads(text)
+    return {
+        "verdict": str(result.get("verdict", "warning")),
+        "score": int(result.get("score", 0)),
+        "reason": str(result.get("reason", "")).strip(),
+    }
 
 
 def render_overlay_image_compare(
@@ -656,6 +774,8 @@ def render_extend_images_tab() -> None:
     pending_output_folder = st.session_state.pop("pending_extend_output_text", None)
     if pending_output_folder is not None:
         st.session_state["extend_output_text"] = pending_output_folder
+    if "extend_local_judge_enabled" not in st.session_state:
+        st.session_state["extend_local_judge_enabled"] = bool(saved_state.get("local_judge_enabled", False))
 
     image_folders = discover_image_folders()
     default_folder = OUTPAINTED_DIR
@@ -828,9 +948,27 @@ def render_extend_images_tab() -> None:
         str(source_path),
         image_cache_key(source_path),
     )
+    judge_result = (
+        face_preservation_judge(
+            str(source_path),
+            image_cache_key(source_path),
+            str(target_path),
+            image_cache_key(target_path),
+        )
+        if target_path.exists()
+        else None
+    )
     prompt_key = f"extend_prompt::{workflow}::{source_key}::{output_key}"
     if prompt_key not in st.session_state:
         st.session_state[prompt_key] = detected_prompt
+    local_judge_key = (
+        f"extend_local_judge::{workflow}::{source_key}::{output_key}::"
+        f"{image_cache_key(source_path)}::{image_cache_key(target_path) if target_path.exists() else 'missing'}"
+    )
+    ai_judge_key = (
+        f"extend_ai_judge::{workflow}::{source_key}::{output_key}::"
+        f"{image_cache_key(source_path)}::{image_cache_key(target_path) if target_path.exists() else 'missing'}"
+    )
 
     active_summary_cols = st.columns(3, gap="small")
     active_summary_cols[0].markdown(
@@ -866,7 +1004,14 @@ def render_extend_images_tab() -> None:
         key=swap_compare_key,
     )
     compare_controls[3].caption("Use left/right buttons above to move quickly through the folder.")
-    save_extend_tab_state(selected_folder, output_folder_text, only_missing, active_name, swap_compare_sides)
+    save_extend_tab_state(
+        selected_folder,
+        output_folder_text,
+        only_missing,
+        active_name,
+        swap_compare_sides,
+        bool(st.session_state["extend_local_judge_enabled"]),
+    )
 
     st.markdown("<div id='extend-compare-anchor'></div>", unsafe_allow_html=True)
     if target_path.exists():
@@ -955,6 +1100,42 @@ def render_extend_images_tab() -> None:
 
     with meta_col:
         st.markdown("**Details**")
+        local_judge_ready, local_judge_reason = local_judge_available()
+        local_judge_enabled = st.checkbox(
+            "Enable local NN judge",
+            key="extend_local_judge_enabled",
+            help="Uses local face and person models to rank how well the extension preserved people.",
+        )
+        save_extend_tab_state(
+            selected_folder,
+            output_folder_text,
+            only_missing,
+            active_name,
+            swap_compare_sides,
+            local_judge_enabled,
+        )
+        if local_judge_enabled:
+            judge_status = "ready" if local_judge_ready else "unavailable"
+            st.caption(f"Local judge: {judge_status} — {local_judge_reason}")
+            if target_path.exists():
+                if st.button(
+                    "Run local NN judge",
+                    key=f"extend_run_local_judge::{workflow}::{source_key}::{output_key}",
+                    use_container_width=True,
+                    disabled=not local_judge_ready,
+                ):
+                    with st.spinner("Running local extension judge..."):
+                        st.session_state[local_judge_key] = run_local_extension_judge(source_path, target_path)
+                    st.rerun()
+        if target_path.exists():
+            if st.button(
+                "Run AI face judge",
+                key=f"extend_run_ai_judge::{workflow}::{source_key}::{output_key}",
+                use_container_width=True,
+            ):
+                with st.spinner("Running AI face judge..."):
+                    st.session_state[ai_judge_key] = run_ai_face_judge(source_path, target_path)
+                st.rerun()
         st.markdown(
             f"""
             <div class="extend-details-card">
@@ -962,11 +1143,30 @@ def render_extend_images_tab() -> None:
               <div><span>Target save path</span><strong>{relative_folder_label(target_path)}</strong></div>
               <div><span>Status</span><strong>{'Ready' if target_path.exists() else 'Needs extension'}</strong></div>
               <div><span>Prompt profile</span><strong>{detected_profile}</strong></div>
+              <div><span>Local NN judge</span><strong>{st.session_state.get(local_judge_key, {}).get('label', 'Not run') if local_judge_enabled and target_path.exists() else ('Disabled' if not local_judge_enabled else 'No saved result yet')}</strong></div>
+              <div><span>Face judge</span><strong>{judge_result['label'] if judge_result else 'No saved result yet'}</strong></div>
               <div><span>Position</span><strong>{visible_names.index(active_name) + 1} of {len(visible_names)}</strong></div>
             </div>
             """,
             unsafe_allow_html=True,
         )
+        local_judge_result = st.session_state.get(local_judge_key)
+        if local_judge_result:
+            st.caption(
+                f"Local NN judge: {local_judge_result['label']} | overall {local_judge_result['overall_score']:.3f} | "
+                f"face count {local_judge_result['face_count_score']:.3f} | face identity {local_judge_result['face_identity_score']:.3f} | "
+                f"person count {local_judge_result['person_count_score']:.3f} | edge risk {local_judge_result['edge_duplication_risk']:.3f}. "
+                f"{local_judge_result['reason']}"
+            )
+        if judge_result:
+            st.caption(
+                f"Judge score {judge_result['score']:.3f} | face {judge_result['face_score']:.3f} | center {judge_result['center_score']:.3f}. This is a local heuristic, not true face recognition."
+            )
+        ai_judge_result = st.session_state.get(ai_judge_key)
+        if ai_judge_result:
+            st.caption(
+                f"AI face judge: {ai_judge_result['verdict']} ({ai_judge_result['score']}/100) — {ai_judge_result['reason']}"
+            )
 
 
 def inject_styles() -> None:
