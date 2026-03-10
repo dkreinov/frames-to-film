@@ -15,8 +15,11 @@ from google import genai
 from google.genai import types
 from PIL import Image, ImageChops, ImageOps, ImageStat
 
+from concat_videos import ordered_segment_files_for_sequence, stitch_sequence
 from extend_image_judge import judge_available as local_judge_available
 from extend_image_judge import judge_extension as run_local_extension_judge
+from generate_all_videos import build_pairs_from_sequence, generate_pairs_for_sequence, sort_key as natural_image_sort_key
+from image_pair_prompts import FALLBACK_PROMPT, PAIR_PROMPTS
 from outpaint_16_9 import TARGET_ASPECT_RATIO, choose_extension_prompt
 from redo_runner import (
     generate_automatic_retry_prompt,
@@ -110,6 +113,7 @@ OUTPAINTED_DIR = ROOT_DIR / "outpainted"
 RAW_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 DEFAULT_EXTENSION_OUTPUT_DIR = "kling_test/manual_extends"
 EXTEND_TAB_STATE_PATH = ROOT_DIR / "pipeline_runs" / "extend_tab_state.json"
+BUILD_TAB_STATE_PATH = ROOT_DIR / "pipeline_runs" / "build_movie_state.json"
 EXTEND_TARGET_W = 5376
 EXTEND_TARGET_H = 3024
 EXTEND_IMAGE_MODEL = "gemini-3-pro-image-preview"
@@ -163,7 +167,13 @@ def main() -> None:
 
     selected_pair = select_pair(pairs, pair_rows, status_filter)
 
-    review_tab, queue_tab, extend_tab = st.tabs(["Review", "Redo queue", "Extend images"])
+    extend_tab, build_tab, review_tab, queue_tab = st.tabs(["Extend images", "Build movie", "Review", "Redo queue"])
+    with extend_tab:
+        render_extend_images_tab()
+
+    with build_tab:
+        render_build_movie_tab()
+
     with review_tab:
         render_review_panel(
             selected_pair,
@@ -181,9 +191,6 @@ def main() -> None:
 
     with queue_tab:
         render_redo_queue(redo_requests, review_lookup, winners, run_id)
-
-    with extend_tab:
-        render_extend_images_tab()
 
     error_message = st.session_state.pop("redo_run_error", "")
     if error_message:
@@ -225,6 +232,26 @@ def discover_extension_sources(source_dir: Path) -> list[Path]:
         ],
         key=lambda path: path.name.lower(),
     )
+
+
+def discover_orderable_images(source_dir: Path) -> list[Path]:
+    if not source_dir.exists():
+        return []
+    return sorted(
+        [
+            path
+            for path in source_dir.iterdir()
+            if path.is_file() and path.suffix.lower() in RAW_IMAGE_EXTENSIONS
+        ],
+        key=lambda path: natural_image_sort_key(path.name),
+    )
+
+
+def normalize_ordered_images(saved_order: list[str], available_names: list[str]) -> list[str]:
+    available_set = set(available_names)
+    ordered = [name for name in saved_order if name in available_set]
+    ordered.extend(name for name in available_names if name not in ordered)
+    return ordered
 
 
 def image_cache_key(path: Path) -> str:
@@ -399,6 +426,25 @@ def load_extend_tab_state() -> dict[str, str | bool]:
         return json.loads(EXTEND_TAB_STATE_PATH.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
+
+
+def load_build_tab_state() -> dict[str, str | bool | list[str]]:
+    if not BUILD_TAB_STATE_PATH.exists():
+        return {}
+    try:
+        return json.loads(BUILD_TAB_STATE_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def save_build_tab_state(source_folder: Path, ordered_images: list[str], selected_pair_keys: list[str]) -> None:
+    BUILD_TAB_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "source_folder": relative_folder_label(source_folder),
+        "ordered_images": ordered_images,
+        "selected_pair_keys": selected_pair_keys,
+    }
+    BUILD_TAB_STATE_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
 def save_extend_tab_state(
@@ -1236,6 +1282,259 @@ def render_extend_images_tab() -> None:
             st.caption(
                 f"AI face judge: {ai_judge_result['verdict']} ({ai_judge_result['score']}/100) — {ai_judge_result['reason']}"
             )
+
+
+def render_build_movie_tab() -> None:
+    st.subheader("Build movie")
+    st.caption("Choose the finished 16:9 stills, keep them in order, preview the Kling pairs, then generate clips or stitch the finished segments.")
+    saved_state = load_build_tab_state()
+    pending_source_folder = st.session_state.pop("pending_build_source_folder", None)
+    source_folders = discover_image_folders()
+    default_folder = ROOT_DIR / "kling_test"
+    initial_source_folder = path_from_saved_text(str(saved_state.get("source_folder", relative_folder_label(default_folder))))
+    if initial_source_folder not in source_folders:
+        source_folders.insert(0, initial_source_folder)
+    if default_folder not in source_folders:
+        source_folders.insert(0, default_folder)
+
+    source_key = "build_source_folder"
+    if source_key not in st.session_state or st.session_state[source_key] not in source_folders:
+        st.session_state[source_key] = initial_source_folder
+    if pending_source_folder is not None and pending_source_folder in source_folders:
+        st.session_state[source_key] = pending_source_folder
+
+    source_cols = st.columns([1.55, 0.5, 0.45], gap="small")
+    selected_folder = source_cols[0].selectbox(
+        "Build source folder",
+        options=source_folders,
+        key=source_key,
+        format_func=relative_folder_label,
+        help="Choose the folder that contains the final 16:9 stills for Kling.",
+    )
+    if source_cols[1].button("Browse...", use_container_width=True, key="browse_build_source_folder"):
+        picked_source = browse_for_folder(selected_folder)
+        if picked_source is not None:
+            st.session_state["pending_build_source_folder"] = picked_source
+            st.rerun()
+    if source_cols[2].button("Open", use_container_width=True, key="open_build_source_folder"):
+        open_folder_in_windows(selected_folder)
+
+    source_paths = discover_orderable_images(selected_folder)
+    if not source_paths:
+        st.info("No image files were found in this folder.")
+        return
+
+    available_names = [path.name for path in source_paths]
+    source_lookup = {path.name: path for path in source_paths}
+    ordered_state_key = f"build_ordered_images::{folder_key_text(selected_folder)}"
+    saved_order = saved_state.get("ordered_images", [])
+    if ordered_state_key not in st.session_state:
+        st.session_state[ordered_state_key] = normalize_ordered_images(saved_order if isinstance(saved_order, list) else [], available_names)
+    else:
+        st.session_state[ordered_state_key] = normalize_ordered_images(st.session_state[ordered_state_key], available_names)
+    ordered_names = st.session_state[ordered_state_key]
+
+    current_image_key = f"build_current_image::{folder_key_text(selected_folder)}"
+    if current_image_key not in st.session_state or st.session_state[current_image_key] not in ordered_names:
+        st.session_state[current_image_key] = ordered_names[0]
+
+    sequence_cols = st.columns([1.15, 0.85], gap="large")
+    with sequence_cols[0]:
+        st.markdown("**Sequence**")
+        st.caption("Default order is numeric-natural, so `2` stays before `11`.")
+        current_name = st.selectbox(
+            "Current image in sequence",
+            options=ordered_names,
+            key=current_image_key,
+            label_visibility="collapsed",
+        )
+        current_index = ordered_names.index(current_name)
+        action_cols = st.columns(4, gap="small")
+        if action_cols[0].button("Move up", use_container_width=True, disabled=current_index == 0):
+            ordered_names[current_index - 1], ordered_names[current_index] = ordered_names[current_index], ordered_names[current_index - 1]
+            st.session_state[ordered_state_key] = ordered_names
+            st.rerun()
+        if action_cols[1].button("Move down", use_container_width=True, disabled=current_index == len(ordered_names) - 1):
+            ordered_names[current_index + 1], ordered_names[current_index] = ordered_names[current_index], ordered_names[current_index + 1]
+            st.session_state[ordered_state_key] = ordered_names
+            st.rerun()
+        if action_cols[2].button("Remove", use_container_width=True, disabled=len(ordered_names) <= 2):
+            ordered_names.remove(current_name)
+            st.session_state[ordered_state_key] = ordered_names
+            st.session_state[current_image_key] = ordered_names[max(0, min(current_index, len(ordered_names) - 1))]
+            st.rerun()
+        if action_cols[3].button("Reset order", use_container_width=True):
+            st.session_state[ordered_state_key] = normalize_ordered_images([], available_names)
+            st.session_state[current_image_key] = st.session_state[ordered_state_key][0]
+            st.rerun()
+        st.dataframe(
+            [{"position": index + 1, "image": name} for index, name in enumerate(ordered_names)],
+            use_container_width=True,
+            hide_index=True,
+            height=240,
+        )
+
+    with sequence_cols[1]:
+        st.markdown("**Add back images**")
+        excluded_names = [name for name in available_names if name not in ordered_names]
+        if excluded_names:
+            add_name = st.selectbox(
+                "Excluded images",
+                options=excluded_names,
+                key=f"build_add_image::{folder_key_text(selected_folder)}",
+                label_visibility="collapsed",
+            )
+            if st.button("Add to end", use_container_width=True, key=f"build_add_image_button::{folder_key_text(selected_folder)}"):
+                st.session_state[ordered_state_key] = ordered_names + [add_name]
+                st.session_state[current_image_key] = add_name
+                st.rerun()
+        else:
+            st.caption("All images in this folder are already in the sequence.")
+
+        current_path = source_lookup[st.session_state[current_image_key]]
+        st.image(
+            load_display_image_bytes(str(current_path), 900, image_cache_key(current_path)),
+            caption=f"Current still: {current_path.name}",
+            use_container_width=True,
+        )
+
+    pair_rows = []
+    sequence_pairs = build_pairs_from_sequence(ordered_names)
+    for start_name, end_name, pair_key in sequence_pairs:
+        pair_rows.append(
+            {
+                "pair_key": pair_key,
+                "start": start_name,
+                "end": end_name,
+                "prompt": PAIR_PROMPTS.get(pair_key, FALLBACK_PROMPT),
+            }
+        )
+
+    selected_pairs_key = f"build_selected_pairs::{folder_key_text(selected_folder)}"
+    saved_pair_keys = saved_state.get("selected_pair_keys", [])
+    default_pair_keys = [row["pair_key"] for row in pair_rows]
+    if selected_pairs_key not in st.session_state:
+        if isinstance(saved_pair_keys, list):
+            saved_set = set(saved_pair_keys)
+            st.session_state[selected_pairs_key] = [row["pair_key"] for row in pair_rows if row["pair_key"] in saved_set] or default_pair_keys
+        else:
+            st.session_state[selected_pairs_key] = default_pair_keys
+    else:
+        current_selected = set(st.session_state[selected_pairs_key])
+        st.session_state[selected_pairs_key] = [row["pair_key"] for row in pair_rows if row["pair_key"] in current_selected] or default_pair_keys
+
+    save_build_tab_state(selected_folder, ordered_names, st.session_state[selected_pairs_key])
+
+    summary_cols = st.columns(4, gap="small")
+    summary_cols[0].markdown(
+        f"<div class='extend-summary-card'><span>Source</span><strong>{relative_folder_label(selected_folder)}</strong></div>",
+        unsafe_allow_html=True,
+    )
+    summary_cols[1].markdown(
+        f"<div class='extend-summary-card'><span>Images</span><strong>{len(ordered_names)}</strong></div>",
+        unsafe_allow_html=True,
+    )
+    summary_cols[2].markdown(
+        f"<div class='extend-summary-card'><span>Pairs</span><strong>{len(pair_rows)}</strong></div>",
+        unsafe_allow_html=True,
+    )
+    existing_segments = ordered_segment_files_for_sequence(ordered_names, os.path.join(selected_folder, "videos"))
+    summary_cols[3].markdown(
+        f"<div class='extend-summary-card'><span>Segments ready</span><strong>{len(existing_segments)}</strong></div>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("**Pair preview**")
+    pair_keys = [row["pair_key"] for row in pair_rows]
+    missing_pair_keys = [
+        row["pair_key"]
+        for row in pair_rows
+        if f"seg_{row['pair_key']}.mp4" not in existing_segments
+    ]
+    pair_action_cols = st.columns(3, gap="small")
+    if pair_action_cols[0].button("Select all pairs", use_container_width=True, key=f"build_select_all::{folder_key_text(selected_folder)}"):
+        st.session_state[selected_pairs_key] = pair_keys
+        save_build_tab_state(selected_folder, ordered_names, st.session_state[selected_pairs_key])
+        st.rerun()
+    if pair_action_cols[1].button("Only missing segments", use_container_width=True, key=f"build_select_missing::{folder_key_text(selected_folder)}"):
+        st.session_state[selected_pairs_key] = missing_pair_keys or pair_keys
+        save_build_tab_state(selected_folder, ordered_names, st.session_state[selected_pairs_key])
+        st.rerun()
+    if pair_action_cols[2].button("Clear selection", use_container_width=True, key=f"build_clear_pairs::{folder_key_text(selected_folder)}"):
+        st.session_state[selected_pairs_key] = []
+        save_build_tab_state(selected_folder, ordered_names, st.session_state[selected_pairs_key])
+        st.rerun()
+    st.multiselect(
+        "Pairs to generate",
+        options=pair_keys,
+        key=selected_pairs_key,
+        help="Choose which consecutive pairs to send to Kling from this sequence.",
+    )
+    save_build_tab_state(selected_folder, ordered_names, st.session_state[selected_pairs_key])
+
+    preview_key = f"build_preview_pair::{folder_key_text(selected_folder)}"
+    preview_options = [row["pair_key"] for row in pair_rows]
+    if preview_key not in st.session_state or st.session_state[preview_key] not in preview_options:
+        st.session_state[preview_key] = preview_options[0]
+    preview_pair_key = st.selectbox("Preview pair", options=preview_options, key=preview_key)
+    preview_row = next(row for row in pair_rows if row["pair_key"] == preview_pair_key)
+    preview_cols = st.columns(2, gap="large")
+    preview_cols[0].image(
+        load_display_image_bytes(str(source_lookup[preview_row["start"]]), 1000, image_cache_key(source_lookup[preview_row["start"]])),
+        caption=f"Start: {preview_row['start']}",
+        use_container_width=True,
+    )
+    preview_cols[1].image(
+        load_display_image_bytes(str(source_lookup[preview_row["end"]]), 1000, image_cache_key(source_lookup[preview_row["end"]])),
+        caption=f"End: {preview_row['end']}",
+        use_container_width=True,
+    )
+    st.text_area(
+        "Prompt for this pair",
+        value=preview_row["prompt"],
+        height=140,
+        disabled=True,
+        key=f"build_prompt_preview::{preview_pair_key}",
+    )
+
+    videos_dir = os.path.join(selected_folder, "videos")
+    status_path = os.path.join(videos_dir, "status.json")
+    action_cols = st.columns([1, 1, 1.2], gap="small")
+    use_credits_key = f"build_use_kling::{folder_key_text(selected_folder)}"
+    if use_credits_key not in st.session_state:
+        st.session_state[use_credits_key] = False
+    action_cols[0].checkbox("Use Kling credits", key=use_credits_key)
+    if action_cols[1].button("Generate selected pairs", use_container_width=True, type="primary"):
+        if not st.session_state[selected_pairs_key]:
+            st.warning("Choose at least one pair to generate.")
+        elif not st.session_state[use_credits_key]:
+            st.warning("Tick `Use Kling credits` before starting Kling generation.")
+        else:
+            with st.spinner("Generating selected pairs with Kling..."):
+                generation_results = generate_pairs_for_sequence(
+                    ordered_names,
+                    image_dir=str(selected_folder),
+                    video_dir=videos_dir,
+                    status_path=status_path,
+                    selected_keys=st.session_state[selected_pairs_key],
+                )
+            st.session_state[f"build_generation_results::{folder_key_text(selected_folder)}"] = generation_results
+            st.rerun()
+    if action_cols[2].button("Stitch available sequence", use_container_width=True):
+        try:
+            stitch_result = stitch_sequence(
+                ordered_names,
+                videos_dir=videos_dir,
+                output_file=os.path.join(videos_dir, "full_movie.mp4"),
+            )
+            st.success(f"Stitched {len(stitch_result['segments'])} segments into {relative_folder_label(Path(stitch_result['output_file']))}.")
+        except Exception as exc:
+            st.error(f"Stitch failed: {exc}")
+
+    generation_results = st.session_state.get(f"build_generation_results::{folder_key_text(selected_folder)}")
+    if generation_results:
+        st.markdown("**Last generation run**")
+        st.dataframe(generation_results, use_container_width=True, hide_index=True, height=260)
 
 
 def inject_styles() -> None:

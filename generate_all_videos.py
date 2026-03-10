@@ -183,6 +183,16 @@ def get_image_sequence():
     return sorted(files, key=sort_key)
 
 
+def build_pairs_from_sequence(files):
+    pairs = []
+    for i in range(len(files) - 1):
+        a_name = files[i].split('.')[0]
+        b_name = files[i + 1].split('.')[0]
+        key = f"{a_name}_to_{b_name}"
+        pairs.append((files[i], files[i + 1], key))
+    return pairs
+
+
 def load_status():
     if os.path.exists(STATUS_PATH):
         with open(STATUS_PATH) as f:
@@ -193,6 +203,86 @@ def load_status():
 def save_status(status):
     with open(STATUS_PATH, 'w') as f:
         json.dump(status, f, indent=2)
+
+
+def generate_pairs_for_sequence(
+    files,
+    image_dir=None,
+    video_dir=None,
+    status_path=None,
+    selected_keys=None,
+):
+    image_dir = image_dir or IMG_DIR
+    video_dir = video_dir or VID_DIR
+    status_path = status_path or STATUS_PATH
+    os.makedirs(video_dir, exist_ok=True)
+
+    def load_status_for_path():
+        if os.path.exists(status_path):
+            with open(status_path) as f:
+                return json.load(f)
+        return {}
+
+    def save_status_for_path(status):
+        with open(status_path, 'w') as f:
+            json.dump(status, f, indent=2)
+
+    sequence_pairs = build_pairs_from_sequence(files)
+    if selected_keys is not None:
+        selected = set(selected_keys)
+        sequence_pairs = [pair for pair in sequence_pairs if pair[2] in selected]
+
+    status = load_status_for_path()
+    token = get_jwt()
+    token_time = time.time()
+    results = []
+
+    for f_a, f_b, key in sequence_pairs:
+        if time.time() - token_time > 1500:
+            token = get_jwt()
+            token_time = time.time()
+
+        a_name = f_a.split('.')[0]
+        b_name = f_b.split('.')[0]
+        out_path = os.path.join(video_dir, f"seg_{a_name}_to_{b_name}.mp4")
+        path_a = os.path.join(image_dir, f_a)
+        path_b = os.path.join(image_dir, f_b)
+        prompt = PAIR_PROMPTS.get(key, FALLBACK_PROMPT)
+
+        task_id, err = submit_video(token, path_a, path_b, prompt)
+        if not task_id:
+            status[key] = {"result": "submit_fail", "error": err}
+            save_status_for_path(status)
+            results.append({"pair_key": key, "result": "submit_fail", "error": err, "prompt": prompt})
+            continue
+
+        video_url = poll_task(token, task_id)
+        if not video_url:
+            status[key] = {"result": "poll_fail", "task_id": task_id}
+            save_status_for_path(status)
+            results.append({"pair_key": key, "result": "poll_fail", "task_id": task_id, "prompt": prompt})
+            continue
+
+        size_mb = download_video(video_url, out_path)
+        status[key] = {
+            "result": "ok",
+            "task_id": task_id,
+            "file": os.path.basename(out_path),
+            "size_mb": round(size_mb, 1),
+        }
+        save_status_for_path(status)
+        results.append(
+            {
+                "pair_key": key,
+                "result": "ok",
+                "task_id": task_id,
+                "file": os.path.basename(out_path),
+                "size_mb": round(size_mb, 1),
+                "prompt": prompt,
+            }
+        )
+
+    return results
 
 
 def main():

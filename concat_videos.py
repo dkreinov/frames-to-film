@@ -56,6 +56,18 @@ def _ordered_segment_files():
             yield seg_name
 
 
+def ordered_segment_files_for_sequence(image_files, videos_dir):
+    files = []
+    for i in range(len(image_files) - 1):
+        a = image_files[i].split(".")[0]
+        b = image_files[i + 1].split(".")[0]
+        seg_name = f"seg_{a}_to_{b}.mp4"
+        path = os.path.join(videos_dir, seg_name)
+        if os.path.isfile(path):
+            files.append(seg_name)
+    return files
+
+
 def _get_ffmpeg_exe():
     """Return path to ffmpeg: PATH, then tools/ffmpeg.exe, or download portable on Windows."""
     exe = shutil.which("ffmpeg")
@@ -120,6 +132,31 @@ def main():
     ]
     subprocess.run(cmd, check=True, cwd=VID_DIR)
     print(f"Done: {OUTPUT_FILE}")
+
+
+def stitch_sequence(image_files, videos_dir, output_file):
+    files = ordered_segment_files_for_sequence(image_files, videos_dir)
+    if not files:
+        raise RuntimeError("No matching segment files exist for the selected sequence.")
+
+    os.makedirs(videos_dir, exist_ok=True)
+    list_path = os.path.join(videos_dir, "concat_list.txt")
+    with open(list_path, "w") as f:
+        for name in files:
+            f.write(f"file '{name}'\n")
+
+    ffmpeg_exe = _get_ffmpeg_exe()
+    if not ffmpeg_exe:
+        raise RuntimeError("ffmpeg not found and auto-download failed.")
+
+    cmd = [
+        ffmpeg_exe, "-y", "-f", "concat", "-safe", "0",
+        "-i", list_path,
+        "-c", "copy",
+        output_file,
+    ]
+    subprocess.run(cmd, check=True, cwd=videos_dir)
+    return {"segments": files, "output_file": output_file}
 
 
 if __name__ == "__main__":

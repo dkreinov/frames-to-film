@@ -1,9 +1,19 @@
 # Review Tool
 
-This is a small local Streamlit app for reviewing generated movie clips, marking good ones as approved, and collecting bad ones into a redo queue.
+This is a small local Streamlit app for the full still-to-movie workflow:
+
+1. extend still images to 16:9
+2. build a Kling batch from the finished stills
+3. review generated clips
+4. retry weak clips through the redo queue
 
 ## What It Does
 
+- loads finished still images and helps you extend them to 16:9
+- builds a still-image sequence for Kling with natural numeric ordering
+- previews consecutive image pairs before generation
+- can launch a selected Kling batch from the GUI
+- can stitch the available finished segments in the same sequence order
 - Loads segment videos from `kling_test/videos/`
 - Treats the current `seg_<pair>.mp4` files as version `v1`
 - Supports future retry files such as `seg_<pair>_v2.mp4`
@@ -56,6 +66,33 @@ If you need the explicit interpreter:
 ```powershell
 C:\Users\nishtiak\AppData\Local\Programs\Python\Python312\python.exe -m streamlit run D:\Programming\olga_movie\review_app.py
 ```
+
+## Tab Flow
+
+The tabs now follow the pipeline:
+
+1. `Extend images`
+2. `Build movie`
+3. `Review`
+4. `Redo queue`
+
+## Build Movie
+
+Use `Build movie` after you already have final 16:9 stills.
+
+What it does:
+
+- lets you choose the still-image folder for Kling
+- orders images naturally, so `2` stays before `11`
+- lets you remove images from the sequence or add them back
+- previews each consecutive image pair and the prompt that will be used
+- lets you choose which pairs to generate
+- can generate only missing segments
+- can stitch the available sequence into `videos/full_movie.mp4`
+
+The build state is remembered in:
+
+- `pipeline_runs/build_movie_state.json`
 
 ## Review Flow
 
