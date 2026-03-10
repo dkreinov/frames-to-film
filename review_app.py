@@ -340,6 +340,40 @@ def extension_target_path(source_path: Path, output_dir: Path) -> Path:
     return output_dir / source_path.name
 
 
+def extension_target_variants(source_path: Path, output_dir: Path) -> list[Path]:
+    base_path = extension_target_path(source_path, output_dir)
+    variants: list[Path] = []
+    if base_path.exists():
+        variants.append(base_path)
+
+    stem = source_path.stem
+    suffix = source_path.suffix
+    pattern = f"{stem}_v*{suffix}"
+    numbered: list[tuple[int, Path]] = []
+    for candidate in sorted(output_dir.glob(pattern), key=lambda path: path.name.lower()):
+        suffix_text = candidate.stem.removeprefix(f"{stem}_v")
+        if suffix_text.isdigit():
+            numbered.append((int(suffix_text), candidate))
+    numbered.sort(key=lambda item: item[0])
+    variants.extend(path for _, path in numbered)
+    return variants
+
+
+def next_extension_target_path(source_path: Path, output_dir: Path) -> Path:
+    variants = extension_target_variants(source_path, output_dir)
+    if not variants:
+        return extension_target_path(source_path, output_dir)
+    last_variant = variants[-1]
+    stem = source_path.stem
+    suffix = source_path.suffix
+    if last_variant.name == source_path.name:
+        next_version = 2
+    else:
+        suffix_text = last_variant.stem.removeprefix(f"{stem}_v")
+        next_version = int(suffix_text) + 1 if suffix_text.isdigit() else 2
+    return output_dir / f"{stem}_v{next_version}{suffix}"
+
+
 def relative_folder_label(path: Path) -> str:
     try:
         return str(path.resolve().relative_to(ROOT_DIR.resolve())) if path.resolve() != ROOT_DIR.resolve() else "."
@@ -885,13 +919,13 @@ def render_extend_images_tab() -> None:
     visible_names: list[str] = []
     source_lookup = {path.name: path for path in source_paths}
     for source_path in source_paths:
-        target_path = extension_target_path(source_path, output_dir)
-        is_ready = target_path.exists()
+        variants = extension_target_variants(source_path, output_dir)
+        is_ready = bool(variants)
         browser_rows.append(
             {
                 "image": source_path.name,
                 "status": "Ready" if is_ready else "Needs extension",
-                "target": relative_folder_label(target_path),
+                "target": relative_folder_label(variants[-1]) if variants else relative_folder_label(extension_target_path(source_path, output_dir)),
             }
         )
         if not only_missing or not is_ready:
@@ -902,7 +936,7 @@ def render_extend_images_tab() -> None:
         return
 
     ready_count = len(source_paths) - len(visible_names) if only_missing else sum(
-        1 for source_path in source_paths if extension_target_path(source_path, output_dir).exists()
+        1 for source_path in source_paths if extension_target_variants(source_path, output_dir)
     )
     pending_count = len(source_paths) - ready_count
     summary_cols = st.columns(4, gap="small")
@@ -942,8 +976,17 @@ def render_extend_images_tab() -> None:
 
     active_name = selected_name
     source_path = source_lookup[active_name]
-    target_path = extension_target_path(source_path, output_dir)
     source_key = folder_key_text(source_path)
+    target_variants = extension_target_variants(source_path, output_dir)
+    variant_options = target_variants if target_variants else [extension_target_path(source_path, output_dir)]
+    variant_labels = {
+        path: ("Base result" if path.name == source_path.name else path.name)
+        for path in variant_options
+    }
+    variant_key = f"extend_target_variant::{workflow}::{source_key}::{output_key}"
+    if variant_key not in st.session_state or st.session_state[variant_key] not in variant_options:
+        st.session_state[variant_key] = variant_options[-1]
+    target_path = st.session_state[variant_key]
     detected_prompt, detected_profile, detected_ratio, detected_width_multiplier = extension_prompt_for_image(
         str(source_path),
         image_cache_key(source_path),
@@ -983,6 +1026,15 @@ def render_extend_images_tab() -> None:
         f"<div class='extend-summary-card'><span>Prompt profile</span><strong>{detected_profile}</strong></div>",
         unsafe_allow_html=True,
     )
+    if target_variants:
+        st.selectbox(
+            "Saved version",
+            options=variant_options,
+            key=variant_key,
+            format_func=lambda path: variant_labels[path],
+            help="Pick which saved extension to compare against the original.",
+        )
+        target_path = st.session_state[variant_key]
 
     with st.expander("Browse folder contents", expanded=False):
         st.dataframe(browser_rows, use_container_width=True, hide_index=True, height=220)
@@ -1044,26 +1096,32 @@ def render_extend_images_tab() -> None:
     with action_col:
         st.markdown("**Create or replace**")
         st.caption("Run the API directly, or open Gemini Web if you want to iterate manually before saving.")
-        overwrite = st.checkbox(
-            "Overwrite existing saved result",
-            value=False,
-            disabled=not target_path.exists(),
-            key=f"extend_overwrite::{workflow}::{source_key}::{output_key}",
+        save_mode_key = f"extend_save_mode::{workflow}::{source_key}::{output_key}"
+        if save_mode_key not in st.session_state:
+            st.session_state[save_mode_key] = "Save as new version" if target_variants else "Save result"
+        save_mode_options = ["Save result"] if not target_variants else ["Save as new version", "Replace selected version"]
+        save_mode = st.radio(
+            "Save mode",
+            options=save_mode_options,
+            key=save_mode_key,
+            horizontal=True,
+            label_visibility="collapsed",
         )
+        save_target_path = next_extension_target_path(source_path, output_dir) if save_mode == "Save as new version" else target_path
+        st.caption(f"Next save path: {relative_folder_label(save_target_path)}")
         action_buttons = st.columns(2, gap="small")
         action_buttons[0].link_button("Open Gemini Web", "https://gemini.google.com/app", use_container_width=True)
-        api_disabled = target_path.exists() and not overwrite
         if action_buttons[1].button(
             "Run with Gemini API",
             use_container_width=True,
-            disabled=api_disabled,
             type="primary",
         ):
             with st.spinner("Extending image with Gemini API..."):
-                run_extend_image_api(source_path, target_path, st.session_state[prompt_key])
+                run_extend_image_api(source_path, save_target_path, st.session_state[prompt_key])
             load_display_image_bytes.clear()
             load_compare_data_uri.clear()
-            st.success(f"Saved API result to {relative_folder_label(target_path)}.")
+            st.session_state[variant_key] = save_target_path
+            st.success(f"Saved API result to {relative_folder_label(save_target_path)}.")
             st.rerun()
         st.markdown("**Prompt**")
         prompt_actions = st.columns([1, 1.2], gap="small")
@@ -1088,14 +1146,13 @@ def render_extend_images_tab() -> None:
             type=["jpg", "jpeg", "png"],
             key=f"extend_upload::{workflow}::{source_key}::{output_key}",
         )
-        save_disabled = uploaded_result is None or (target_path.exists() and not overwrite)
-        if target_path.exists() and not overwrite:
-            st.info("A saved result already exists. Tick overwrite if you want to replace it.")
+        save_disabled = uploaded_result is None
         if st.button("Save uploaded result", use_container_width=True, disabled=save_disabled):
-            save_uploaded_extension(uploaded_result, target_path)
+            save_uploaded_extension(uploaded_result, save_target_path)
             load_display_image_bytes.clear()
             load_compare_data_uri.clear()
-            st.success(f"Saved {target_path.name} to {relative_folder_label(target_path.parent)}.")
+            st.session_state[variant_key] = save_target_path
+            st.success(f"Saved {save_target_path.name} to {relative_folder_label(save_target_path.parent)}.")
             st.rerun()
 
     with meta_col:
