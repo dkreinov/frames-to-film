@@ -1929,6 +1929,10 @@ def inject_styles() -> None:
             box-shadow: 0 10px 22px rgba(78, 45, 24, 0.07);
         }
         .extend-summary-card {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+            justify-content: space-between;
             min-height: 74px;
             padding: 0.75rem 0.9rem;
         }
@@ -1952,14 +1956,20 @@ def inject_styles() -> None:
             display: block;
             font-size: 1rem;
             line-height: 1.3;
+            overflow-wrap: anywhere;
         }
         .extend-details-card {
+            display: grid;
+            gap: 0.7rem;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             padding: 0.9rem 1rem;
         }
-        .extend-details-card > div + div {
-            border-top: 1px solid rgba(194, 120, 67, 0.12);
-            margin-top: 0.65rem;
-            padding-top: 0.65rem;
+        .extend-details-card > div {
+            background: rgba(255, 255, 255, 0.45);
+            border: 1px solid rgba(194, 120, 67, 0.10);
+            border-radius: 12px;
+            min-height: 78px;
+            padding: 0.7rem 0.8rem;
         }
         [data-testid="stSidebar"] h2,
         [data-testid="stSidebar"] p,
