@@ -134,7 +134,18 @@ def _person_model():
     except ImportError as exc:
         raise RuntimeError(f"Person model is unavailable: {exc}") from exc
 
-    return YOLO("yolov8n.pt")
+    weights_dir = Path(__file__).resolve().parent / "pipeline_runs" / "models"
+    weights_path = weights_dir / "yolov8n.pt"
+    if weights_path.exists():
+        return YOLO(str(weights_path))
+
+    model = YOLO("yolov8n.pt")
+    cwd_weights = Path("yolov8n.pt")
+    if cwd_weights.exists():
+        weights_dir.mkdir(parents=True, exist_ok=True)
+        cwd_weights.replace(weights_path)
+        return YOLO(str(weights_path))
+    return model
 
 
 def _open_rgb(path: str | Path) -> Image.Image:
