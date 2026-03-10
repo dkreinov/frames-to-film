@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import shutil
 import subprocess
 import sys
 from io import BytesIO
@@ -461,6 +462,7 @@ def save_build_tab_state(
     ordered_images: list[str],
     selected_pair_keys: list[str],
     custom_order: bool,
+    pool_folder: Path | None = None,
 ) -> None:
     BUILD_TAB_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -469,6 +471,8 @@ def save_build_tab_state(
         "selected_pair_keys": selected_pair_keys,
         "custom_order": custom_order,
     }
+    if pool_folder is not None:
+        payload["pool_folder"] = relative_folder_label(pool_folder)
     BUILD_TAB_STATE_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
@@ -1433,6 +1437,26 @@ def render_build_movie_tab() -> None:
         st.session_state[ordered_state_key] = normalize_ordered_images(st.session_state[ordered_state_key], available_names)
     ordered_names = st.session_state[ordered_state_key]
 
+    pending_import_key = f"build_pending_import::{folder_key_text(selected_folder)}"
+    pending_import = st.session_state.pop(pending_import_key, None)
+    if isinstance(pending_import, dict):
+        imported_names = [
+            str(name)
+            for name in pending_import.get("names", [])
+            if isinstance(name, str) and name in available_names and name not in ordered_names
+        ]
+        if imported_names:
+            mode = str(pending_import.get("mode", "after_active"))
+            if mode == "end" or not ordered_names:
+                ordered_names = ordered_names + imported_names
+            else:
+                anchor = str(pending_import.get("after", ""))
+                insert_at = ordered_names.index(anchor) + 1 if anchor in ordered_names else len(ordered_names)
+                ordered_names = ordered_names[:insert_at] + imported_names + ordered_names[insert_at:]
+            st.session_state[ordered_state_key] = ordered_names
+            st.session_state[custom_order_key] = True
+            st.session_state[f"build_current_image::{folder_key_text(selected_folder)}"] = imported_names[0]
+
     current_image_key = f"build_current_image::{folder_key_text(selected_folder)}"
     if current_image_key not in st.session_state or st.session_state[current_image_key] not in ordered_names:
         st.session_state[current_image_key] = ordered_names[0]
@@ -1547,6 +1571,113 @@ def render_build_movie_tab() -> None:
             """,
             unsafe_allow_html=True,
         )
+        with st.expander("Add from another folder", expanded=False):
+            pending_pool_folder = st.session_state.pop("pending_build_pool_folder", None)
+            pool_folders = [folder for folder in discover_image_folders() if folder.resolve() != selected_folder.resolve()]
+            initial_pool_folder = path_from_saved_text(str(saved_state.get("pool_folder", relative_folder_label(selected_folder))))
+            if initial_pool_folder.resolve() == selected_folder.resolve():
+                initial_pool_folder = pool_folders[0] if pool_folders else selected_folder
+            if pending_pool_folder is not None and pending_pool_folder not in pool_folders:
+                pool_folders.insert(0, pending_pool_folder)
+            if initial_pool_folder not in pool_folders and pool_folders:
+                pool_folders.insert(0, initial_pool_folder)
+            if not pool_folders:
+                st.caption("No additional image folders were found.")
+            else:
+                pool_folder_key = "build_pool_folder"
+                if pool_folder_key not in st.session_state or st.session_state[pool_folder_key] not in pool_folders:
+                    st.session_state[pool_folder_key] = initial_pool_folder
+                if pending_pool_folder is not None and pending_pool_folder in pool_folders:
+                    st.session_state[pool_folder_key] = pending_pool_folder
+
+                pool_cols = st.columns([1.4, 0.45, 0.35], gap="small")
+                pool_folder = pool_cols[0].selectbox(
+                    "Pool folder",
+                    options=pool_folders,
+                    key=pool_folder_key,
+                    format_func=relative_folder_label,
+                    help="Pick another folder and add selected stills into this movie sequence.",
+                )
+                if pool_cols[1].button("Browse...", use_container_width=True, key="browse_build_pool_folder"):
+                    picked_pool = browse_for_folder(pool_folder)
+                    if picked_pool is not None:
+                        st.session_state["pending_build_pool_folder"] = picked_pool
+                        st.rerun()
+                if pool_cols[2].button("Open", use_container_width=True, key="open_build_pool_folder"):
+                    open_folder_in_windows(pool_folder)
+
+                pool_paths = discover_orderable_images(pool_folder)
+                pool_ids = [str(path) for path in pool_paths]
+                selected_pool_key = f"build_pool_selection::{folder_key_text(selected_folder)}::{folder_key_text(pool_folder)}"
+                if selected_pool_key not in st.session_state:
+                    st.session_state[selected_pool_key] = []
+                current_pool_selection = {
+                    item
+                    for item in st.session_state[selected_pool_key]
+                    if item in pool_ids
+                }
+                st.session_state[selected_pool_key] = sorted(current_pool_selection)
+
+                st.caption(f"{len(pool_paths)} image(s) available in {relative_folder_label(pool_folder)}.")
+                thumb_columns = st.columns(4, gap="small")
+                for index, pool_path in enumerate(pool_paths):
+                    with thumb_columns[index % 4]:
+                        st.image(
+                            load_display_image_bytes(str(pool_path), 320, image_cache_key(pool_path)),
+                            caption=pool_path.name,
+                            use_container_width=True,
+                        )
+                        checked = str(pool_path) in current_pool_selection
+                        if st.checkbox(
+                            "Select",
+                            value=checked,
+                            key=f"build_pool_pick::{folder_key_text(selected_folder)}::{folder_key_text(pool_folder)}::{pool_path.name}",
+                        ):
+                            current_pool_selection.add(str(pool_path))
+                        else:
+                            current_pool_selection.discard(str(pool_path))
+                st.session_state[selected_pool_key] = sorted(current_pool_selection)
+
+                import_cols = st.columns(2, gap="small")
+                if import_cols[0].button(
+                    "Add selected after active still",
+                    use_container_width=True,
+                    key=f"build_import_after::{folder_key_text(selected_folder)}::{folder_key_text(pool_folder)}",
+                    disabled=not st.session_state[selected_pool_key],
+                ):
+                    imported_names: list[str] = []
+                    for pool_item in st.session_state[selected_pool_key]:
+                        pool_path = Path(pool_item)
+                        target_path = next_import_target_path(pool_path, selected_folder)
+                        shutil.copy2(pool_path, target_path)
+                        imported_names.append(target_path.name)
+                    st.session_state[pending_import_key] = {
+                        "mode": "after_active",
+                        "after": current_name,
+                        "names": imported_names,
+                    }
+                    st.session_state[selected_pool_key] = []
+                    st.success(f"Imported {len(imported_names)} image(s) into {relative_folder_label(selected_folder)}.")
+                    st.rerun()
+                if import_cols[1].button(
+                    "Add selected to end",
+                    use_container_width=True,
+                    key=f"build_import_end::{folder_key_text(selected_folder)}::{folder_key_text(pool_folder)}",
+                    disabled=not st.session_state[selected_pool_key],
+                ):
+                    imported_names = []
+                    for pool_item in st.session_state[selected_pool_key]:
+                        pool_path = Path(pool_item)
+                        target_path = next_import_target_path(pool_path, selected_folder)
+                        shutil.copy2(pool_path, target_path)
+                        imported_names.append(target_path.name)
+                    st.session_state[pending_import_key] = {
+                        "mode": "end",
+                        "names": imported_names,
+                    }
+                    st.session_state[selected_pool_key] = []
+                    st.success(f"Imported {len(imported_names)} image(s) into {relative_folder_label(selected_folder)}.")
+                    st.rerun()
 
     pair_rows = []
     sequence_pairs = build_pairs_from_sequence(ordered_names)
@@ -1579,6 +1710,7 @@ def render_build_movie_tab() -> None:
         ordered_names,
         st.session_state[selected_pairs_key],
         st.session_state[custom_order_key],
+        st.session_state.get("build_pool_folder"),
     )
 
     summary_cols = st.columns(4, gap="small")
@@ -1647,6 +1779,7 @@ def render_build_movie_tab() -> None:
         ordered_names,
         st.session_state[selected_pairs_key],
         st.session_state[custom_order_key],
+        st.session_state.get("build_pool_folder"),
     )
 
     preview_key = f"build_preview_pair::{folder_key_text(selected_folder)}"
@@ -3026,6 +3159,22 @@ def next_pair_needing_review(pair_rows, current_pair_id: str):
         if item["status"] == "Needs review":
             return item["pair_id"]
     return None
+
+
+def next_import_target_path(source_path: Path, target_dir: Path) -> Path:
+    target_dir.mkdir(parents=True, exist_ok=True)
+    candidate = target_dir / source_path.name
+    if not candidate.exists():
+        return candidate
+
+    stem = source_path.stem
+    suffix = source_path.suffix
+    index = 2
+    while True:
+        candidate = target_dir / f"{stem}_pool{index}{suffix}"
+        if not candidate.exists():
+            return candidate
+        index += 1
 
 
 def next_pair_to_review(pair_rows, current_pair_id: str):
