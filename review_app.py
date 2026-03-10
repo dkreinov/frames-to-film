@@ -894,8 +894,10 @@ def render_extend_images_tab() -> None:
         include_picker=False,
     )
 
-    action_col, meta_col = st.columns([1.1, 0.9], gap="large")
+    action_col, meta_col = st.columns([1.15, 0.85], gap="large")
     with action_col:
+        st.markdown("**Create or replace**")
+        st.caption("Run the API directly, or open Gemini Web if you want to iterate manually before saving.")
         overwrite = st.checkbox(
             "Overwrite existing saved result",
             value=False,
@@ -917,6 +919,7 @@ def render_extend_images_tab() -> None:
             load_compare_data_uri.clear()
             st.success(f"Saved API result to {relative_folder_label(target_path)}.")
             st.rerun()
+        st.markdown("**Prompt**")
         prompt_actions = st.columns([1, 1.2], gap="small")
         if prompt_actions[0].button(
             "Use detected prompt",
@@ -950,13 +953,19 @@ def render_extend_images_tab() -> None:
             st.rerun()
 
     with meta_col:
-        st.caption(f"Source path: `{relative_folder_label(source_path)}`")
-        st.caption(f"Target save path: `{relative_folder_label(target_path)}`")
-        st.caption(
-            f"Status: {'Ready' if target_path.exists() else 'Needs extension'}"
+        st.markdown("**Details**")
+        st.markdown(
+            f"""
+            <div class="extend-details-card">
+              <div><span>Source path</span><strong>{relative_folder_label(source_path)}</strong></div>
+              <div><span>Target save path</span><strong>{relative_folder_label(target_path)}</strong></div>
+              <div><span>Status</span><strong>{'Ready' if target_path.exists() else 'Needs extension'}</strong></div>
+              <div><span>Prompt profile</span><strong>{detected_profile}</strong></div>
+              <div><span>Position</span><strong>{visible_names.index(active_name) + 1} of {len(visible_names)}</strong></div>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
-        st.caption(f"Prompt profile: {detected_profile}")
-        st.caption(f"Viewing image {visible_names.index(active_name) + 1} of {len(visible_names)} in the current filter.")
 
 
 def inject_styles() -> None:
@@ -1008,6 +1017,46 @@ def inject_styles() -> None:
             font-size: 0.96rem;
             margin: 0;
             max-width: 58rem;
+        }
+        .extend-summary-card,
+        .extend-details-card {
+            background: rgba(255, 250, 245, 0.88);
+            border: 1px solid rgba(194, 120, 67, 0.18);
+            border-radius: 14px;
+            box-shadow: 0 10px 22px rgba(78, 45, 24, 0.07);
+        }
+        .extend-summary-card {
+            min-height: 74px;
+            padding: 0.75rem 0.9rem;
+        }
+        .extend-summary-card--active {
+            background: linear-gradient(180deg, rgba(255, 246, 235, 0.98) 0%, rgba(255, 236, 214, 0.92) 100%);
+            border-color: rgba(194, 120, 67, 0.28);
+        }
+        .extend-summary-card span,
+        .extend-details-card span {
+            color: #8b5e3c;
+            display: block;
+            font-size: 0.78rem;
+            font-weight: 600;
+            letter-spacing: 0.01em;
+            margin-bottom: 0.22rem;
+            text-transform: uppercase;
+        }
+        .extend-summary-card strong,
+        .extend-details-card strong {
+            color: #3f2415;
+            display: block;
+            font-size: 1rem;
+            line-height: 1.3;
+        }
+        .extend-details-card {
+            padding: 0.9rem 1rem;
+        }
+        .extend-details-card > div + div {
+            border-top: 1px solid rgba(194, 120, 67, 0.12);
+            margin-top: 0.65rem;
+            padding-top: 0.65rem;
         }
         [data-testid="stSidebar"] h2,
         [data-testid="stSidebar"] p,
