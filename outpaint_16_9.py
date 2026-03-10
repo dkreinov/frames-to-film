@@ -5,7 +5,7 @@ import re
 import time
 from io import BytesIO
 from dotenv import load_dotenv
-from PIL import Image
+from PIL import Image, ImageOps
 from google import genai
 from google.genai import types
 
@@ -16,6 +16,7 @@ OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "kling_test")
 TARGET_W, TARGET_H = 5376, 3024  # 16:9
 IMAGE_MODEL = "gemini-3-pro-image-preview"
 API_DELAY = 10
+TARGET_ASPECT_RATIO = TARGET_W / TARGET_H
 
 PROMPT = (
     "Extend this photograph to 16:9 widescreen landscape aspect ratio by widening it horizontally. "
@@ -23,6 +24,146 @@ PROMPT = (
     "Only extend the background on both sides naturally. Match the existing lighting, colors, textures, "
     "and photographic style exactly. No seams, no visible transitions."
 )
+
+PORTRAIT_PROMPT = (
+    "This is a portrait-oriented photograph that needs to become 16:9 by widening only left and right. "
+    "Keep every person exactly unchanged, especially the same face, expression, hair, body, clothing, and pose. "
+    "Do not morph, replace, restyle, or invent a different person. Preserve the existing center composition exactly as it is. "
+    "Only extend the background on both sides naturally, matching the current lighting, colors, textures, and photographic realism. "
+    "No seams, no visible transitions."
+)
+
+PRESERVE_PROMPT = (
+    "This image is already an edited composition. Preserve the existing image exactly as it is. "
+    "Expand only the left and right outer edges as needed to reach a 16:9 landscape frame. "
+    "Do not change any person, face, expression, body, clothing, pose, or the existing central composition. "
+    "Only continue the surrounding background naturally. Match the current lighting, colors, textures, and photographic realism. "
+    "No seams, no visible transitions."
+)
+
+MINIMAL_WIDEN_PROMPT = (
+    "This image is already close to 16:9. Preserve the existing image exactly as it is. "
+    "Widen only the extreme left and right edges by a very small amount to reach exact 16:9. "
+    "Do not change any person, face, expression, body, clothing, pose, or the current composition. "
+    "Only continue the outer background naturally with no seams or visible transitions."
+)
+
+SINGLE_SELFIE_PROMPT = (
+    "Keep the person exactly the same, especially the face, hair, expression, clothing, and pose. "
+    "Preserve the current photo exactly in the center and extend only the outdoor background on the left and right. "
+    "Continue the same trees, sky, grass, or garden naturally. No new people, no face changes, no seams."
+)
+
+TWO_PERSON_PROMPT = (
+    "Keep both people exactly the same, especially their faces, hair, expressions, clothing, and pose. "
+    "Preserve the original photo exactly in the center and extend only the background on the left and right. "
+    "Continue the same environment naturally and do not invent extra people, arms, or bodies. No seams."
+)
+
+INDOOR_FAMILY_PROMPT = (
+    "Keep every original person exactly once and preserve all faces, expressions, clothing, and pose. "
+    "Preserve the current family photo exactly in the center and extend only the room on the left and right. "
+    "Continue the same walls, furniture, floor, and lighting naturally. Do not duplicate or invent any person. No seams."
+)
+
+OUTDOOR_FAMILY_PROMPT = (
+    "Keep every original person exactly once and preserve all faces, expressions, clothing, and pose. "
+    "Preserve the current family photo exactly in the center and extend only the outdoor background on the left and right. "
+    "Continue the same grass, trees, sky, path, or landscape naturally. Do not duplicate or invent any person. No seams."
+)
+
+EVENT_PROMPT = (
+    "Keep every visible person exactly the same, especially the faces, expressions, clothing, and pose. "
+    "Preserve the current event photo exactly in the center and extend only the background on the left and right. "
+    "Continue the same lights, crowd, room, or night atmosphere naturally without inventing extra people in the center. No seams."
+)
+
+GROUP_EDGE_PROMPT = (
+    "This is a crowded group photo. Keep every original person exactly once and preserve the original photo unchanged in the center. "
+    "Do not duplicate, extend, clone, or invent any person, face, body, arm, or clothing at the left or right edges. "
+    "Expand to 16:9 by adding only empty restaurant or room background and floor space beyond the outermost people. "
+    "Continue the same walls, windows, tables, chairs, lighting, and floor naturally. No seams."
+)
+
+CITY_GROUP_PROMPT = (
+    "Keep every original person exactly once and preserve all faces, expressions, clothing, and pose. "
+    "Preserve the current city photo exactly in the center and extend only the street, buildings, lights, and pavement on the left and right. "
+    "Do not duplicate or invent any person. Keep the same city atmosphere and realistic perspective. No seams."
+)
+
+SCENIC_SINGLE_PROMPT = (
+    "Keep the person exactly the same, especially the face, body, clothing, and pose. "
+    "Preserve the current scenic photo exactly in the center and extend only the mountains, trees, sky, and landscape on the left and right. "
+    "Do not change the person or invent extra people. Keep the same natural light and realistic depth. No seams."
+)
+
+FULL_BODY_PROMPT = (
+    "Keep every person exactly the same from head to toe, especially the face, hair, expression, clothing, hands, and full-body pose. "
+    "Preserve the current photo exactly in the center and extend only the hallway, room, or background on the left and right. "
+    "Do not distort legs, arms, hands, or clothing. Do not invent extra people. No seams."
+)
+
+GREEN_ROOM_PROMPT = (
+    "Keep every original person exactly once and preserve all faces, expressions, clothing, and pose. "
+    "Preserve the current birthday photo exactly in the center and extend only the room on the left and right. "
+    "Continue the same green wall, party decorations, table, and lighting naturally. Do not duplicate or invent any person. No seams."
+)
+
+GROUP_PROMPT_OVERRIDES = {
+    "13.jpg": (TWO_PERSON_PROMPT, "Custom: close selfie"),
+    "18.jpg": (TWO_PERSON_PROMPT, "Custom: close selfie"),
+    "19.jpg": (INDOOR_FAMILY_PROMPT, "Custom: indoor family"),
+    "2.jpg": (PORTRAIT_PROMPT, "Custom: portrait"),
+    "2.JPG": (PORTRAIT_PROMPT, "Custom: portrait"),
+    "20.jpg": (INDOOR_FAMILY_PROMPT, "Custom: indoor family"),
+    "20230204_155432.jpg": (GREEN_ROOM_PROMPT, "Custom: birthday room"),
+    "24.jpg": (OUTDOOR_FAMILY_PROMPT, "Custom: outdoor family"),
+    "24_b.jpg": (SCENIC_SINGLE_PROMPT, "Custom: scenic single"),
+    "24_c.jpg": (SINGLE_SELFIE_PROMPT, "Custom: single selfie"),
+    "25.jpg": (FULL_BODY_PROMPT, "Custom: full body"),
+    "26.jpg": (INDOOR_FAMILY_PROMPT, "Custom: indoor family"),
+    "27_b.jpg": (TWO_PERSON_PROMPT, "Custom: two people"),
+    "28.jpeg": (EVENT_PROMPT, "Custom: event"),
+    "29.jpg": (TWO_PERSON_PROMPT, "Custom: two people"),
+    "3.jpg": (EVENT_PROMPT, "Custom: event"),
+    "3.JPG": (EVENT_PROMPT, "Custom: event"),
+    "30.jpeg": (GROUP_EDGE_PROMPT, "Custom: crowded group"),
+    "31.jpeg": (CITY_GROUP_PROMPT, "Custom: city group"),
+    "32.jpeg": (INDOOR_FAMILY_PROMPT, "Custom: indoor family"),
+    "33.jpg": (CITY_GROUP_PROMPT, "Custom: city group"),
+    "4.jpg": (EVENT_PROMPT, "Custom: event"),
+    "8.jpg": (INDOOR_FAMILY_PROMPT, "Custom: indoor family"),
+    "9.jpg": (INDOOR_FAMILY_PROMPT, "Custom: indoor family"),
+    "IMG-20150329-WA0006.jpg": (INDOOR_FAMILY_PROMPT, "Custom: indoor family"),
+    "IMG-20150610-WA0010.jpg": (OUTDOOR_FAMILY_PROMPT, "Custom: outdoor family"),
+    "IMG-20150610-WA0013.jpg": (OUTDOOR_FAMILY_PROMPT, "Custom: outdoor family"),
+    "IMG-20170505-WA0007.jpg": (OUTDOOR_FAMILY_PROMPT, "Custom: outdoor family"),
+    "IMG-20170706-WA0007.jpg": (CITY_GROUP_PROMPT, "Custom: city group"),
+    "IMG-20170813-WA0013.jpg": (OUTDOOR_FAMILY_PROMPT, "Custom: outdoor family"),
+    "IMG-20180317-WA0016.jpg": (TWO_PERSON_PROMPT, "Custom: close selfie"),
+    "IMG-20180805-WA0011.jpg": (OUTDOOR_FAMILY_PROMPT, "Custom: outdoor family"),
+    "IMG-20180911-WA0005.jpg": (OUTDOOR_FAMILY_PROMPT, "Custom: outdoor family"),
+    "IMG-20200211-WA0021.jpg": (OUTDOOR_FAMILY_PROMPT, "Custom: outdoor family"),
+    "IMG-20210612-WA0031.jpg": (OUTDOOR_FAMILY_PROMPT, "Custom: outdoor family"),
+    "IMG-20211116-WA0015.jpg": (INDOOR_FAMILY_PROMPT, "Custom: indoor family"),
+    "IMG-20211127-WA0029.jpg": (OUTDOOR_FAMILY_PROMPT, "Custom: outdoor family"),
+}
+
+
+def choose_extension_prompt(img, filename=None):
+    if filename:
+        override = GROUP_PROMPT_OVERRIDES.get(filename)
+        if override is not None:
+            return override
+    ratio = img.width / img.height
+    width_multiplier = TARGET_ASPECT_RATIO / ratio
+    if ratio < 1.0:
+        return PORTRAIT_PROMPT, "Portrait side extension"
+    if width_multiplier <= 1.08:
+        return MINIMAL_WIDEN_PROMPT, "Near-16:9 preserve"
+    if width_multiplier <= 1.35:
+        return PRESERVE_PROMPT, "Already wide preserve"
+    return PROMPT, "Full side extension"
 
 
 def sort_key(filename):
@@ -103,13 +244,15 @@ def main():
         out = os.path.join(OUT_DIR, filename)
 
         img = Image.open(src)
+        img = ImageOps.exif_transpose(img)
         if img.mode != 'RGB':
             img = img.convert('RGB')
 
-        print(f"[{i+1}/{len(todo)}] {filename}: {img.size}", end="", flush=True)
+        prompt, prompt_profile = choose_extension_prompt(img, filename)
+        print(f"[{i+1}/{len(todo)}] {filename}: {img.size} [{prompt_profile}]", end="", flush=True)
 
         try:
-            result = outpaint(client, img, PROMPT)
+            result = outpaint(client, img, prompt)
         except Exception as e:
             print(f" ERROR: {e}")
             time.sleep(API_DELAY)

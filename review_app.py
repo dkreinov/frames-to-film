@@ -334,9 +334,10 @@ def browse_for_folder(initial_dir: Path) -> Path | None:
 
 @st.cache_data
 def extension_prompt_for_image(path_text: str, file_key: str) -> tuple[str, str, float, float]:
+    source_path = Path(path_text)
     with Image.open(path_text) as source_image:
         source_image = ImageOps.exif_transpose(source_image)
-        prompt, profile = choose_extension_prompt(source_image)
+        prompt, profile = choose_extension_prompt(source_image, source_path.name)
         aspect_ratio = source_image.width / source_image.height
         width_multiplier = TARGET_ASPECT_RATIO / aspect_ratio
     return prompt, profile, aspect_ratio, width_multiplier
