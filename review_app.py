@@ -1837,8 +1837,11 @@ def render_build_movie_tab() -> None:
     use_credits_key = f"build_use_kling::{folder_key_text(selected_folder)}"
     if use_credits_key not in st.session_state:
         st.session_state[use_credits_key] = False
+    st.caption(
+        f"Generate clips for {len(st.session_state[selected_pairs_key])} selected pair(s). Stitch the movie after at least one segment exists."
+    )
     action_cols[0].checkbox("Use Kling credits", key=use_credits_key)
-    if action_cols[1].button("Generate selected pairs", use_container_width=True, type="primary"):
+    if action_cols[1].button("Generate clips", use_container_width=True, type="primary"):
         if not st.session_state[selected_pairs_key]:
             st.warning("Choose at least one pair to generate.")
         elif not st.session_state[use_credits_key]:
@@ -1854,7 +1857,11 @@ def render_build_movie_tab() -> None:
                 )
             st.session_state[f"build_generation_results::{folder_key_text(selected_folder)}"] = generation_results
             st.rerun()
-    if action_cols[2].button("Stitch available sequence", use_container_width=True):
+    if action_cols[2].button(
+        "Stitch movie",
+        use_container_width=True,
+        disabled=not existing_segments,
+    ):
         try:
             stitch_result = stitch_sequence(
                 ordered_names,
@@ -2202,7 +2209,7 @@ def sidebar_controls() -> tuple[str, str]:
         label_visibility="collapsed",
     )
 
-    st.sidebar.caption("Pick a clip, review it, then save or queue a redo.")
+    st.sidebar.caption("Review the queue, approve what works, and send weak clips for another pass.")
     return run_id, status_filter
 
 
@@ -2233,8 +2240,8 @@ def select_pair(pairs, pair_rows, status_filter: str):
     current_index = visible_pair_ids.index(st.session_state.selected_pair_id)
     render_sidebar_queue_summary(pair_rows, visible_pair_ids, current_index)
 
-    button_cols = st.sidebar.columns(2)
-    if button_cols[0].button("Previous", use_container_width=True, disabled=current_index == 0):
+    button_cols = st.sidebar.columns([1, 1, 1.45], gap="small")
+    if button_cols[0].button("Back", use_container_width=True, disabled=current_index == 0):
         set_selected_pair(visible_pair_ids[current_index - 1])
         st.rerun()
     if button_cols[1].button(
@@ -2246,8 +2253,8 @@ def select_pair(pairs, pair_rows, status_filter: str):
         st.rerun()
 
     next_review_pair = next_pair_needing_review(filtered_pair_ids, st.session_state.selected_pair_id)
-    if st.sidebar.button(
-        "Jump to next unreviewed",
+    if button_cols[2].button(
+        "Next unreviewed",
         use_container_width=True,
         disabled=next_review_pair is None,
     ) and next_review_pair is not None:
@@ -2255,12 +2262,9 @@ def select_pair(pairs, pair_rows, status_filter: str):
         st.rerun()
 
     current_row = pair_row_lookup[st.session_state.selected_pair_id]
-    st.sidebar.markdown("**Current clip**")
     st.sidebar.caption(
-        f"{st.session_state.selected_pair_id} | {display_status(current_row['status'])} | "
-        f"{version_summary(current_row)}"
+        f"Current: {st.session_state.selected_pair_id} • {display_status(current_row['status'])} • {version_summary(current_row)}"
     )
-    st.sidebar.caption("[ ] Unreviewed  [R] Needs redo  [OK] Approved  [?] Discussion")
 
     selected_pair_id = st.sidebar.radio(
         "Queue",
@@ -2497,8 +2501,9 @@ def render_review_panel(
                 st.write(f"File: `{current_clip.filename}`")
                 st.write(f"Path: `{current_clip.video_path}`")
 
+            st.caption("Use the primary button only when this version is approved. Save review keeps redo and discussion decisions without jumping away.")
             submit_cols = st.columns(2, gap="medium")
-            save_only = submit_cols[0].form_submit_button("Save only", use_container_width=True)
+            save_only = submit_cols[0].form_submit_button("Save review", use_container_width=True)
             approve_and_next = submit_cols[1].form_submit_button(
                 "Approve and next",
                 type="primary",
@@ -2841,8 +2846,9 @@ def render_redo_queue(redo_requests, review_lookup, winners, run_id: str) -> Non
             help="Choose exactly which queued retries to preview or run.",
         )
 
-    control_cols = st.columns([1, 1, 1.2], gap="large")
-    if control_cols[0].button("Preview queued retries", use_container_width=True):
+    st.caption("Preview the rewritten prompts first, then run only the retries you want to spend credits on.")
+    control_cols = st.columns([1.1, 1, 1.3], gap="large")
+    if control_cols[0].button("Preview retry prompts", use_container_width=True):
         if not selected_queue_keys:
             st.warning("Select at least one queued retry to preview.")
         else:
@@ -2850,7 +2856,7 @@ def render_redo_queue(redo_requests, review_lookup, winners, run_id: str) -> Non
 
     run_confirmed = control_cols[1].checkbox("Use Kling credits", value=False)
     if control_cols[2].button(
-        "Run queued retries",
+        "Generate selected retries",
         use_container_width=True,
         disabled=not queued_requests or not selected_queue_keys,
         type="primary",
@@ -3150,10 +3156,10 @@ def render_sidebar_queue_summary(pair_rows, visible_pair_ids, current_index: int
     rebuilt = sum(1 for item in pair_rows if item["rebuilt"])
 
     st.sidebar.markdown("**Queue summary**")
-    summary_cols = st.sidebar.columns(2)
+    summary_cols = st.sidebar.columns(3)
     summary_cols[0].metric("Left", unreviewed)
-    summary_cols[1].metric("Needs redo", redo)
-    st.sidebar.caption(f"Rebuilt clips: {rebuilt}")
+    summary_cols[1].metric("Redo", redo)
+    summary_cols[2].metric("Rebuilt", rebuilt)
     st.sidebar.caption(f"Showing clip {current_index + 1} of {len(visible_pair_ids)} in this filter.")
 
 
