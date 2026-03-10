@@ -126,6 +126,34 @@ The `Extend images` tab is for the manual Gemini Web workflow:
 
 The app saves the uploaded result into the chosen output folder with the expected filename. Filename collisions are treated as the same image only inside that selected output folder, so different source folders can safely contain the same names.
 
+## Optional Local NN Judge For Extensions
+
+The `Extend images` tab now also supports an optional local neural-network judge.
+
+What it checks:
+
+- face-count preservation
+- face-identity preservation
+- person/body-count preservation
+- likely invented or duplicated edge people
+
+How to use it:
+
+1. Open `Extend images`
+2. Select an image that already has a saved extension
+3. Enable `Enable local NN judge`
+4. Click `Run local NN judge`
+
+What the labels mean:
+
+- `Good`: the extension looks consistent enough with the original
+- `Review`: something drifted and should be checked by a human
+- `Bad`: the extension likely invented or changed people too aggressively
+
+The app shows the human-facing label first and keeps the raw component scores inside `Local NN judge details`.
+
+If the local models are not available, the toggle still renders but the details panel will explain that the judge is unavailable instead of breaking the tab.
+
 ## Review Decisions
 
 - `Approve`: the clip is good enough for the final movie.
