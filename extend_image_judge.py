@@ -54,7 +54,13 @@ def judge_extension(source_path: str | Path, result_path: str | Path) -> dict[st
             + (1.0 - edge_duplication_risk) * 0.10
         )
         overall_score = max(0.0, min(1.0, overall_score))
-        label = _label_for_score(overall_score, edge_duplication_risk)
+        label = _label_for_result(
+            overall_score,
+            face_count_score,
+            face_identity_score,
+            person_count_score,
+            edge_duplication_risk,
+        )
         reason = _reason_for_result(
             face_count_score,
             face_identity_score,
@@ -92,9 +98,9 @@ def judge_extension(source_path: str | Path, result_path: str | Path) -> dict[st
 
 def judge_available() -> tuple[bool, str]:
     try:
-        import insightface  # noqa: F401
-        import onnxruntime  # noqa: F401
+        import facenet_pytorch  # noqa: F401
         import ultralytics  # noqa: F401
+        import torch  # noqa: F401
     except ImportError as exc:
         return False, f"Missing local judge dependency: {exc.name}"
 
@@ -110,13 +116,15 @@ def judge_available() -> tuple[bool, str]:
 @lru_cache(maxsize=1)
 def _face_model():
     try:
-        from insightface.app import FaceAnalysis
+        from facenet_pytorch import InceptionResnetV1, MTCNN
+        import torch
     except ImportError as exc:
         raise RuntimeError(f"Face model is unavailable: {exc}") from exc
 
-    app = FaceAnalysis(name="buffalo_l", providers=["CPUExecutionProvider"])
-    app.prepare(ctx_id=0, det_size=(640, 640))
-    return app
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    detector = MTCNN(keep_all=True, device=device)
+    embedder = InceptionResnetV1(pretrained="vggface2").eval().to(device)
+    return {"detector": detector, "embedder": embedder, "device": device}
 
 
 @lru_cache(maxsize=1)
@@ -154,14 +162,36 @@ def _align_images(source_image: Image.Image, result_image: Image.Image) -> tuple
 
 
 def _detect_faces(image: Image.Image) -> list[dict[str, np.ndarray | tuple[float, float, float, float]]]:
-    face_app = _face_model()
-    bgr = np.asarray(image)[:, :, ::-1]
+    import torch
+
+    face_model = _face_model()
+    detector = face_model["detector"]
+    embedder = face_model["embedder"]
+    device = face_model["device"]
     faces = []
-    for face in face_app.get(bgr):
-        embedding = np.asarray(face.normed_embedding, dtype=np.float32)
+    boxes, probabilities = detector.detect(image)
+    if boxes is None:
+        return faces
+
+    for bbox, probability in zip(boxes, probabilities):
+        if probability is None or probability < 0.90:
+            continue
+        left, top, right, bottom = [max(0, int(round(value))) for value in bbox]
+        if right <= left or bottom <= top:
+            continue
+        face_crop = image.crop((left, top, right, bottom)).resize((160, 160), Image.LANCZOS)
+        face_tensor = torch.from_numpy(np.asarray(face_crop, dtype=np.float32) / 255.0)
+        face_tensor = face_tensor.permute(2, 0, 1).unsqueeze(0)
+        face_tensor = (face_tensor - 0.5) / 0.5
+        face_tensor = face_tensor.to(device)
+        with torch.no_grad():
+            embedding = embedder(face_tensor).cpu().numpy()[0]
+        norm = float(np.linalg.norm(embedding))
+        if norm > 0:
+            embedding = embedding / norm
         faces.append(
             {
-                "bbox": tuple(float(value) for value in face.bbox),
+                "bbox": tuple(float(value) for value in (left, top, right, bottom)),
                 "embedding": embedding,
             }
         )
@@ -244,10 +274,28 @@ def _bbox_center_x(bbox: tuple[float, float, float, float]) -> float:
     return (bbox[0] + bbox[2]) / 2
 
 
-def _label_for_score(overall_score: float, edge_duplication_risk: float) -> str:
-    if edge_duplication_risk >= 0.45 or overall_score < 0.5:
+def _label_for_result(
+    overall_score: float,
+    face_count_score: float,
+    face_identity_score: float,
+    person_count_score: float,
+    edge_duplication_risk: float,
+) -> str:
+    if (
+        edge_duplication_risk >= 0.55
+        or face_identity_score < 0.65
+        or person_count_score < 0.45
+        or face_count_score < 0.55
+        or overall_score < 0.55
+    ):
         return "Bad"
-    if overall_score < 0.75:
+    if (
+        edge_duplication_risk >= 0.22
+        or face_identity_score < 0.88
+        or person_count_score < 0.75
+        or face_count_score < 0.9
+        or overall_score < 0.9
+    ):
         return "Review"
     return "Good"
 
@@ -265,12 +313,20 @@ def _reason_for_result(
 ) -> str:
     if edge_duplication_risk >= 0.45:
         return "Likely invented or duplicated people near the image edges."
+    if edge_duplication_risk >= 0.22:
+        return "Possible invented or duplicated people near the image edges."
     if face_identity_score < 0.55:
         return "Faces no longer match the original strongly enough."
+    if face_identity_score < 0.88:
+        return "Faces drifted enough that the extension should be reviewed."
     if face_count_score < 0.7:
         return f"Face count drifted from {source_faces} to {result_faces} in the preserved center."
+    if face_count_score < 0.9:
+        return f"Face count changed from {source_faces} to {result_faces} in the preserved center."
     if person_count_score < 0.7:
         return f"Person count drifted from {source_people} to {result_people} in the preserved center."
+    if person_count_score < 0.75:
+        return f"Person count changed from {source_people} to {result_people} in the preserved center."
     if result_people_full > result_people:
         return "Preserved center looks acceptable, but extra edge people were detected."
     return "Faces and people look consistent with the original."
