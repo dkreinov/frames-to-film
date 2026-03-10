@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Storyboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Segoe UI", system-ui, sans-serif;
+      }
+
+      body {
+        margin: 0;
+        background: transparent;
+        color: #1f2937;
+      }
+
+      .board-shell {
+        background: rgba(255, 250, 245, 0.86);
+        border: 1px solid rgba(194, 120, 67, 0.18);
+        border-radius: 16px;
+        box-shadow: 0 10px 22px rgba(78, 45, 24, 0.07);
+        padding: 0.9rem;
+      }
+
+      .board-help {
+        color: #7c5a3a;
+        font-size: 0.9rem;
+        margin: 0 0 0.8rem;
+      }
+
+      .board {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .card {
+        background: #fffaf5;
+        border: 1px solid rgba(194, 120, 67, 0.24);
+        border-radius: 14px;
+        box-shadow: 0 8px 20px rgba(78, 45, 24, 0.08);
+        cursor: pointer;
+        overflow: hidden;
+        transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+        width: 148px;
+      }
+
+      .card:hover {
+        box-shadow: 0 12px 26px rgba(78, 45, 24, 0.12);
+        transform: translateY(-1px);
+      }
+
+      .card.selected {
+        border-color: #b45309;
+        box-shadow: 0 0 0 2px rgba(180, 83, 9, 0.18), 0 12px 26px rgba(78, 45, 24, 0.12);
+      }
+
+      .card.dragging {
+        opacity: 0.92;
+      }
+
+      .card img {
+        aspect-ratio: 4 / 3;
+        display: block;
+        height: auto;
+        object-fit: cover;
+        width: 100%;
+      }
+
+      .card-header {
+        align-items: center;
+        background: linear-gradient(180deg, #fff6ec 0%, #fde8d2 100%);
+        border-bottom: 1px solid rgba(194, 120, 67, 0.15);
+        color: #8c3e0b;
+        display: flex;
+        font-size: 0.82rem;
+        font-weight: 700;
+        justify-content: space-between;
+        letter-spacing: 0.01em;
+        line-height: 1.2;
+        min-height: 44px;
+        padding: 0.55rem 0.65rem;
+      }
+
+      .card-order {
+        color: #b45309;
+        font-size: 0.75rem;
+        font-weight: 800;
+        margin-left: 0.5rem;
+        white-space: nowrap;
+      }
+
+      .card-title {
+        overflow-wrap: anywhere;
+      }
+
+      .selected-note {
+        color: #7c5a3a;
+        font-size: 0.82rem;
+        margin-top: 0.8rem;
+      }
+
+      .empty {
+        color: #7c5a3a;
+        font-size: 0.92rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="board-shell">
+      <p class="board-help">Drag thumbnails to change the movie order. Click a card to make it the active still.</p>
+      <div id="board" class="board"></div>
+      <div id="selected-note" class="selected-note"></div>
+      <div id="empty" class="empty" hidden>No stills available.</div>
+    </div>
+
+    <script>
+      let currentItems = [];
+      let currentSelectedId = null;
+      let sortable = null;
+
+      function sendMessage(type, data) {
+        const message = Object.assign(
+          { isStreamlitMessage: true, type },
+          data || {}
+        );
+        window.parent.postMessage(message, "*");
+      }
+
+      function setFrameHeight() {
+        const height = document.documentElement.scrollHeight;
+        sendMessage("streamlit:setFrameHeight", { height });
+      }
+
+      function setComponentValue(value) {
+        sendMessage("streamlit:setComponentValue", { value });
+      }
+
+      function renderBoard() {
+        const board = document.getElementById("board");
+        const empty = document.getElementById("empty");
+        const selectedNote = document.getElementById("selected-note");
+
+        board.innerHTML = "";
+
+        if (!currentItems.length) {
+          empty.hidden = false;
+          selectedNote.textContent = "";
+          setFrameHeight();
+          return;
+        }
+
+        empty.hidden = true;
+
+        currentItems.forEach((item, index) => {
+          const card = document.createElement("div");
+          card.className = "card";
+          card.dataset.id = item.id;
+          if (item.id === currentSelectedId) {
+            card.classList.add("selected");
+          }
+
+          const header = document.createElement("div");
+          header.className = "card-header";
+
+          const title = document.createElement("div");
+          title.className = "card-title";
+          title.textContent = item.name;
+
+          const order = document.createElement("div");
+          order.className = "card-order";
+          order.textContent = "#" + (index + 1);
+
+          header.appendChild(title);
+          header.appendChild(order);
+
+          const image = document.createElement("img");
+          image.src = item.thumb;
+          image.alt = item.name;
+          image.draggable = false;
+
+          card.appendChild(header);
+          card.appendChild(image);
+          card.addEventListener("click", () => {
+            currentSelectedId = item.id;
+            renderBoard();
+            setComponentValue({
+              ordered_ids: currentItems.map((entry) => entry.id),
+              selected_id: currentSelectedId,
+            });
+          });
+
+          board.appendChild(card);
+        });
+
+        selectedNote.textContent = currentSelectedId
+          ? `Selected still: ${currentSelectedId}`
+          : "";
+
+        if (sortable) {
+          sortable.destroy();
+        }
+
+        sortable = Sortable.create(board, {
+          animation: 150,
+          ghostClass: "dragging",
+          onEnd: () => {
+            const ids = Array.from(board.children).map((child) => child.dataset.id);
+            currentItems = ids
+              .map((id) => currentItems.find((item) => item.id === id))
+              .filter(Boolean);
+            renderBoard();
+            setComponentValue({
+              ordered_ids: currentItems.map((entry) => entry.id),
+              selected_id: currentSelectedId,
+            });
+          },
+        });
+
+        setFrameHeight();
+      }
+
+      function onRender(event) {
+        const data = event.data;
+        if (!data || data.type !== "streamlit:render") {
+          return;
+        }
+
+        const args = data.args || {};
+        currentItems = Array.isArray(args.items) ? args.items : [];
+        currentSelectedId = args.selected_id || (currentItems[0] && currentItems[0].id) || null;
+        renderBoard();
+      }
+
+      window.addEventListener("message", onRender);
+      sendMessage("streamlit:componentReady", { apiVersion: 1 });
+      setFrameHeight();
+    </script>
+  </body>
+</html>

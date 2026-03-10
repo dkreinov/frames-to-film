@@ -84,6 +84,9 @@ What it does:
 
 - lets you choose the still-image folder for Kling
 - orders images naturally, so `2` stays before `11`
+- shows the sequence as a visual thumbnail storyboard
+- lets you drag thumbnails to reorder the movie with the mouse
+- lets you click a thumbnail to make it the active still
 - lets you remove images from the sequence or add them back
 - previews each consecutive image pair and the prompt that will be used
 - lets you choose which pairs to generate

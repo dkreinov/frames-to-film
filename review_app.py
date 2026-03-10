@@ -3,6 +3,8 @@ from __future__ import annotations
 import base64
 import json
 import os
+import subprocess
+import sys
 from io import BytesIO
 from pathlib import Path
 import tkinter as tk
@@ -117,6 +119,10 @@ BUILD_TAB_STATE_PATH = ROOT_DIR / "pipeline_runs" / "build_movie_state.json"
 EXTEND_TARGET_W = 5376
 EXTEND_TARGET_H = 3024
 EXTEND_IMAGE_MODEL = "gemini-3-pro-image-preview"
+STORYBOARD_COMPONENT = components.declare_component(
+    "movie_storyboard",
+    path=str(ROOT_DIR / "components" / "storyboard"),
+)
 
 
 def main() -> None:
@@ -283,6 +289,19 @@ def load_compare_data_uri(path_text: str, max_width: int, file_key: str) -> str:
     return f"data:image/jpeg;base64,{encoded}"
 
 
+def render_storyboard_component(
+    items: list[dict[str, str]],
+    selected_id: str,
+    component_key: str,
+) -> dict[str, list[str] | str] | None:
+    return STORYBOARD_COMPONENT(
+        items=items,
+        selected_id=selected_id,
+        key=component_key,
+        default={"ordered_ids": [item["id"] for item in items], "selected_id": selected_id},
+    )
+
+
 def average_hash(image: Image.Image, size: int = 8) -> int:
     gray = image.convert("L").resize((size, size), Image.LANCZOS)
     pixels = list(gray.getdata())
@@ -437,12 +456,18 @@ def load_build_tab_state() -> dict[str, str | bool | list[str]]:
         return {}
 
 
-def save_build_tab_state(source_folder: Path, ordered_images: list[str], selected_pair_keys: list[str]) -> None:
+def save_build_tab_state(
+    source_folder: Path,
+    ordered_images: list[str],
+    selected_pair_keys: list[str],
+    custom_order: bool,
+) -> None:
     BUILD_TAB_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "source_folder": relative_folder_label(source_folder),
         "ordered_images": ordered_images,
         "selected_pair_keys": selected_pair_keys,
+        "custom_order": custom_order,
     }
     BUILD_TAB_STATE_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
@@ -474,10 +499,69 @@ def open_folder_in_windows(path: Path) -> None:
 
 
 def browse_for_folder(initial_dir: Path) -> Path | None:
+    initial = initial_dir if initial_dir.exists() else ROOT_DIR
+    python_script = """
+import sys
+import tkinter as tk
+from tkinter import filedialog
+
+initial = sys.argv[1]
+root = tk.Tk()
+root.withdraw()
+root.attributes("-topmost", True)
+selected = filedialog.askdirectory(initialdir=initial)
+root.destroy()
+if selected:
+    print(selected)
+""".strip()
+    try:
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                python_script,
+                str(initial),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        selected = (result.stdout or "").strip()
+        if selected:
+            return Path(selected)
+    except OSError:
+        pass
+
+    escaped_initial = str(initial).replace("'", "''")
+    powershell_script = f"""
+$shell = New-Object -ComObject Shell.Application
+$folder = $shell.BrowseForFolder(0, 'Select folder', 0, '{escaped_initial}')
+if ($folder) {{
+    Write-Output $folder.Self.Path
+}}
+""".strip()
+    try:
+        result = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-STA",
+                "-Command",
+                powershell_script,
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        selected = (result.stdout or "").strip()
+        if selected:
+            return Path(selected)
+    except OSError:
+        pass
+
     root = tk.Tk()
     root.withdraw()
     root.attributes("-topmost", True)
-    initial = initial_dir if initial_dir.exists() else ROOT_DIR
     selected = filedialog.askdirectory(initialdir=str(initial))
     root.destroy()
     if not selected:
@@ -865,6 +949,8 @@ def render_extend_images_tab() -> None:
     initial_source_folder = path_from_saved_text(
         str(saved_state.get("source_folder", relative_folder_label(default_folder)))
     )
+    if pending_source_folder is not None and pending_source_folder not in folder_options:
+        folder_options.insert(0, pending_source_folder)
     if initial_source_folder not in folder_options:
         folder_options.insert(0, initial_source_folder)
     if "extend_source_folder" not in st.session_state or st.session_state["extend_source_folder"] not in folder_options:
@@ -1292,6 +1378,8 @@ def render_build_movie_tab() -> None:
     source_folders = discover_image_folders()
     default_folder = ROOT_DIR / "kling_test"
     initial_source_folder = path_from_saved_text(str(saved_state.get("source_folder", relative_folder_label(default_folder))))
+    if pending_source_folder is not None and pending_source_folder not in source_folders:
+        source_folders.insert(0, pending_source_folder)
     if initial_source_folder not in source_folders:
         source_folders.insert(0, initial_source_folder)
     if default_folder not in source_folders:
@@ -1327,9 +1415,20 @@ def render_build_movie_tab() -> None:
     available_names = [path.name for path in source_paths]
     source_lookup = {path.name: path for path in source_paths}
     ordered_state_key = f"build_ordered_images::{folder_key_text(selected_folder)}"
+    custom_order_key = f"build_custom_order::{folder_key_text(selected_folder)}"
     saved_order = saved_state.get("ordered_images", [])
-    if ordered_state_key not in st.session_state:
-        st.session_state[ordered_state_key] = normalize_ordered_images(saved_order if isinstance(saved_order, list) else [], available_names)
+    saved_folder_label = str(saved_state.get("source_folder", ""))
+    saved_custom_order = bool(saved_state.get("custom_order", False))
+    use_saved_order = (
+        saved_folder_label == relative_folder_label(selected_folder)
+        and saved_custom_order
+        and isinstance(saved_order, list)
+    )
+    if custom_order_key not in st.session_state:
+        st.session_state[custom_order_key] = use_saved_order
+        st.session_state[ordered_state_key] = normalize_ordered_images(saved_order if use_saved_order else [], available_names)
+    elif ordered_state_key not in st.session_state:
+        st.session_state[ordered_state_key] = normalize_ordered_images(saved_order if use_saved_order else [], available_names)
     else:
         st.session_state[ordered_state_key] = normalize_ordered_images(st.session_state[ordered_state_key], available_names)
     ordered_names = st.session_state[ordered_state_key]
@@ -1338,40 +1437,68 @@ def render_build_movie_tab() -> None:
     if current_image_key not in st.session_state or st.session_state[current_image_key] not in ordered_names:
         st.session_state[current_image_key] = ordered_names[0]
 
-    sequence_cols = st.columns([1.15, 0.85], gap="large")
+    st.markdown("**Sequence board**")
+    st.caption("Drag thumbnails to reorder the movie. Click a thumbnail to make it the active still. Default order is numeric-natural, so `2` stays before `11`.")
+    storyboard_items = [
+        {
+            "id": name,
+            "name": name,
+            "thumb": load_compare_data_uri(str(source_lookup[name]), 320, image_cache_key(source_lookup[name])),
+        }
+        for name in ordered_names
+    ]
+    storyboard_value = render_storyboard_component(
+        storyboard_items,
+        st.session_state[current_image_key],
+        component_key=f"build_storyboard::{folder_key_text(selected_folder)}",
+    )
+    if isinstance(storyboard_value, dict):
+        new_order = storyboard_value.get("ordered_ids", [])
+        if isinstance(new_order, list):
+            normalized_order = normalize_ordered_images(
+                [str(name) for name in new_order],
+                available_names,
+            )
+            if normalized_order != ordered_names:
+                st.session_state[ordered_state_key] = normalized_order
+                ordered_names = normalized_order
+                st.session_state[custom_order_key] = True
+        selected_name = str(storyboard_value.get("selected_id", "")).strip()
+        if selected_name in ordered_names:
+            st.session_state[current_image_key] = selected_name
+
+    current_name = st.session_state[current_image_key]
+    current_index = ordered_names.index(current_name)
+    sequence_cols = st.columns([1.05, 0.95], gap="large")
     with sequence_cols[0]:
-        st.markdown("**Sequence**")
-        st.caption("Default order is numeric-natural, so `2` stays before `11`.")
-        current_name = st.selectbox(
-            "Current image in sequence",
-            options=ordered_names,
-            key=current_image_key,
-            label_visibility="collapsed",
-        )
-        current_index = ordered_names.index(current_name)
         action_cols = st.columns(4, gap="small")
-        if action_cols[0].button("Move up", use_container_width=True, disabled=current_index == 0):
+        if action_cols[0].button("Move left", use_container_width=True, disabled=current_index == 0):
             ordered_names[current_index - 1], ordered_names[current_index] = ordered_names[current_index], ordered_names[current_index - 1]
             st.session_state[ordered_state_key] = ordered_names
+            st.session_state[custom_order_key] = True
             st.rerun()
-        if action_cols[1].button("Move down", use_container_width=True, disabled=current_index == len(ordered_names) - 1):
+        if action_cols[1].button("Move right", use_container_width=True, disabled=current_index == len(ordered_names) - 1):
             ordered_names[current_index + 1], ordered_names[current_index] = ordered_names[current_index], ordered_names[current_index + 1]
             st.session_state[ordered_state_key] = ordered_names
+            st.session_state[custom_order_key] = True
             st.rerun()
-        if action_cols[2].button("Remove", use_container_width=True, disabled=len(ordered_names) <= 2):
+        if action_cols[2].button("Remove selected", use_container_width=True, disabled=len(ordered_names) <= 2):
             ordered_names.remove(current_name)
             st.session_state[ordered_state_key] = ordered_names
             st.session_state[current_image_key] = ordered_names[max(0, min(current_index, len(ordered_names) - 1))]
+            st.session_state[custom_order_key] = True
             st.rerun()
-        if action_cols[3].button("Reset order", use_container_width=True):
+        if action_cols[3].button("Use natural order", use_container_width=True):
             st.session_state[ordered_state_key] = normalize_ordered_images([], available_names)
             st.session_state[current_image_key] = st.session_state[ordered_state_key][0]
+            st.session_state[custom_order_key] = False
             st.rerun()
-        st.dataframe(
-            [{"position": index + 1, "image": name} for index, name in enumerate(ordered_names)],
+
+        current_path = source_lookup[st.session_state[current_image_key]]
+        st.image(
+            load_display_image_bytes(str(current_path), 900, image_cache_key(current_path)),
+            caption=f"Active still: {current_path.name}",
             use_container_width=True,
-            hide_index=True,
-            height=240,
         )
 
     with sequence_cols[1]:
@@ -1387,15 +1514,21 @@ def render_build_movie_tab() -> None:
             if st.button("Add to end", use_container_width=True, key=f"build_add_image_button::{folder_key_text(selected_folder)}"):
                 st.session_state[ordered_state_key] = ordered_names + [add_name]
                 st.session_state[current_image_key] = add_name
+                st.session_state[custom_order_key] = True
                 st.rerun()
         else:
             st.caption("All images in this folder are already in the sequence.")
 
-        current_path = source_lookup[st.session_state[current_image_key]]
-        st.image(
-            load_display_image_bytes(str(current_path), 900, image_cache_key(current_path)),
-            caption=f"Current still: {current_path.name}",
-            use_container_width=True,
+        st.markdown(
+            f"""
+            <div class="extend-details-card">
+              <div><span>Active still</span><strong>{current_name}</strong></div>
+              <div><span>Position</span><strong>{current_index + 1} of {len(ordered_names)}</strong></div>
+              <div><span>Sequence mode</span><strong>{'Custom order' if st.session_state[custom_order_key] else 'Natural order'}</strong></div>
+              <div><span>Folder</span><strong>{relative_folder_label(selected_folder)}</strong></div>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
 
     pair_rows = []
@@ -1423,7 +1556,12 @@ def render_build_movie_tab() -> None:
         current_selected = set(st.session_state[selected_pairs_key])
         st.session_state[selected_pairs_key] = [row["pair_key"] for row in pair_rows if row["pair_key"] in current_selected] or default_pair_keys
 
-    save_build_tab_state(selected_folder, ordered_names, st.session_state[selected_pairs_key])
+    save_build_tab_state(
+        selected_folder,
+        ordered_names,
+        st.session_state[selected_pairs_key],
+        st.session_state[custom_order_key],
+    )
 
     summary_cols = st.columns(4, gap="small")
     summary_cols[0].markdown(
@@ -1454,15 +1592,15 @@ def render_build_movie_tab() -> None:
     pair_action_cols = st.columns(3, gap="small")
     if pair_action_cols[0].button("Select all pairs", use_container_width=True, key=f"build_select_all::{folder_key_text(selected_folder)}"):
         st.session_state[selected_pairs_key] = pair_keys
-        save_build_tab_state(selected_folder, ordered_names, st.session_state[selected_pairs_key])
+        save_build_tab_state(selected_folder, ordered_names, st.session_state[selected_pairs_key], st.session_state[custom_order_key])
         st.rerun()
     if pair_action_cols[1].button("Only missing segments", use_container_width=True, key=f"build_select_missing::{folder_key_text(selected_folder)}"):
         st.session_state[selected_pairs_key] = missing_pair_keys or pair_keys
-        save_build_tab_state(selected_folder, ordered_names, st.session_state[selected_pairs_key])
+        save_build_tab_state(selected_folder, ordered_names, st.session_state[selected_pairs_key], st.session_state[custom_order_key])
         st.rerun()
     if pair_action_cols[2].button("Clear selection", use_container_width=True, key=f"build_clear_pairs::{folder_key_text(selected_folder)}"):
         st.session_state[selected_pairs_key] = []
-        save_build_tab_state(selected_folder, ordered_names, st.session_state[selected_pairs_key])
+        save_build_tab_state(selected_folder, ordered_names, st.session_state[selected_pairs_key], st.session_state[custom_order_key])
         st.rerun()
     st.multiselect(
         "Pairs to generate",
@@ -1470,7 +1608,12 @@ def render_build_movie_tab() -> None:
         key=selected_pairs_key,
         help="Choose which consecutive pairs to send to Kling from this sequence.",
     )
-    save_build_tab_state(selected_folder, ordered_names, st.session_state[selected_pairs_key])
+    save_build_tab_state(
+        selected_folder,
+        ordered_names,
+        st.session_state[selected_pairs_key],
+        st.session_state[custom_order_key],
+    )
 
     preview_key = f"build_preview_pair::{folder_key_text(selected_folder)}"
     preview_options = [row["pair_key"] for row in pair_rows]
