@@ -1,13 +1,21 @@
 from __future__ import annotations
 
-import ast
+import base64
 import json
+import os
+from io import BytesIO
 from pathlib import Path
+import tkinter as tk
+from tkinter import filedialog
 
 import streamlit as st
 import streamlit.components.v1 as components
-from PIL import Image
+from dotenv import load_dotenv
+from google import genai
+from google.genai import types
+from PIL import Image, ImageOps
 
+from outpaint_16_9 import TARGET_ASPECT_RATIO, choose_extension_prompt
 from redo_runner import (
     generate_automatic_retry_prompt,
     preview_redo_queue,
@@ -99,6 +107,10 @@ ROOT_DIR = Path(__file__).resolve().parent
 OUTPAINTED_DIR = ROOT_DIR / "outpainted"
 RAW_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 DEFAULT_EXTENSION_OUTPUT_DIR = "kling_test/manual_extends"
+EXTEND_TAB_STATE_PATH = ROOT_DIR / "pipeline_runs" / "extend_tab_state.json"
+EXTEND_TARGET_W = 5376
+EXTEND_TARGET_H = 3024
+EXTEND_IMAGE_MODEL = "gemini-3-pro-image-preview"
 
 
 def main() -> None:
@@ -177,37 +189,6 @@ def main() -> None:
 
 
 @st.cache_data
-def load_extension_prompt_catalog() -> tuple[dict[str, str], str, str]:
-    four_three_prompts: dict[str, str] = {}
-    four_three_fallback = ""
-    sixteen_nine_prompt = ""
-
-    outpaint_script = ROOT_DIR / "outpaint_images.py"
-    outpaint_tree = ast.parse(outpaint_script.read_text(encoding="utf-8"))
-    for node in outpaint_tree.body:
-        if not isinstance(node, ast.Assign):
-            continue
-        for target in node.targets:
-            if not isinstance(target, ast.Name):
-                continue
-            if target.id == "IMAGE_PROMPTS":
-                four_three_prompts = ast.literal_eval(node.value)
-            elif target.id == "FALLBACK_PROMPT":
-                four_three_fallback = ast.literal_eval(node.value)
-
-    wide_script = ROOT_DIR / "outpaint_16_9.py"
-    wide_tree = ast.parse(wide_script.read_text(encoding="utf-8"))
-    for node in wide_tree.body:
-        if not isinstance(node, ast.Assign):
-            continue
-        for target in node.targets:
-            if isinstance(target, ast.Name) and target.id == "PROMPT":
-                sixteen_nine_prompt = ast.literal_eval(node.value)
-
-    return four_three_prompts, four_three_fallback, sixteen_nine_prompt
-
-
-@st.cache_data
 def discover_image_folders() -> list[Path]:
     excluded = {".git", ".streamlit", "_cursor", "__pycache__", "pipeline_runs", "docs", "tools"}
     folders: list[Path] = []
@@ -244,29 +225,121 @@ def discover_extension_sources(source_dir: Path) -> list[Path]:
     )
 
 
+def image_cache_key(path: Path) -> str:
+    stats = path.stat()
+    return f"{stats.st_mtime_ns}:{stats.st_size}"
+
+
+@st.cache_data
+def load_display_image_bytes(path_text: str, max_width: int, file_key: str) -> bytes:
+    image = Image.open(path_text)
+    image = ImageOps.exif_transpose(image)
+
+    if image.width > max_width:
+        scale = max_width / image.width
+        new_height = max(1, int(image.height * scale))
+        image = image.resize((max_width, new_height), Image.LANCZOS)
+
+    buffer = BytesIO()
+    if image.mode != "RGB":
+        image = image.convert("RGB")
+    image.save(buffer, format="JPEG", quality=90)
+    return buffer.getvalue()
+
+
+@st.cache_data
+def load_compare_data_uri(path_text: str, max_width: int, file_key: str) -> str:
+    data = load_display_image_bytes(path_text, max_width, file_key)
+    encoded = base64.b64encode(data).decode("ascii")
+    return f"data:image/jpeg;base64,{encoded}"
+
+
 def resolve_extension_output_dir(folder_text: str) -> Path | None:
     folder_text = folder_text.strip().replace("\\", "/")
     if not folder_text:
         folder_text = DEFAULT_EXTENSION_OUTPUT_DIR
     relative_path = Path(folder_text)
     if relative_path.is_absolute():
-        return None
+        return relative_path
 
-    output_dir = (ROOT_DIR / relative_path).resolve()
-    try:
-        output_dir.relative_to(ROOT_DIR.resolve())
-    except ValueError:
-        return None
-    return output_dir
+    return (ROOT_DIR / relative_path).resolve()
 
 
 def extension_target_path(source_path: Path, output_dir: Path) -> Path:
     return output_dir / source_path.name
 
 
-def extension_prompt_for_image(filename: str, workflow: str) -> str:
-    _, _, sixteen_nine_prompt = load_extension_prompt_catalog()
-    return sixteen_nine_prompt
+def relative_folder_label(path: Path) -> str:
+    try:
+        return str(path.resolve().relative_to(ROOT_DIR.resolve())) if path.resolve() != ROOT_DIR.resolve() else "."
+    except ValueError:
+        return str(path)
+
+
+def folder_key_text(path: Path) -> str:
+    return str(path).replace("\\", "/")
+
+
+def path_from_saved_text(path_text: str) -> Path:
+    candidate = Path(path_text)
+    if candidate.is_absolute():
+        return candidate
+    return (ROOT_DIR / candidate).resolve()
+
+
+def load_extend_tab_state() -> dict[str, str | bool]:
+    if not EXTEND_TAB_STATE_PATH.exists():
+        return {}
+    try:
+        return json.loads(EXTEND_TAB_STATE_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def save_extend_tab_state(
+    source_folder: Path,
+    output_folder: str,
+    only_missing: bool,
+    active_image: str,
+    swap_compare_sides: bool,
+) -> None:
+    EXTEND_TAB_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "source_folder": relative_folder_label(source_folder),
+        "output_folder": output_folder,
+        "only_missing": only_missing,
+        "active_image": active_image,
+        "swap_compare_sides": swap_compare_sides,
+    }
+    EXTEND_TAB_STATE_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def open_folder_in_windows(path: Path) -> None:
+    if not path.exists():
+        path.mkdir(parents=True, exist_ok=True)
+    os.startfile(str(path))
+
+
+def browse_for_folder(initial_dir: Path) -> Path | None:
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes("-topmost", True)
+    initial = initial_dir if initial_dir.exists() else ROOT_DIR
+    selected = filedialog.askdirectory(initialdir=str(initial))
+    root.destroy()
+    if not selected:
+        return None
+    return Path(selected)
+
+
+@st.cache_data
+def extension_prompt_for_image(path_text: str, file_key: str) -> tuple[str, str, float, float]:
+    with Image.open(path_text) as source_image:
+        source_image = ImageOps.exif_transpose(source_image)
+        prompt, profile = choose_extension_prompt(source_image)
+        aspect_ratio = source_image.width / source_image.height
+        width_multiplier = TARGET_ASPECT_RATIO / aspect_ratio
+    return prompt, profile, aspect_ratio, width_multiplier
 
 
 def save_uploaded_extension(uploaded_file, target_path: Path) -> None:
@@ -283,31 +356,395 @@ def save_uploaded_extension(uploaded_file, target_path: Path) -> None:
     image.save(target_path, format="JPEG", quality=95)
 
 
+def get_extend_api_client() -> genai.Client:
+    load_dotenv(ROOT_DIR / ".env")
+    api_key = os.getenv("gemini")
+    if not api_key:
+        raise RuntimeError("No 'gemini' key found in .env")
+    return genai.Client(api_key=api_key)
+
+
+def upscale_extend_result(image: Image.Image) -> Image.Image:
+    width, height = image.size
+    if width >= EXTEND_TARGET_W and height >= EXTEND_TARGET_H:
+        return image.resize((EXTEND_TARGET_W, EXTEND_TARGET_H), Image.LANCZOS)
+
+    scale = max(EXTEND_TARGET_W / width, EXTEND_TARGET_H / height)
+    resized_width = int(width * scale)
+    resized_height = int(height * scale)
+    resized = image.resize((resized_width, resized_height), Image.LANCZOS)
+    left = (resized_width - EXTEND_TARGET_W) // 2
+    top = (resized_height - EXTEND_TARGET_H) // 2
+    return resized.crop((left, top, left + EXTEND_TARGET_W, top + EXTEND_TARGET_H))
+
+
+def run_extend_image_api(source_path: Path, target_path: Path, prompt: str) -> None:
+    source_image = Image.open(source_path)
+    source_image = ImageOps.exif_transpose(source_image)
+    if source_image.mode != "RGB":
+        source_image = source_image.convert("RGB")
+
+    buffer = BytesIO()
+    source_image.save(buffer, format="JPEG", quality=95)
+    buffer.seek(0)
+    image_for_api = Image.open(buffer)
+
+    client = get_extend_api_client()
+    response = client.models.generate_content(
+        model=EXTEND_IMAGE_MODEL,
+        contents=[prompt, image_for_api],
+        config=types.GenerateContentConfig(response_modalities=["Text", "Image"]),
+    )
+
+    result_image = None
+    for part in response.candidates[0].content.parts:
+        if part.inline_data is not None:
+            result_image = Image.open(BytesIO(part.inline_data.data))
+            break
+
+    if result_image is None:
+        raise RuntimeError("Gemini API returned no image result.")
+
+    if result_image.mode != "RGB":
+        result_image = result_image.convert("RGB")
+
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    upscale_extend_result(result_image).save(target_path, format="JPEG", quality=95)
+
+
+def render_overlay_image_compare(
+    source_path: Path,
+    target_path: Path,
+    large_view: bool,
+    swap_sides: bool,
+) -> None:
+    source_uri = load_compare_data_uri(
+        str(source_path),
+        2200 if large_view else 1500,
+        image_cache_key(source_path),
+    )
+    target_uri = load_compare_data_uri(
+        str(target_path),
+        2200 if large_view else 1500,
+        image_cache_key(target_path),
+    )
+    left_uri = target_uri if swap_sides else source_uri
+    right_uri = source_uri if swap_sides else target_uri
+    left_label = "Extended" if swap_sides else "Original"
+    right_label = "Original" if swap_sides else "Extended"
+    height = 920 if large_view else 620
+    script = f"""
+    <style>
+      .extend-compare {{
+        background: #17120f;
+        border-radius: 18px;
+        overflow: hidden;
+        position: relative;
+      }}
+      .extend-compare__stage {{
+        aspect-ratio: 16 / 9;
+        position: relative;
+        width: 100%;
+      }}
+      .extend-compare__stage img {{
+        height: 100%;
+        inset: 0;
+        object-fit: contain;
+        position: absolute;
+        width: 100%;
+      }}
+      .extend-compare__before {{
+        clip-path: inset(0 calc(100% - var(--split, 50%)) 0 0);
+      }}
+      .extend-compare__line {{
+        background: rgba(255,255,255,0.95);
+        box-shadow: 0 0 0 1px rgba(0,0,0,0.18);
+        height: 100%;
+        left: var(--split, 50%);
+        position: absolute;
+        top: 0;
+        width: 3px;
+      }}
+      .extend-compare__label {{
+        background: rgba(15, 23, 42, 0.74);
+        border-radius: 999px;
+        color: #fff7ed;
+        font: 600 13px/1 system-ui, sans-serif;
+        left: 14px;
+        padding: 8px 12px;
+        position: absolute;
+        top: 14px;
+      }}
+      .extend-compare__label--after {{
+        left: auto;
+        right: 14px;
+      }}
+      .extend-compare__controls {{
+        align-items: center;
+        display: flex;
+        gap: 12px;
+        padding: 12px 14px 14px;
+      }}
+      .extend-compare__controls input {{
+        flex: 1;
+      }}
+    </style>
+    <div class="extend-compare" id="extend-compare">
+      <div class="extend-compare__stage" id="extend-stage" style="--split:50%">
+        <img class="extend-compare__after" src="{right_uri}" alt="{right_label} image" />
+        <img class="extend-compare__before" src="{left_uri}" alt="{left_label} image" />
+        <div class="extend-compare__line"></div>
+        <div class="extend-compare__label">{left_label}</div>
+        <div class="extend-compare__label extend-compare__label--after">{right_label}</div>
+      </div>
+      <div class="extend-compare__controls">
+        <span style="color:#f5e7d3;font:600 13px/1 system-ui,sans-serif;">Drag to compare</span>
+        <input id="extend-slider" type="range" min="0" max="100" value="50" />
+      </div>
+    </div>
+    <script>
+      const stage = document.getElementById("extend-stage");
+      const slider = document.getElementById("extend-slider");
+      if (stage && slider) {{
+        slider.addEventListener("input", () => {{
+          stage.style.setProperty("--split", slider.value + "%");
+        }});
+      }}
+    </script>
+    """
+    components.html(script, height=height)
+
+
+def render_extend_scroll_restore(anchor_id: str) -> None:
+    script = f"""
+    <script>
+      const anchorId = "{anchor_id}";
+      function scrollToAnchor() {{
+        const anchor = window.parent.document.getElementById(anchorId);
+        if (anchor) {{
+          const parentWindow = window.parent;
+          const top = anchor.getBoundingClientRect().top + parentWindow.scrollY - 24;
+          parentWindow.scrollTo({{top, behavior: "auto"}});
+        }}
+      }}
+      let attempts = 0;
+      function keepTrying() {{
+        scrollToAnchor();
+        attempts += 1;
+        if (attempts < 18) {{
+          window.setTimeout(keepTrying, 120);
+        }}
+      }}
+      window.addEventListener("load", () => {{
+        window.setTimeout(keepTrying, 80);
+      }});
+      window.setTimeout(keepTrying, 120);
+    </script>
+    """
+    components.html(script, height=0)
+
+
+def render_extension_compare(
+    source_path: Path,
+    target_path: Path,
+    compare_mode: str,
+    large_view: bool,
+    swap_sides: bool,
+) -> None:
+    if compare_mode == "Overlay slider":
+        render_overlay_image_compare(source_path, target_path, large_view, swap_sides)
+        return
+
+    source_image = load_display_image_bytes(
+        str(source_path),
+        2200 if large_view else 1500,
+        image_cache_key(source_path),
+    )
+    target_image = load_display_image_bytes(
+        str(target_path),
+        2200 if large_view else 1500,
+        image_cache_key(target_path),
+    )
+    left_image = target_image if swap_sides else source_image
+    right_image = source_image if swap_sides else target_image
+    left_caption = f"{'Extended' if swap_sides else 'Original'}: {target_path.name if swap_sides else source_path.name}"
+    right_caption = f"{'Original' if swap_sides else 'Extended'}: {source_path.name if swap_sides else target_path.name}"
+
+    if compare_mode == "Stacked":
+        st.image(left_image, caption=left_caption, use_container_width=True)
+        st.image(right_image, caption=right_caption, use_container_width=True)
+        return
+
+    compare_cols = st.columns(2, gap="large")
+    with compare_cols[0]:
+        st.image(left_image, caption=left_caption, use_container_width=True)
+    with compare_cols[1]:
+        st.image(right_image, caption=right_caption, use_container_width=True)
+
+
+def render_extension_nav(
+    visible_names: list[str],
+    browser_rows: list[dict[str, str]],
+    active_key: str,
+    current_index: int,
+    *,
+    include_picker: bool,
+) -> str:
+    nav_cols = st.columns([1, 1, 1.2, 1.1, 2.0] if include_picker else [1, 1, 1.2, 1.2], gap="small")
+    if nav_cols[0].button(
+        "Previous image",
+        use_container_width=True,
+        disabled=current_index == 0,
+        key=f"{active_key}::prev::{include_picker}",
+    ):
+        st.session_state["pending_extend_scroll_anchor"] = "extend-compare-anchor"
+        st.session_state[active_key] = visible_names[current_index - 1]
+        st.rerun()
+    if nav_cols[1].button(
+        "Next image",
+        use_container_width=True,
+        disabled=current_index == len(visible_names) - 1,
+        key=f"{active_key}::next::{include_picker}",
+    ):
+        st.session_state["pending_extend_scroll_anchor"] = "extend-compare-anchor"
+        st.session_state[active_key] = visible_names[current_index + 1]
+        st.rerun()
+    if nav_cols[2].button(
+        "Next needs extension",
+        use_container_width=True,
+        key=f"{active_key}::pending::{include_picker}",
+    ):
+        pending_names = [
+            row["image"]
+            for row in browser_rows
+            if row["status"] == "Needs extension" and row["image"] in visible_names
+        ]
+        if pending_names:
+            st.session_state["pending_extend_scroll_anchor"] = "extend-compare-anchor"
+            st.session_state[active_key] = pending_names[0]
+            st.rerun()
+    if include_picker and nav_cols[3].button(
+        "Jump to compare",
+        use_container_width=True,
+        key=f"{active_key}::jump_compare",
+    ):
+        st.session_state["pending_extend_scroll_anchor"] = "extend-compare-anchor"
+        st.rerun()
+    if include_picker:
+        selected_name = nav_cols[4].selectbox(
+            "Active image",
+            options=visible_names,
+            index=visible_names.index(st.session_state[active_key]),
+            label_visibility="collapsed",
+        )
+        st.session_state[active_key] = selected_name
+        return selected_name
+
+    nav_cols[3].caption("Use these buttons while comparing to move without scrolling up.")
+    return st.session_state[active_key]
+
+
 def render_extend_images_tab() -> None:
     st.subheader("Extend images")
-    st.caption("Use the existing 16:9 outpaint prompt, generate in Gemini Web, then upload the finished image into your chosen output folder.")
+    st.caption("Browse one image at a time, compare the original against the current saved extension, then upload a replacement if needed.")
     workflow = "16:9 from 4:3 images"
+    saved_state = load_extend_tab_state()
+    pending_source_folder = st.session_state.pop("pending_extend_source_folder", None)
+    if pending_source_folder is not None:
+        st.session_state["extend_source_folder"] = pending_source_folder
+    pending_output_folder = st.session_state.pop("pending_extend_output_text", None)
+    if pending_output_folder is not None:
+        st.session_state["extend_output_text"] = pending_output_folder
 
     image_folders = discover_image_folders()
     default_folder = OUTPAINTED_DIR
     folder_options = [path for path in image_folders if path.exists()]
     if default_folder not in folder_options:
         folder_options.insert(0, default_folder)
-    selected_folder = st.selectbox(
-        "Source folder",
-        options=folder_options,
-        index=folder_options.index(default_folder),
-        format_func=lambda path: str(path.relative_to(ROOT_DIR)) if path != ROOT_DIR else ".",
-        help="Choose which folder of images to browse.",
+    initial_source_folder = path_from_saved_text(
+        str(saved_state.get("source_folder", relative_folder_label(default_folder)))
     )
-    output_folder_text = st.text_input(
-        "Output folder",
-        value=DEFAULT_EXTENSION_OUTPUT_DIR,
-        help="Images are treated as the same item only when the same filename already exists in this chosen output folder.",
+    if initial_source_folder not in folder_options:
+        folder_options.insert(0, initial_source_folder)
+    if "extend_source_folder" not in st.session_state or st.session_state["extend_source_folder"] not in folder_options:
+        st.session_state["extend_source_folder"] = initial_source_folder
+    output_preset_options = [DEFAULT_EXTENSION_OUTPUT_DIR]
+    output_preset_options.extend(
+        relative_folder_label(path)
+        for path in folder_options
+        if relative_folder_label(path) not in output_preset_options
     )
+    output_preset_options.append("Custom...")
+
+    output_preset_key = "extend_output_preset"
+    output_text_key = "extend_output_text"
+    initial_output_folder = str(saved_state.get("output_folder", DEFAULT_EXTENSION_OUTPUT_DIR))
+    if output_preset_key not in st.session_state:
+        st.session_state[output_preset_key] = (
+            initial_output_folder if initial_output_folder in output_preset_options else "Custom..."
+        )
+    if output_text_key not in st.session_state:
+        st.session_state[output_text_key] = initial_output_folder
+
+    workspace_cols = st.columns(2, gap="large")
+    with workspace_cols[0]:
+        st.markdown("**Source folder**")
+        source_cols = st.columns([1.55, 0.5, 0.45], gap="small")
+        selected_folder = source_cols[0].selectbox(
+            "Source folder",
+            options=folder_options,
+            key="extend_source_folder",
+            format_func=relative_folder_label,
+            label_visibility="collapsed",
+            help="Choose which folder of images to browse.",
+        )
+        if source_cols[1].button("Browse...", use_container_width=True, key="browse_source_folder"):
+            picked_source = browse_for_folder(selected_folder)
+            if picked_source is not None:
+                st.session_state["pending_extend_source_folder"] = picked_source
+                st.rerun()
+        if source_cols[2].button("Open", use_container_width=True, key="open_source_folder"):
+            open_folder_in_windows(selected_folder)
+        st.caption("Pick the folder you want to browse and compare.")
+
+    with workspace_cols[1]:
+        st.markdown("**Output folder**")
+        preset_col, text_col = st.columns([0.95, 1.25], gap="small")
+        selected_output_preset = preset_col.selectbox(
+            "Output folder preset",
+            options=output_preset_options,
+            key=output_preset_key,
+            label_visibility="collapsed",
+            help="Pick an existing folder quickly, or switch to Custom and type any project-relative output path.",
+        )
+        if selected_output_preset != "Custom...":
+            st.session_state[output_text_key] = selected_output_preset
+
+        output_folder_text = text_col.text_input(
+            "Output folder",
+            key=output_text_key,
+            label_visibility="collapsed",
+            help="Images are treated as the same item only when the same filename already exists in this chosen output folder. You can type any relative project path here.",
+        )
+        output_action_cols = st.columns([0.55, 0.45, 1.2], gap="small")
+        if output_action_cols[0].button("Browse...", use_container_width=True, key="browse_output_folder"):
+            picked_output = browse_for_folder(path_from_saved_text(output_folder_text))
+            if picked_output is not None:
+                pending_output_text = relative_folder_label(picked_output)
+                st.session_state["pending_extend_output_text"] = pending_output_text
+                st.session_state[output_preset_key] = (
+                    pending_output_text
+                    if pending_output_text in output_preset_options
+                    else "Custom..."
+                )
+                st.rerun()
+        if output_action_cols[1].button("Open", use_container_width=True, key="open_output_folder"):
+            open_folder_in_windows(path_from_saved_text(output_folder_text))
+        st.caption("This is where API and manual results will be saved.")
+
     output_dir = resolve_extension_output_dir(output_folder_text)
     if output_dir is None:
-        st.error("Output folder must be a relative path inside this project.")
+        st.error("Output folder is invalid.")
         return
 
     source_paths = discover_extension_sources(selected_folder)
@@ -315,69 +752,172 @@ def render_extend_images_tab() -> None:
         st.info("No source images were found for this workflow.")
         return
 
+    folder_key = folder_key_text(selected_folder)
+    output_key = folder_key_text(output_dir)
+    only_missing = st.checkbox(
+        "Show only images without a saved extension",
+        value=bool(saved_state.get("only_missing", False)),
+        key=f"extend_only_missing::{folder_key}::{output_key}",
+    )
+
+    browser_rows = []
+    visible_names: list[str] = []
     source_lookup = {path.name: path for path in source_paths}
-    st.markdown("**Pick images from this folder**")
-    gallery_cols = st.columns(4)
-    selected_names: list[str] = []
-    folder_key = str(selected_folder.relative_to(ROOT_DIR)) if selected_folder != ROOT_DIR else "."
-    for index, source_path in enumerate(source_paths):
-        col = gallery_cols[index % 4]
-        with col:
-            st.image(str(source_path), caption=source_path.name, use_container_width=True)
-            selected = st.checkbox(
-                f"Use {source_path.name}",
-                key=f"extend_select::{workflow}::{folder_key}::{source_path.name}",
-            )
-            if selected:
-                selected_names.append(source_path.name)
-
-    if not selected_names:
-        st.info("Select at least one image to prepare a prompt and save an extended result.")
-        return
-
-    rows = []
-    for name in selected_names:
-        source_path = source_lookup[name]
+    for source_path in source_paths:
         target_path = extension_target_path(source_path, output_dir)
-        rows.append(
+        is_ready = target_path.exists()
+        browser_rows.append(
             {
-                "image": name,
-                "source": str(source_path.parent.relative_to(ROOT_DIR)) if source_path.parent != ROOT_DIR else ".",
-                "target": str(target_path.relative_to(ROOT_DIR)),
-                "status": "Ready" if target_path.exists() else "Needs extension",
+                "image": source_path.name,
+                "status": "Ready" if is_ready else "Needs extension",
+                "target": relative_folder_label(target_path),
             }
         )
-    st.dataframe(rows, use_container_width=True, hide_index=True)
+        if not only_missing or not is_ready:
+            visible_names.append(source_path.name)
 
-    active_name = st.selectbox("Active image", options=selected_names)
+    if not visible_names:
+        st.info("Every image in this folder already has a saved extension in the selected output folder.")
+        return
+
+    ready_count = len(source_paths) - len(visible_names) if only_missing else sum(
+        1 for source_path in source_paths if extension_target_path(source_path, output_dir).exists()
+    )
+    pending_count = len(source_paths) - ready_count
+    summary_cols = st.columns(4, gap="small")
+    summary_cols[0].markdown(
+        f"<div class='extend-summary-card'><span>Source</span><strong>{relative_folder_label(selected_folder)}</strong></div>",
+        unsafe_allow_html=True,
+    )
+    summary_cols[1].markdown(
+        f"<div class='extend-summary-card'><span>Output</span><strong>{relative_folder_label(output_dir)}</strong></div>",
+        unsafe_allow_html=True,
+    )
+    summary_cols[2].markdown(
+        f"<div class='extend-summary-card'><span>Ready</span><strong>{ready_count}</strong></div>",
+        unsafe_allow_html=True,
+    )
+    summary_cols[3].markdown(
+        f"<div class='extend-summary-card'><span>Needs work</span><strong>{pending_count}</strong></div>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("**Image browser**")
+    st.caption(f"{len(visible_names)} visible out of {len(source_paths)} images in this folder.")
+
+    active_key = f"extend_active::{workflow}::{folder_key}::{output_key}"
+    saved_active_image = str(saved_state.get("active_image", ""))
+    if active_key not in st.session_state or st.session_state[active_key] not in visible_names:
+        st.session_state[active_key] = saved_active_image if saved_active_image in visible_names else visible_names[0]
+
+    current_index = visible_names.index(st.session_state[active_key])
+    selected_name = render_extension_nav(
+        visible_names,
+        browser_rows,
+        active_key,
+        current_index,
+        include_picker=True,
+    )
+
+    st.dataframe(browser_rows, use_container_width=True, hide_index=True, height=220)
+
+    active_name = selected_name
     source_path = source_lookup[active_name]
     target_path = extension_target_path(source_path, output_dir)
-    source_key = str(source_path.relative_to(ROOT_DIR)).replace("\\", "/")
-    output_key = str(output_dir.relative_to(ROOT_DIR)).replace("\\", "/")
+    source_key = folder_key_text(source_path)
+    detected_prompt, detected_profile, detected_ratio, detected_width_multiplier = extension_prompt_for_image(
+        str(source_path),
+        image_cache_key(source_path),
+    )
     prompt_key = f"extend_prompt::{workflow}::{source_key}::{output_key}"
     if prompt_key not in st.session_state:
-        st.session_state[prompt_key] = extension_prompt_for_image(active_name, workflow)
+        st.session_state[prompt_key] = detected_prompt
 
-    preview_col, action_col = st.columns([1.35, 1])
-    with preview_col:
-        st.image(str(source_path), caption=f"Source: {source_path.name}", use_container_width=True)
-        if target_path.exists():
-            st.image(str(target_path), caption=f"Current saved result: {target_path.name}", use_container_width=True)
+    swap_compare_key = f"extend_swap_compare::{folder_key}::{output_key}"
+    if swap_compare_key not in st.session_state:
+        st.session_state[swap_compare_key] = bool(saved_state.get("swap_compare_sides", True))
 
-    with action_col:
-        st.link_button("Open Gemini Web", "https://gemini.google.com/app", use_container_width=True)
-        st.caption(f"Target save path: `{target_path.relative_to(ROOT_DIR)}`")
-        st.text_area(
-            "Prompt for Gemini",
-            key=prompt_key,
-            height=260,
-            help="You can keep the existing prompt or edit it before using Gemini Web.",
+    compare_controls = st.columns([1.2, 1, 1, 1.1], gap="small")
+    compare_mode = compare_controls[0].radio(
+        "Compare mode",
+        options=["Overlay slider", "Stacked", "Side by side"],
+        horizontal=True,
+        label_visibility="collapsed",
+    )
+    large_view = compare_controls[1].checkbox("Large compare view", value=True)
+    swap_compare_sides = compare_controls[2].checkbox(
+        "Swap compare sides",
+        key=swap_compare_key,
+    )
+    compare_controls[3].caption("Use left/right buttons above to move quickly through the folder.")
+    save_extend_tab_state(selected_folder, output_folder_text, only_missing, active_name, swap_compare_sides)
+
+    st.markdown("<div id='extend-compare-anchor'></div>", unsafe_allow_html=True)
+    if target_path.exists():
+        render_extension_compare(source_path, target_path, compare_mode, large_view, swap_compare_sides)
+    else:
+        st.image(
+            load_display_image_bytes(
+                str(source_path),
+                2200 if large_view else 1500,
+                image_cache_key(source_path),
+            ),
+            caption=f"Original: {source_path.name}",
+            use_container_width=True,
         )
+        st.info("No saved extension yet for this image.")
+
+    pending_scroll_anchor = st.session_state.pop("pending_extend_scroll_anchor", "")
+    if pending_scroll_anchor:
+        render_extend_scroll_restore(pending_scroll_anchor)
+
+    render_extension_nav(
+        visible_names,
+        browser_rows,
+        active_key,
+        visible_names.index(active_name),
+        include_picker=False,
+    )
+
+    action_col, meta_col = st.columns([1.1, 0.9], gap="large")
+    with action_col:
         overwrite = st.checkbox(
             "Overwrite existing saved result",
             value=False,
             disabled=not target_path.exists(),
             key=f"extend_overwrite::{workflow}::{source_key}::{output_key}",
+        )
+        action_buttons = st.columns(2, gap="small")
+        action_buttons[0].link_button("Open Gemini Web", "https://gemini.google.com/app", use_container_width=True)
+        api_disabled = target_path.exists() and not overwrite
+        if action_buttons[1].button(
+            "Run with Gemini API",
+            use_container_width=True,
+            disabled=api_disabled,
+            type="primary",
+        ):
+            with st.spinner("Extending image with Gemini API..."):
+                run_extend_image_api(source_path, target_path, st.session_state[prompt_key])
+            load_display_image_bytes.clear()
+            load_compare_data_uri.clear()
+            st.success(f"Saved API result to {relative_folder_label(target_path)}.")
+            st.rerun()
+        prompt_actions = st.columns([1, 1.2], gap="small")
+        if prompt_actions[0].button(
+            "Use detected prompt",
+            key=f"extend_reset_prompt::{workflow}::{source_key}::{output_key}",
+            use_container_width=True,
+        ):
+            st.session_state[prompt_key] = detected_prompt
+            st.rerun()
+        prompt_actions[1].caption(
+            f"Detected: {detected_profile} | aspect {detected_ratio:.2f} | width x{detected_width_multiplier:.2f} to reach 16:9"
+        )
+        st.text_area(
+            "Prompt for Gemini",
+            key=prompt_key,
+            height=220,
+            help="You can keep the existing prompt or edit it before using Gemini Web.",
         )
         uploaded_result = st.file_uploader(
             "Upload the extended image from Gemini",
@@ -389,8 +929,19 @@ def render_extend_images_tab() -> None:
             st.info("A saved result already exists. Tick overwrite if you want to replace it.")
         if st.button("Save uploaded result", use_container_width=True, disabled=save_disabled):
             save_uploaded_extension(uploaded_result, target_path)
-            st.success(f"Saved {target_path.name} to {target_path.parent.relative_to(ROOT_DIR)}.")
+            load_display_image_bytes.clear()
+            load_compare_data_uri.clear()
+            st.success(f"Saved {target_path.name} to {relative_folder_label(target_path.parent)}.")
             st.rerun()
+
+    with meta_col:
+        st.caption(f"Source path: `{relative_folder_label(source_path)}`")
+        st.caption(f"Target save path: `{relative_folder_label(target_path)}`")
+        st.caption(
+            f"Status: {'Ready' if target_path.exists() else 'Needs extension'}"
+        )
+        st.caption(f"Prompt profile: {detected_profile}")
+        st.caption(f"Viewing image {visible_names.index(active_name) + 1} of {len(visible_names)} in the current filter.")
 
 
 def inject_styles() -> None:
