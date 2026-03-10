@@ -819,8 +819,6 @@ def render_extend_images_tab() -> None:
         include_picker=True,
     )
 
-    st.dataframe(browser_rows, use_container_width=True, hide_index=True, height=220)
-
     active_name = selected_name
     source_path = source_lookup[active_name]
     target_path = extension_target_path(source_path, output_dir)
@@ -832,6 +830,23 @@ def render_extend_images_tab() -> None:
     prompt_key = f"extend_prompt::{workflow}::{source_key}::{output_key}"
     if prompt_key not in st.session_state:
         st.session_state[prompt_key] = detected_prompt
+
+    active_summary_cols = st.columns(3, gap="small")
+    active_summary_cols[0].markdown(
+        f"<div class='extend-summary-card extend-summary-card--active'><span>Active image</span><strong>{active_name}</strong></div>",
+        unsafe_allow_html=True,
+    )
+    active_summary_cols[1].markdown(
+        f"<div class='extend-summary-card'><span>Status</span><strong>{'Ready' if target_path.exists() else 'Needs extension'}</strong></div>",
+        unsafe_allow_html=True,
+    )
+    active_summary_cols[2].markdown(
+        f"<div class='extend-summary-card'><span>Prompt profile</span><strong>{detected_profile}</strong></div>",
+        unsafe_allow_html=True,
+    )
+
+    with st.expander("Browse folder contents", expanded=False):
+        st.dataframe(browser_rows, use_container_width=True, hide_index=True, height=220)
 
     swap_compare_key = f"extend_swap_compare::{folder_key}::{output_key}"
     if swap_compare_key not in st.session_state:
