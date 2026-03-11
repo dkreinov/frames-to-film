@@ -931,9 +931,36 @@ def render_extension_nav(
     return st.session_state[active_key]
 
 
+def render_workflow_strip(active_step: str) -> None:
+    steps = [
+        ("extend", "1. Extend stills"),
+        ("build", "2. Build sequence"),
+        ("review", "3. Review clips"),
+        ("redo", "4. Retry weak clips"),
+    ]
+    chips = []
+    for step_key, label in steps:
+        classes = "workflow-step workflow-step--active" if step_key == active_step else "workflow-step"
+        chips.append(f'<span class="{classes}">{label}</span>')
+    st.markdown(f'<div class="workflow-strip">{"".join(chips)}</div>', unsafe_allow_html=True)
+
+
+def render_next_action_card(title: str, body: str) -> None:
+    st.markdown(
+        f"""
+        <div class="next-action-card">
+          <span>{title}</span>
+          <strong>{body}</strong>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def render_extend_images_tab() -> None:
     st.subheader("Extend images")
     st.caption("Browse one image at a time, compare the original against the current saved extension, then upload a replacement if needed.")
+    render_workflow_strip("extend")
     workflow = "16:9 from 4:3 images"
     saved_state = load_extend_tab_state()
     pending_source_folder = st.session_state.pop("pending_extend_source_folder", None)
@@ -1091,6 +1118,10 @@ def render_extend_images_tab() -> None:
     summary_cols[3].markdown(
         f"<div class='extend-summary-card'><span>Needs work</span><strong>{pending_count}</strong></div>",
         unsafe_allow_html=True,
+    )
+    render_next_action_card(
+        "Next action",
+        "Pick one still, check the compare view, then run Gemini API or save a manual result.",
     )
 
     st.markdown("**Image browser**")
@@ -1377,6 +1408,7 @@ def render_extend_images_tab() -> None:
 def render_build_movie_tab() -> None:
     st.subheader("Build movie")
     st.caption("Choose the finished 16:9 stills, keep them in order, preview the Kling pairs, then generate clips or stitch the finished segments.")
+    render_workflow_strip("build")
     saved_state = load_build_tab_state()
     pending_source_folder = st.session_state.pop("pending_build_source_folder", None)
     source_folders = discover_image_folders()
@@ -1731,6 +1763,10 @@ def render_build_movie_tab() -> None:
         f"<div class='extend-summary-card'><span>Segments ready</span><strong>{len(existing_segments)}</strong></div>",
         unsafe_allow_html=True,
     )
+    render_next_action_card(
+        "Next action",
+        "Arrange the storyboard first, then generate clips. Stitch the movie only after some segments are ready.",
+    )
 
     st.markdown("**Pair preview**")
     pair_keys = [row["pair_key"] for row in pair_rows]
@@ -1927,6 +1963,50 @@ def inject_styles() -> None:
             font-size: 0.96rem;
             margin: 0;
             max-width: 58rem;
+        }
+        .workflow-strip {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.55rem;
+            margin: 0.35rem 0 0.95rem;
+        }
+        .workflow-step {
+            background: rgba(255, 248, 239, 0.84);
+            border: 1px solid rgba(194, 120, 67, 0.16);
+            border-radius: 999px;
+            color: #8b5e3c;
+            display: inline-flex;
+            font-size: 0.84rem;
+            font-weight: 600;
+            padding: 0.42rem 0.78rem;
+        }
+        .workflow-step--active {
+            background: linear-gradient(180deg, #fff1df 0%, #ffe2c2 100%);
+            border-color: rgba(194, 120, 67, 0.30);
+            color: #9a3412;
+        }
+        .next-action-card {
+            background: linear-gradient(180deg, rgba(255, 245, 232, 0.96) 0%, rgba(255, 237, 213, 0.88) 100%);
+            border: 1px solid rgba(194, 120, 67, 0.20);
+            border-radius: 14px;
+            box-shadow: 0 10px 22px rgba(120, 53, 15, 0.07);
+            margin: 0.5rem 0 0.9rem;
+            padding: 0.7rem 0.9rem;
+        }
+        .next-action-card span {
+            color: #8b5e3c;
+            display: block;
+            font-size: 0.76rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            margin-bottom: 0.2rem;
+            text-transform: uppercase;
+        }
+        .next-action-card strong {
+            color: #3f2415;
+            display: block;
+            font-size: 0.95rem;
+            line-height: 1.35;
         }
         .extend-summary-card,
         .extend-details-card {
@@ -2351,6 +2431,11 @@ def render_review_panel(
     status_filter: str,
 ) -> None:
     st.subheader(pair_label(selected_pair.pair_id))
+    render_workflow_strip("review")
+    render_next_action_card(
+        "Next action",
+        "Approve the current version if it works. Otherwise save a redo or discussion review and move on.",
+    )
 
     version_numbers = [item.version for item in selected_pair.versions]
     version_labels = {item.version: f"v{item.version} - {item.filename}" for item in selected_pair.versions}
@@ -2810,6 +2895,11 @@ def render_compare_card(clip, full_width: bool = False) -> None:
 
 def render_redo_queue(redo_requests, review_lookup, winners, run_id: str) -> None:
     st.subheader("Redo queue")
+    render_workflow_strip("redo")
+    render_next_action_card(
+        "Next action",
+        "Preview the rewritten prompts first, then generate only the retries worth spending credits on.",
+    )
     if not redo_requests:
         st.info("No clips are queued for redo.")
         return
