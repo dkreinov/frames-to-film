@@ -211,6 +211,7 @@ def generate_pairs_for_sequence(
     video_dir=None,
     status_path=None,
     selected_keys=None,
+    prompt_overrides=None,
 ):
     image_dir = image_dir or IMG_DIR
     video_dir = video_dir or VID_DIR
@@ -226,6 +227,8 @@ def generate_pairs_for_sequence(
     def save_status_for_path(status):
         with open(status_path, 'w') as f:
             json.dump(status, f, indent=2)
+
+    prompt_overrides = prompt_overrides or {}
 
     sequence_pairs = build_pairs_from_sequence(files)
     if selected_keys is not None:
@@ -247,7 +250,7 @@ def generate_pairs_for_sequence(
         out_path = os.path.join(video_dir, f"seg_{a_name}_to_{b_name}.mp4")
         path_a = os.path.join(image_dir, f_a)
         path_b = os.path.join(image_dir, f_b)
-        prompt = PAIR_PROMPTS.get(key, FALLBACK_PROMPT)
+        prompt = prompt_overrides.get(key) or PAIR_PROMPTS.get(key, FALLBACK_PROMPT)
 
         task_id, err = submit_video(token, path_a, path_b, prompt)
         if not task_id:

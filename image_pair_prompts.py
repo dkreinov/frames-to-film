@@ -245,3 +245,90 @@ PAIR_PROMPTS = {
         "light, and the sense of one life chapter becoming the next."
     ),
 }
+
+OLIA_CONTINUE_EXTEND_API_PAIR_PROMPTS = {
+    "2_to_3": (
+        "Gentle push-in. Transition naturally between the two early childhood "
+        "portraits. Preserve the same girl, soft vintage character, and calm "
+        "family-photo continuity."
+    ),
+    "23_to_24": (
+        "Gentle pull-back. Transition naturally into the warm indoor portrait. "
+        "Preserve the same woman, stable facial features, and festive home "
+        "continuity."
+    ),
+    "24_to_24_b": (
+        "Slow tracking drift. Keep the same woman and let one warm portrait pose "
+        "flow naturally into the next. Preserve the same room, lighting, and "
+        "winter evening mood."
+    ),
+    "24_b_to_24_c": (
+        "Gentle push-in. Transition naturally between the two doorway portrait "
+        "frames. Preserve the same woman, stable face, and elegant winter "
+        "styling without inventing a new scene."
+    ),
+    "24_c_to_25": (
+        "Slow lateral drift. Transition naturally from the doorway portrait into "
+        "the next warm portrait moment. Preserve the same woman, coat, and calm "
+        "holiday continuity."
+    ),
+    "25_to_25_b": (
+        "Gentle push-in. Keep the same woman and let one portrait pose flow "
+        "naturally into the next. Preserve warm indoor light, stable facial "
+        "features, and the same winter outfit."
+    ),
+    "25_b_to_26": (
+        "Slow pull-back. Transition naturally from the close portrait into the "
+        "next brighter scene. Preserve the same woman, stable face, and natural "
+        "setting continuity without inventing extra action."
+    ),
+    "26_to_27_b": (
+        "Gentle tracking shot. Transition naturally between the two travel-style "
+        "portraits. Preserve the same woman, relaxed expression, and clean "
+        "daylight continuity."
+    ),
+    "27_b_to_28": (
+        "Slow dolly push-in. Transition naturally into the brighter resort-style "
+        "portrait. Preserve the same woman, stable face, and calm vacation "
+        "continuity."
+    ),
+    "28_to_29": (
+        "Gentle lateral drift. Transition naturally between the two adult "
+        "portrait moments. Preserve the same woman, warm color continuity, and "
+        "realistic photo movement."
+    ),
+    "29_to_30": (
+        "Gentle pull-back. Transition naturally from the portrait into the group "
+        "celebration scene. Preserve all original people exactly once, keep "
+        "faces natural, and avoid duplicating or inventing extra guests."
+    ),
+    "30_to_31": (
+        "Slow lateral drift. Transition naturally between the two group "
+        "celebration moments. Preserve all original people exactly once, stable "
+        "faces, and realistic indoor party continuity."
+    ),
+    "31_to_32": (
+        "Gentle tracking shot. Transition naturally through the next celebration "
+        "moment. Preserve the same people, warm indoor light, and natural "
+        "social continuity without extra bodies or distorted faces."
+    ),
+    "32_to_33": (
+        "Slow push-in. Transition naturally into the closing celebration portrait. "
+        "Preserve the same people, stable faces, and a calm, finished family "
+        "photo feeling."
+    ),
+}
+
+
+def normalize_prompt_folder_label(folder_label: str) -> str:
+    return folder_label.replace("/", "\\").strip().lower()
+
+
+def get_pair_prompt(pair_key: str, folder_label: str = "") -> str:
+    normalized_folder = normalize_prompt_folder_label(folder_label)
+    if normalized_folder == "olia_continue\\extend_api":
+        return OLIA_CONTINUE_EXTEND_API_PAIR_PROMPTS.get(
+            pair_key,
+            PAIR_PROMPTS.get(pair_key, FALLBACK_PROMPT),
+        )
+    return PAIR_PROMPTS.get(pair_key, FALLBACK_PROMPT)

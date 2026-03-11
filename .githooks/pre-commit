@@ -13,6 +13,7 @@ fi
 
 token_prefix_regex="(AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9_-]{16,})"
 assignment_regex="((openai_api_key|api[_-]?key|client[_-]?secret|access[_-]?token|refresh[_-]?token|password)[[:space:]]*[:=][[:space:]]*((\"[^\"]{8,}\")|('[^']{8,}')|[A-Za-z0-9._-]{8,})|Authorization:[[:space:]]*Bearer[[:space:]]+[A-Za-z0-9._-]{12,})"
+safe_env_lookup_regex="(os\.(getenv|environ\.get)\([[:space:]]*['\"]PROMPT_LLM_API_KEY['\"][[:space:]]*\)|getenv\([[:space:]]*['\"]PROMPT_LLM_API_KEY['\"][[:space:]]*\))"
 
 failed=0
 
@@ -36,7 +37,7 @@ while IFS= read -r -d '' file; do
     continue
   fi
 
-  if git show ":$file" 2>/dev/null | tr -d '\000' | grep -aniE "$assignment_regex" >"$match_file" 2>/dev/null; then
+  if git show ":$file" 2>/dev/null | tr -d '\000' | grep -avE "$safe_env_lookup_regex" | grep -aniE "$assignment_regex" >"$match_file" 2>/dev/null; then
     printf '%s\n' "pre-commit: possible secret detected in '$file':" >&2
     cat "$match_file" >&2
     failed=1

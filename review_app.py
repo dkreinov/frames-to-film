@@ -22,7 +22,7 @@ from concat_videos import ordered_segment_files_for_sequence, stitch_sequence
 from extend_image_judge import judge_available as local_judge_available
 from extend_image_judge import judge_extension as run_local_extension_judge
 from generate_all_videos import build_pairs_from_sequence, generate_pairs_for_sequence, sort_key as natural_image_sort_key
-from image_pair_prompts import FALLBACK_PROMPT, PAIR_PROMPTS
+from image_pair_prompts import get_pair_prompt
 from outpaint_16_9 import TARGET_ASPECT_RATIO, choose_extension_prompt
 from redo_runner import (
     generate_automatic_retry_prompt,
@@ -448,7 +448,7 @@ def load_extend_tab_state() -> dict[str, str | bool]:
         return {}
 
 
-def load_build_tab_state() -> dict[str, str | bool | list[str]]:
+def load_build_tab_state() -> dict[str, object]:
     if not BUILD_TAB_STATE_PATH.exists():
         return {}
     try:
@@ -463,6 +463,8 @@ def save_build_tab_state(
     selected_pair_keys: list[str],
     custom_order: bool,
     pool_folder: Path | None = None,
+    prompt_overrides: dict[str, str] | None = None,
+    prompt_sources: dict[str, str] | None = None,
 ) -> None:
     BUILD_TAB_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -473,6 +475,10 @@ def save_build_tab_state(
     }
     if pool_folder is not None:
         payload["pool_folder"] = relative_folder_label(pool_folder)
+    if prompt_overrides:
+        payload["prompt_overrides"] = prompt_overrides
+    if prompt_sources:
+        payload["prompt_sources"] = prompt_sources
     BUILD_TAB_STATE_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
@@ -600,10 +606,89 @@ def save_uploaded_extension(uploaded_file, target_path: Path) -> None:
 
 def get_extend_api_client() -> genai.Client:
     load_dotenv(ROOT_DIR / ".env")
-    api_key = os.getenv("gemini")
+    api_key = os.getenv("PROMPT_LLM_API_KEY")
     if not api_key:
-        raise RuntimeError("No 'gemini' key found in .env")
+        raise RuntimeError("No prompt LLM API key found in .env")
     return genai.Client(api_key=api_key)
+
+
+def normalize_prompt_text(text: str) -> str:
+    return " ".join(text.strip().split())
+
+
+def generate_build_pair_prompt_with_llm(
+    pair_key: str,
+    start_name: str,
+    end_name: str,
+    base_prompt: str,
+    current_prompt: str,
+) -> str | None:
+    client = get_extend_api_client()
+    if client is None:
+        return None
+
+    rewrite_request = f"""Rewrite this Kling image-to-video prompt for pair {pair_key}.
+
+Return only the final prompt text.
+
+Goals:
+- keep it concise and directly usable in Kling
+- prefer 2 to 4 short sentences
+- make the first sentence the camera move
+- preserve subject identity, face, clothing, and pose continuity when relevant
+- transition naturally from the start still to the end still
+- keep the same setting and avoid inventing a new scene unless clearly implied by the stills
+- use specific motion and continuity wording instead of abstract mood language
+
+Start still: {start_name}
+End still: {end_name}
+
+Base prompt:
+{base_prompt}
+
+Current working prompt:
+{current_prompt}
+"""
+
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=rewrite_request,
+        )
+    except Exception:
+        return None
+
+    text = getattr(response, "text", None)
+    if not text:
+        return None
+    normalized = normalize_prompt_text(text)
+    return normalized or None
+
+
+def build_pair_prompt_brief(
+    pair_key: str,
+    start_name: str,
+    end_name: str,
+    base_prompt: str,
+    current_prompt: str,
+) -> str:
+    return f"""Create a Kling image-to-video prompt for pair {pair_key}.
+
+Return only the final prompt text.
+
+Requirements:
+- keep it concise and directly usable in Kling
+- use 2 to 4 short sentences
+- make the first sentence the camera move
+- preserve the same person, face, clothing, and pose continuity when relevant
+- transition naturally from the start still to the end still
+- keep the same setting and avoid inventing a new scene unless clearly implied by the stills
+
+Start still: {start_name}
+End still: {end_name}
+Base prompt: {base_prompt}
+Current working prompt: {current_prompt}
+"""
 
 
 def upscale_extend_result(image: Image.Image) -> Image.Image:
@@ -1452,9 +1537,13 @@ def render_build_movie_tab() -> None:
     source_lookup = {path.name: path for path in source_paths}
     ordered_state_key = f"build_ordered_images::{folder_key_text(selected_folder)}"
     custom_order_key = f"build_custom_order::{folder_key_text(selected_folder)}"
+    prompt_overrides_key = f"build_prompt_overrides::{folder_key_text(selected_folder)}"
+    prompt_sources_key = f"build_prompt_sources::{folder_key_text(selected_folder)}"
     saved_order = saved_state.get("ordered_images", [])
     saved_folder_label = str(saved_state.get("source_folder", ""))
     saved_custom_order = bool(saved_state.get("custom_order", False))
+    saved_prompt_overrides = saved_state.get("prompt_overrides", {})
+    saved_prompt_sources = saved_state.get("prompt_sources", {})
     use_saved_order = (
         saved_folder_label == relative_folder_label(selected_folder)
         and saved_custom_order
@@ -1468,6 +1557,32 @@ def render_build_movie_tab() -> None:
     else:
         st.session_state[ordered_state_key] = normalize_ordered_images(st.session_state[ordered_state_key], available_names)
     ordered_names = st.session_state[ordered_state_key]
+    if prompt_overrides_key not in st.session_state:
+        if (
+            saved_folder_label == relative_folder_label(selected_folder)
+            and isinstance(saved_prompt_overrides, dict)
+        ):
+            st.session_state[prompt_overrides_key] = {
+                str(key): str(value)
+                for key, value in saved_prompt_overrides.items()
+                if isinstance(key, str) and isinstance(value, str)
+            }
+        else:
+            st.session_state[prompt_overrides_key] = {}
+    if prompt_sources_key not in st.session_state:
+        if (
+            saved_folder_label == relative_folder_label(selected_folder)
+            and isinstance(saved_prompt_sources, dict)
+        ):
+            st.session_state[prompt_sources_key] = {
+                str(key): str(value)
+                for key, value in saved_prompt_sources.items()
+                if isinstance(key, str) and isinstance(value, str)
+            }
+        else:
+            st.session_state[prompt_sources_key] = {}
+    prompt_overrides = st.session_state[prompt_overrides_key]
+    prompt_sources = st.session_state[prompt_sources_key]
 
     pending_import_key = f"build_pending_import::{folder_key_text(selected_folder)}"
     pending_import = st.session_state.pop(pending_import_key, None)
@@ -1711,15 +1826,21 @@ def render_build_movie_tab() -> None:
                     st.success(f"Imported {len(imported_names)} image(s) into {relative_folder_label(selected_folder)}.")
                     st.rerun()
 
+    folder_prompt_label = relative_folder_label(selected_folder)
     pair_rows = []
     sequence_pairs = build_pairs_from_sequence(ordered_names)
     for start_name, end_name, pair_key in sequence_pairs:
+        base_prompt = get_pair_prompt(pair_key, folder_prompt_label)
+        prompt_override = prompt_overrides.get(pair_key, "")
+        prompt_source = prompt_sources.get(pair_key, "default")
         pair_rows.append(
             {
                 "pair_key": pair_key,
                 "start": start_name,
                 "end": end_name,
-                "prompt": PAIR_PROMPTS.get(pair_key, FALLBACK_PROMPT),
+                "base_prompt": base_prompt,
+                "prompt": prompt_override or base_prompt,
+                "prompt_source": prompt_source,
             }
         )
     suggested_preview_key = pair_rows[min(current_index, len(pair_rows) - 1)]["pair_key"] if pair_rows else ""
@@ -1743,6 +1864,8 @@ def render_build_movie_tab() -> None:
         st.session_state[selected_pairs_key],
         st.session_state[custom_order_key],
         st.session_state.get("build_pool_folder"),
+        prompt_overrides,
+        prompt_sources,
     )
 
     summary_cols = st.columns(4, gap="small")
@@ -1793,15 +1916,15 @@ def render_build_movie_tab() -> None:
     pair_action_cols = st.columns(3, gap="small")
     if pair_action_cols[0].button("Select all pairs", use_container_width=True, key=f"build_select_all::{folder_key_text(selected_folder)}"):
         st.session_state[selected_pairs_key] = pair_keys
-        save_build_tab_state(selected_folder, ordered_names, st.session_state[selected_pairs_key], st.session_state[custom_order_key])
+        save_build_tab_state(selected_folder, ordered_names, st.session_state[selected_pairs_key], st.session_state[custom_order_key], st.session_state.get("build_pool_folder"), prompt_overrides, prompt_sources)
         st.rerun()
     if pair_action_cols[1].button("Only missing segments", use_container_width=True, key=f"build_select_missing::{folder_key_text(selected_folder)}"):
         st.session_state[selected_pairs_key] = missing_pair_keys or pair_keys
-        save_build_tab_state(selected_folder, ordered_names, st.session_state[selected_pairs_key], st.session_state[custom_order_key])
+        save_build_tab_state(selected_folder, ordered_names, st.session_state[selected_pairs_key], st.session_state[custom_order_key], st.session_state.get("build_pool_folder"), prompt_overrides, prompt_sources)
         st.rerun()
     if pair_action_cols[2].button("Clear selection", use_container_width=True, key=f"build_clear_pairs::{folder_key_text(selected_folder)}"):
         st.session_state[selected_pairs_key] = []
-        save_build_tab_state(selected_folder, ordered_names, st.session_state[selected_pairs_key], st.session_state[custom_order_key])
+        save_build_tab_state(selected_folder, ordered_names, st.session_state[selected_pairs_key], st.session_state[custom_order_key], st.session_state.get("build_pool_folder"), prompt_overrides, prompt_sources)
         st.rerun()
     with st.expander("Customize pair selection", expanded=False):
         st.multiselect(
@@ -1816,6 +1939,8 @@ def render_build_movie_tab() -> None:
         st.session_state[selected_pairs_key],
         st.session_state[custom_order_key],
         st.session_state.get("build_pool_folder"),
+        prompt_overrides,
+        prompt_sources,
     )
 
     preview_key = f"build_preview_pair::{folder_key_text(selected_folder)}"
@@ -1859,12 +1984,112 @@ def render_build_movie_tab() -> None:
         caption=f"End: {preview_row['end']}",
         use_container_width=True,
     )
-    st.text_area(
+    prompt_widget_key = f"build_prompt_preview::{folder_key_text(selected_folder)}::{preview_pair_key}"
+    pending_prompt_key = f"build_pending_prompt::{folder_key_text(selected_folder)}::{preview_pair_key}"
+    pending_prompt = st.session_state.pop(pending_prompt_key, None)
+    if pending_prompt is not None:
+        st.session_state[prompt_widget_key] = pending_prompt
+    elif prompt_widget_key not in st.session_state:
+        st.session_state[prompt_widget_key] = preview_row["prompt"]
+
+    prompt_source_label = {
+        "default": "Default library prompt",
+        "manual": "Manual edit",
+        "gemini": "Gemini rewrite",
+    }.get(preview_row["prompt_source"], "Custom prompt")
+    st.caption(
+        f"Prompt source: {prompt_source_label}. Edit it directly, generate a new draft with Gemini, or copy the brief below into any other LLM."
+    )
+    prompt_text = st.text_area(
         "Prompt for this pair",
-        value=preview_row["prompt"],
         height=140,
-        disabled=True,
-        key=f"build_prompt_preview::{preview_pair_key}",
+        key=prompt_widget_key,
+    )
+    normalized_default_prompt = normalize_prompt_text(preview_row["base_prompt"])
+    normalized_previous_override = normalize_prompt_text(prompt_overrides.get(preview_pair_key, ""))
+    normalized_prompt_text = normalize_prompt_text(prompt_text)
+    if normalized_prompt_text and normalized_prompt_text != normalized_default_prompt:
+        prompt_overrides[preview_pair_key] = normalized_prompt_text
+        if normalized_previous_override == normalized_prompt_text:
+            prompt_sources[preview_pair_key] = prompt_sources.get(preview_pair_key, "manual")
+        else:
+            prompt_sources[preview_pair_key] = "manual"
+    else:
+        prompt_overrides.pop(preview_pair_key, None)
+        prompt_sources.pop(preview_pair_key, None)
+
+    prompt_action_cols = st.columns(3, gap="small")
+    if prompt_action_cols[0].button(
+        "Generate with Gemini",
+        use_container_width=True,
+        key=f"build_generate_prompt::{folder_key_text(selected_folder)}::{preview_pair_key}",
+    ):
+        generated_prompt = generate_build_pair_prompt_with_llm(
+            preview_pair_key,
+            preview_row["start"],
+            preview_row["end"],
+            preview_row["base_prompt"],
+            normalized_prompt_text or preview_row["base_prompt"],
+        )
+        if generated_prompt is None:
+            st.warning("Gemini prompt generation is not available right now.")
+        else:
+            prompt_overrides[preview_pair_key] = generated_prompt
+            prompt_sources[preview_pair_key] = "gemini"
+            st.session_state[pending_prompt_key] = generated_prompt
+            save_build_tab_state(
+                selected_folder,
+                ordered_names,
+                st.session_state[selected_pairs_key],
+                st.session_state[custom_order_key],
+                st.session_state.get("build_pool_folder"),
+                prompt_overrides,
+                prompt_sources,
+            )
+            st.rerun()
+    if prompt_action_cols[1].button(
+        "Reset to default",
+        use_container_width=True,
+        key=f"build_reset_prompt::{folder_key_text(selected_folder)}::{preview_pair_key}",
+    ):
+        prompt_overrides.pop(preview_pair_key, None)
+        prompt_sources.pop(preview_pair_key, None)
+        st.session_state[pending_prompt_key] = preview_row["base_prompt"]
+        save_build_tab_state(
+            selected_folder,
+            ordered_names,
+            st.session_state[selected_pairs_key],
+            st.session_state[custom_order_key],
+            st.session_state.get("build_pool_folder"),
+            prompt_overrides,
+            prompt_sources,
+        )
+        st.rerun()
+    prompt_action_cols[2].markdown(
+        f"<div class='extend-summary-card'><span>Used by Kling</span><strong>{'Custom prompt' if preview_pair_key in prompt_overrides else 'Default prompt'}</strong></div>",
+        unsafe_allow_html=True,
+    )
+    with st.expander("Ask Gemini or any other LLM", expanded=False):
+        st.text_area(
+            "LLM brief you can copy",
+            value=build_pair_prompt_brief(
+                preview_pair_key,
+                preview_row["start"],
+                preview_row["end"],
+                preview_row["base_prompt"],
+                normalized_prompt_text or preview_row["base_prompt"],
+            ),
+            height=220,
+            key=f"build_prompt_brief::{folder_key_text(selected_folder)}::{preview_pair_key}",
+        )
+    save_build_tab_state(
+        selected_folder,
+        ordered_names,
+        st.session_state[selected_pairs_key],
+        st.session_state[custom_order_key],
+        st.session_state.get("build_pool_folder"),
+        prompt_overrides,
+        prompt_sources,
     )
 
     videos_dir = os.path.join(selected_folder, "videos")
@@ -1884,12 +2109,17 @@ def render_build_movie_tab() -> None:
             st.warning("Tick `Use Kling credits` before starting Kling generation.")
         else:
             with st.spinner("Generating selected pairs with Kling..."):
+                generation_prompt_map = {
+                    row["pair_key"]: row["prompt"]
+                    for row in pair_rows
+                }
                 generation_results = generate_pairs_for_sequence(
                     ordered_names,
                     image_dir=str(selected_folder),
                     video_dir=videos_dir,
                     status_path=status_path,
                     selected_keys=st.session_state[selected_pairs_key],
+                    prompt_overrides=generation_prompt_map,
                 )
             st.session_state[f"build_generation_results::{folder_key_text(selected_folder)}"] = generation_results
             st.rerun()
