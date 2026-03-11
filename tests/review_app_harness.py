@@ -12,6 +12,7 @@ TEMP_ROOT.mkdir(parents=True, exist_ok=True)
 review_app.EXTEND_TAB_STATE_PATH = TEMP_ROOT / "extend_tab_state.json"
 review_app.BUILD_TAB_STATE_PATH = TEMP_ROOT / "build_movie_state.json"
 review_app.BUILD_JOB_DIR = TEMP_ROOT / "build_jobs"
+review_app.UI_STATE_PATH = TEMP_ROOT / "ui_state.json"
 
 
 def _seed_state() -> None:
@@ -35,6 +36,7 @@ def _seed_state() -> None:
         selected_pair_keys=selected_pair_keys,
         custom_order=True,
     )
+    review_app.save_ui_state("extend")
 
 
 def _fake_open_folder(_path: Path) -> None:
