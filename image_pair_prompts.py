@@ -249,13 +249,15 @@ PAIR_PROMPTS = {
 OLIA_CONTINUE_EXTEND_API_PAIR_PROMPTS = {
     "2_to_3": (
         "Gentle pull-back. Transition naturally from the solo evening portrait "
-        "into the dance-floor couple frame. Preserve the same woman, teal dress, "
-        "and warm reception lighting."
+        "into the dance-floor couple frame. Preserve the same woman with stable "
+        "face, hair, teal dress, and natural expression throughout the transition. "
+        "Keep the warm reception setting and avoid inventing a new scene."
     ),
     "3_to_4": (
         "Slow lateral drift. Transition naturally from the dance-floor embrace "
         "into the close reception hug with the second woman. Preserve the same "
-        "woman in teal and the same formal party atmosphere."
+        "woman in teal with stable facial features and natural anatomy. Keep the "
+        "same formal party atmosphere and avoid morphing faces."
     ),
     "4_to_5": (
         "Gentle pull-back. Transition naturally from the reception portrait into "
@@ -294,18 +296,19 @@ OLIA_CONTINUE_EXTEND_API_PAIR_PROMPTS = {
     ),
     "11_to_12": (
         "Slow lateral drift. Transition naturally from the children’s close "
-        "portrait into the bright two-woman selfie. Keep faces natural and let "
-        "the family timeline move forward without inventing a new scene."
+        "portrait into the bright two-woman selfie. Keep faces stable and natural "
+        "throughout the transition. Let the family timeline move forward without "
+        "inventing a new scene."
     ),
     "12_to_13": (
         "Gentle pull-back. Transition naturally from the close selfie into the "
-        "outdoor walking scene. Preserve the same woman and keep the daylight "
-        "travel mood calm and realistic."
+        "outdoor walking scene. Preserve the same woman with stable face, hair, "
+        "and expression. Keep the daylight travel mood calm and realistic."
     ),
     "13_to_14": (
         "Slow tracking drift. Transition naturally from the walking path into the "
-        "waterfront trio selfie. Preserve the same woman, open daylight, and "
-        "travel-day continuity."
+        "waterfront trio selfie. Preserve the same woman with stable facial "
+        "features and keep open daylight travel continuity."
     ),
     "14_to_15": (
         "Gentle push-in. Transition naturally between the two outdoor trio "
@@ -314,108 +317,115 @@ OLIA_CONTINUE_EXTEND_API_PAIR_PROMPTS = {
     ),
     "15_to_16": (
         "Slow lateral drift. Transition naturally from the trio portrait into the "
-        "city travel frame. Preserve the same woman, bright outdoor light, and "
-        "tourist-day continuity."
+        "city travel frame. Preserve the same woman with stable face and natural "
+        "expression. Keep the bright outdoor tourist-day continuity."
     ),
     "16_to_17": (
         "Gentle pull-back. Transition naturally from the two-woman city portrait "
-        "into the larger group travel shot. Preserve the same woman and the same "
-        "European city atmosphere."
+        "into the larger group travel shot. Preserve the same woman with stable "
+        "facial features and keep the same European city atmosphere."
     ),
     "17_to_18": (
         "Slow push-in. Transition naturally from the city-square group portrait "
-        "into the warm café table selfie. Preserve the same woman and keep the "
-        "travel mood intimate and natural."
+        "into the warm café table selfie. Preserve the same woman with stable "
+        "face and natural expression. Keep the travel mood intimate and natural."
     ),
     "18_to_19": (
         "Gentle tracking shot. Transition naturally from the café selfie into the "
-        "family table celebration at home. Preserve the same woman and keep the "
-        "change from travel to home feeling calm and real."
+        "family table celebration at home. Preserve the same woman with stable "
+        "facial features and keep the change from travel to home calm and real."
     ),
     "19_to_20": (
         "Slow push-in. Transition naturally from the family dinner table into the "
         "portrait with the strawberry tart and children. Preserve the same woman "
-        "and children and keep the home celebration continuity."
+        "and children with stable faces and natural expressions. Keep the home "
+        "celebration continuity."
     ),
     "20_to_21": (
         "Gentle lateral drift. Transition naturally from the home celebration "
         "portrait into the three-woman outdoor selfie. Preserve the same woman "
-        "and let the shift from indoors to bright daylight feel natural."
+        "with stable face and let the shift from indoors to bright daylight feel "
+        "natural."
     ),
     "21_to_22": (
         "Slow pull-back. Transition naturally from the outdoor selfie into the "
         "family kitchen portrait with flowers. Preserve the same woman and family "
-        "and keep the scene change calm and believable."
+        "with stable faces. Keep the scene change calm and believable."
     ),
     "22_to_23": (
         "Gentle tracking shot. Transition naturally from the bouquet family "
         "portrait into the playful costume moment at home. Preserve the same "
-        "woman and child and keep the house setting consistent."
+        "woman and child with stable faces. Keep the house setting consistent."
     ),
     "23_to_24": (
         "Slow pull-back. Transition naturally from the indoor costume scene into "
-        "the mountain family selfie. Preserve the same family and make the jump "
-        "to the travel landscape feel clear but gentle."
+        "the mountain family selfie. Preserve the same family with stable faces "
+        "and make the jump to the travel landscape clear but gentle."
     ),
     "24_to_24_b": (
         "Gentle push-in. Transition naturally from the mountain family selfie "
-        "into the solo lakeside portrait. Preserve the same woman and let the "
-        "landscape widen into a calmer, more cinematic frame."
+        "into the solo lakeside portrait. Preserve the same woman with stable "
+        "face, hair, and expression. Let the landscape widen into a calmer, more "
+        "cinematic frame without inventing a new scene."
     ),
     "24_b_to_24_c": (
         "Slow lateral drift. Transition naturally from the solo mountain portrait "
         "into the bright park selfie. Preserve the same woman, stable facial "
-        "features, and natural outdoor continuity."
+        "features, and natural outdoor continuity. Avoid morphing or changing "
+        "her expression unnaturally."
     ),
     "24_c_to_25": (
         "Gentle pull-back. Transition naturally from the outdoor selfie into the "
         "garden portrait with the two children. Preserve the same woman and keep "
-        "the family mood warm and natural."
+        "all faces natural and stable. Keep the family mood warm and natural."
     ),
     "25_to_25_b": (
         "Slow push-in. Transition naturally from the sunny garden family portrait "
         "into the birthday scene with cake. Preserve the same parents and "
-        "children and keep every face stable and natural."
+        "children and keep every face stable, natural, and unmorphed."
     ),
     "25_b_to_26": (
         "Gentle tracking shot. Transition naturally from the birthday cake group "
         "into the warm restaurant portrait with mother and son. Preserve the same "
-        "woman and child and keep the indoor celebration continuity."
+        "woman and child with stable faces and natural expressions. Keep the "
+        "indoor celebration continuity."
     ),
     "26_to_27_b": (
         "Slow lateral drift. Transition naturally from the restaurant portrait "
         "into the garden two-woman portrait. Preserve the same woman, stable "
-        "face, and warm daylight continuity."
+        "face, and warm daylight continuity. Avoid morphing or changing the face."
     ),
     "27_b_to_28": (
         "Gentle pull-back. Transition naturally from the garden portrait into the "
-        "night street celebration scene. Preserve the same couple and keep the "
-        "move from daylight to nightlife playful and natural."
+        "night street celebration scene. Preserve the same couple with stable "
+        "faces and keep the move from daylight to nightlife playful and natural."
     ),
     "28_to_29": (
         "Slow push-in. Transition naturally from the playful night-street couple "
         "portrait into the daylight two-woman selfie. Preserve the same woman "
-        "and keep faces stable and natural."
+        "and keep faces stable, natural, and unmorphed."
     ),
     "29_to_30": (
         "Gentle tracking shot. Transition naturally from the daylight two-woman "
         "selfie into the indoor family group portrait. Preserve all original "
-        "people exactly once and avoid inventing extra guests."
+        "people exactly once with stable faces and natural anatomy. Avoid "
+        "inventing extra guests or morphing any face."
     ),
     "30_to_31": (
         "Slow pull-back. Transition naturally from the indoor family group into "
-        "the old-town travel portrait. Preserve the same core family and keep "
-        "the move to the city square clean and realistic."
+        "the old-town travel portrait. Preserve the same core family with stable "
+        "faces and keep the move to the city square clean and realistic."
     ),
     "31_to_32": (
         "Gentle lateral drift. Transition naturally from the city-square tourist "
         "portrait into the home birthday scene with the fruit tray. Preserve the "
-        "same family and make the travel-to-home jump feel calm and natural."
+        "same family with stable faces and make the travel-to-home jump feel calm "
+        "and natural."
     ),
     "32_to_33": (
         "Slow push-in. Transition naturally from the home birthday portrait into "
-        "the Times Square family travel photo. Preserve the same family and keep "
-        "the final jump bright, clean, and celebratory."
+        "the Times Square family travel photo. Preserve the same family with "
+        "stable faces and keep the final jump bright, clean, and celebratory."
     ),
 }
 

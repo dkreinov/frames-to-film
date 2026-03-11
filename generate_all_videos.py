@@ -288,7 +288,40 @@ def generate_pairs_for_sequence(
     return results
 
 
+def run_request_file(request_path):
+    with open(request_path, encoding="utf-8") as f:
+        payload = json.load(f)
+
+    files = [str(item) for item in payload.get("ordered_names", []) if isinstance(item, str)]
+    image_dir = str(payload.get("source_folder", IMG_DIR))
+    video_dir = str(payload.get("video_dir", VID_DIR))
+    status_path = str(payload.get("status_path", os.path.join(video_dir, "status.json")))
+    selected_keys = [
+        str(item)
+        for item in payload.get("selected_pair_keys", [])
+        if isinstance(item, str)
+    ]
+    prompt_overrides = {
+        str(key): str(value)
+        for key, value in payload.get("prompt_overrides", {}).items()
+        if isinstance(key, str) and isinstance(value, str)
+    }
+
+    generate_pairs_for_sequence(
+        files,
+        image_dir=image_dir,
+        video_dir=video_dir,
+        status_path=status_path,
+        selected_keys=selected_keys,
+        prompt_overrides=prompt_overrides,
+    )
+
+
 def main():
+    if len(sys.argv) == 3 and sys.argv[1] == "--request":
+        run_request_file(sys.argv[2])
+        return
+
     os.makedirs(VID_DIR, exist_ok=True)
     files = get_image_sequence()
     status = load_status()

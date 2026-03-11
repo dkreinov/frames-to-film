@@ -85,16 +85,90 @@
         padding: 0.55rem 0.65rem;
       }
 
+      .card-meta {
+        align-items: center;
+        display: flex;
+        gap: 0.4rem;
+      }
+
+      .card-actions {
+        align-items: center;
+        display: inline-flex;
+        gap: 0.35rem;
+      }
+
       .card-order {
         color: #b45309;
         font-size: 0.75rem;
         font-weight: 800;
-        margin-left: 0.5rem;
         white-space: nowrap;
       }
 
       .card-title {
         overflow-wrap: anywhere;
+      }
+
+      .card-remove {
+        align-items: center;
+        appearance: none;
+        background: rgba(180, 83, 9, 0.1);
+        border: 1px solid rgba(180, 83, 9, 0.18);
+        border-radius: 999px;
+        color: #9a3412;
+        cursor: pointer;
+        display: inline-flex;
+        flex: 0 0 auto;
+        font-size: 0.82rem;
+        font-weight: 800;
+        height: 24px;
+        justify-content: center;
+        line-height: 1;
+        padding: 0;
+        transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+        width: 24px;
+      }
+
+      .card-remove:hover:not(:disabled) {
+        background: rgba(180, 83, 9, 0.16);
+        border-color: rgba(180, 83, 9, 0.28);
+        color: #7c2d12;
+      }
+
+      .card-remove:disabled {
+        cursor: default;
+        opacity: 0.45;
+      }
+
+      .card-bridge {
+        align-items: center;
+        appearance: none;
+        background: rgba(180, 83, 9, 0.1);
+        border: 1px solid rgba(180, 83, 9, 0.18);
+        border-radius: 999px;
+        color: #9a3412;
+        cursor: pointer;
+        display: inline-flex;
+        flex: 0 0 auto;
+        font-size: 0.78rem;
+        font-weight: 800;
+        height: 24px;
+        justify-content: center;
+        line-height: 1;
+        padding: 0;
+        transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+        width: 24px;
+      }
+
+      .card-bridge:hover {
+        background: rgba(180, 83, 9, 0.16);
+        border-color: rgba(180, 83, 9, 0.28);
+        color: #7c2d12;
+      }
+
+      .card-bridge.off {
+        background: rgba(100, 116, 139, 0.12);
+        border-color: rgba(100, 116, 139, 0.28);
+        color: #475569;
       }
 
       .selected-note {
@@ -120,6 +194,7 @@
     <script>
       let currentItems = [];
       let currentSelectedId = null;
+      let currentDisabledPairKeys = [];
       let sortable = null;
 
       function sendMessage(type, data) {
@@ -170,12 +245,80 @@
           title.className = "card-title";
           title.textContent = item.name;
 
+          const meta = document.createElement("div");
+          meta.className = "card-meta";
+
           const order = document.createElement("div");
           order.className = "card-order";
           order.textContent = "#" + (index + 1);
 
+          const actions = document.createElement("div");
+          actions.className = "card-actions";
+
+          if (item.outgoing_pair_key) {
+            const bridgeButton = document.createElement("button");
+            bridgeButton.className = "card-bridge";
+            bridgeButton.type = "button";
+            if (!item.outgoing_enabled) {
+              bridgeButton.classList.add("off");
+            }
+            bridgeButton.textContent = item.outgoing_enabled ? "↻" : "×";
+            bridgeButton.title = item.outgoing_enabled
+              ? `Break transition to ${item.next_name}`
+              : `Restore transition to ${item.next_name}`;
+            bridgeButton.setAttribute(
+              "aria-label",
+              item.outgoing_enabled
+                ? `Break transition to ${item.next_name}`
+                : `Restore transition to ${item.next_name}`
+            );
+            bridgeButton.addEventListener("click", (event) => {
+              event.stopPropagation();
+              const disabled = new Set(currentDisabledPairKeys);
+              if (disabled.has(item.outgoing_pair_key)) {
+                disabled.delete(item.outgoing_pair_key);
+              } else {
+                disabled.add(item.outgoing_pair_key);
+              }
+              currentDisabledPairKeys = Array.from(disabled);
+              renderBoard();
+              setComponentValue({
+                ordered_ids: currentItems.map((entry) => entry.id),
+                selected_id: currentSelectedId,
+                disabled_pair_keys: currentDisabledPairKeys,
+              });
+            });
+            actions.appendChild(bridgeButton);
+          }
+
+          const removeButton = document.createElement("button");
+          removeButton.className = "card-remove";
+          removeButton.type = "button";
+          removeButton.textContent = "x";
+          removeButton.title = `Remove ${item.name}`;
+          removeButton.setAttribute("aria-label", `Remove ${item.name}`);
+          removeButton.disabled = currentItems.length <= 2;
+          removeButton.addEventListener("click", (event) => {
+            event.stopPropagation();
+            currentItems = currentItems.filter((entry) => entry.id !== item.id);
+            if (currentSelectedId === item.id) {
+              currentSelectedId = (currentItems[index] && currentItems[index].id) || (currentItems[index - 1] && currentItems[index - 1].id) || null;
+            }
+            renderBoard();
+            setComponentValue({
+              ordered_ids: currentItems.map((entry) => entry.id),
+              selected_id: currentSelectedId,
+              disabled_pair_keys: currentDisabledPairKeys.filter((pairKey) => pairKey !== item.outgoing_pair_key),
+              removed_id: item.id,
+            });
+          });
+
+          actions.appendChild(removeButton);
+          meta.appendChild(order);
+          meta.appendChild(actions);
+
           header.appendChild(title);
-          header.appendChild(order);
+          header.appendChild(meta);
 
           const image = document.createElement("img");
           image.src = item.thumb;
@@ -187,9 +330,10 @@
           card.addEventListener("click", () => {
             currentSelectedId = item.id;
             renderBoard();
-            setComponentValue({
+             setComponentValue({
               ordered_ids: currentItems.map((entry) => entry.id),
               selected_id: currentSelectedId,
+              disabled_pair_keys: currentDisabledPairKeys,
             });
           });
 
@@ -216,6 +360,7 @@
             setComponentValue({
               ordered_ids: currentItems.map((entry) => entry.id),
               selected_id: currentSelectedId,
+              disabled_pair_keys: currentDisabledPairKeys,
             });
           },
         });
@@ -232,6 +377,7 @@
         const args = data.args || {};
         currentItems = Array.isArray(args.items) ? args.items : [];
         currentSelectedId = args.selected_id || (currentItems[0] && currentItems[0].id) || null;
+        currentDisabledPairKeys = Array.isArray(args.disabled_pair_keys) ? args.disabled_pair_keys : [];
         renderBoard();
       }
 

@@ -3,9 +3,11 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
+import time
 from io import BytesIO
 from pathlib import Path
 import tkinter as tk
@@ -18,10 +20,10 @@ from google import genai
 from google.genai import types
 from PIL import Image, ImageChops, ImageOps, ImageStat
 
-from concat_videos import ordered_segment_files_for_sequence, stitch_sequence
+from concat_videos import ordered_segment_files_for_pair_keys, stitch_pair_keys
 from extend_image_judge import judge_available as local_judge_available
 from extend_image_judge import judge_extension as run_local_extension_judge
-from generate_all_videos import build_pairs_from_sequence, generate_pairs_for_sequence, sort_key as natural_image_sort_key
+from generate_all_videos import build_pairs_from_sequence, sort_key as natural_image_sort_key
 from image_pair_prompts import get_pair_prompt
 from outpaint_16_9 import TARGET_ASPECT_RATIO, choose_extension_prompt
 from redo_runner import (
@@ -111,12 +113,22 @@ STATUS_SHORT_LABELS = {
     "Needs discussion": "[?]",
 }
 
+WORKFLOW_STEPS = [
+    ("extend", "Extend images"),
+    ("build", "Build movie"),
+    ("review", "Review"),
+    ("redo", "Redo queue"),
+]
+WORKFLOW_LABELS = dict(WORKFLOW_STEPS)
+
 ROOT_DIR = Path(__file__).resolve().parent
 OUTPAINTED_DIR = ROOT_DIR / "outpainted"
 RAW_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 DEFAULT_EXTENSION_OUTPUT_DIR = "kling_test/manual_extends"
 EXTEND_TAB_STATE_PATH = ROOT_DIR / "pipeline_runs" / "extend_tab_state.json"
 BUILD_TAB_STATE_PATH = ROOT_DIR / "pipeline_runs" / "build_movie_state.json"
+BUILD_JOB_DIR = ROOT_DIR / "pipeline_runs" / "build_jobs"
+UI_STATE_PATH = ROOT_DIR / "pipeline_runs" / "ui_state.json"
 EXTEND_TARGET_W = 5376
 EXTEND_TARGET_H = 3024
 EXTEND_IMAGE_MODEL = "gemini-3-pro-image-preview"
@@ -147,57 +159,55 @@ def main() -> None:
     if review_notice:
         st.success(review_notice)
 
-    run_id, status_filter = sidebar_controls()
+    run_id, status_filter, active_step = sidebar_controls()
     ensure_review_files(run_id)
 
-    pairs = discover_clip_pairs()
-    reviews = load_reviews(run_id)
-    redo_requests = load_redo_queue(run_id)
-    winners = load_winners(run_id)
+    render_workflow_strip(active_step)
 
-    if not pairs:
-        st.error("No generated clips were found in kling_test/videos.")
-        return
-
-    review_lookup = {(item.pair_id, item.version): item for item in reviews}
-    queued_redo_lookup = {
-        (item.pair_id, item.source_version): item
-        for item in redo_requests
-        if item.status == "queued"
-    }
-    waiting_review_lookup = {
-        (item.pair_id, item.target_version): item
-        for item in redo_requests
-        if item.status == "waiting_review" and item.target_version is not None
-    }
-    pair_rows = build_pair_rows(pairs, review_lookup, queued_redo_lookup, winners)
-
-    selected_pair = select_pair(pairs, pair_rows, status_filter)
-
-    extend_tab, build_tab, review_tab, queue_tab = st.tabs(["Extend images", "Build movie", "Review", "Redo queue"])
-    with extend_tab:
+    if active_step == "extend":
         render_extend_images_tab()
-
-    with build_tab:
+    elif active_step == "build":
         render_build_movie_tab()
+    else:
+        pairs = discover_clip_pairs()
+        reviews = load_reviews(run_id)
+        redo_requests = load_redo_queue(run_id)
+        winners = load_winners(run_id)
 
-    with review_tab:
-        render_review_panel(
-            selected_pair,
-            review_lookup,
-            queued_redo_lookup,
-            waiting_review_lookup,
-            winners,
-            run_id,
-            pair_rows,
-            progress_counts(pair_rows),
-            status_filter,
-        )
-        with st.expander("Inbox overview", expanded=False):
-            render_inbox(pair_rows, status_filter, selected_pair.pair_id)
+        review_lookup = {(item.pair_id, item.version): item for item in reviews}
+        queued_redo_lookup = {
+            (item.pair_id, item.source_version): item
+            for item in redo_requests
+            if item.status == "queued"
+        }
+        waiting_review_lookup = {
+            (item.pair_id, item.target_version): item
+            for item in redo_requests
+            if item.status == "waiting_review" and item.target_version is not None
+        }
+        pair_rows = build_pair_rows(pairs, review_lookup, queued_redo_lookup, winners)
 
-    with queue_tab:
-        render_redo_queue(redo_requests, review_lookup, winners, run_id)
+        if active_step == "review":
+            if not pairs:
+                st.error("No generated clips were found in kling_test/videos.")
+                return
+
+            selected_pair = select_pair(pairs, pair_rows, status_filter)
+            render_review_panel(
+                selected_pair,
+                review_lookup,
+                queued_redo_lookup,
+                waiting_review_lookup,
+                winners,
+                run_id,
+                pair_rows,
+                progress_counts(pair_rows),
+                status_filter,
+            )
+            with st.expander("Inbox overview", expanded=False):
+                render_inbox(pair_rows, status_filter, selected_pair.pair_id)
+        else:
+            render_redo_queue(redo_requests, review_lookup, winners, run_id)
 
     error_message = st.session_state.pop("redo_run_error", "")
     if error_message:
@@ -254,11 +264,20 @@ def discover_orderable_images(source_dir: Path) -> list[Path]:
     )
 
 
-def normalize_ordered_images(saved_order: list[str], available_names: list[str]) -> list[str]:
+def normalize_ordered_images(saved_order: list[str], available_names: list[str], append_missing: bool = True) -> list[str]:
     available_set = set(available_names)
     ordered = [name for name in saved_order if name in available_set]
-    ordered.extend(name for name in available_names if name not in ordered)
+    if append_missing:
+        ordered.extend(name for name in available_names if name not in ordered)
     return ordered
+
+
+def active_sequence_pairs(ordered_names: list[str], disabled_pair_keys: set[str]) -> list[tuple[str, str, str]]:
+    return [
+        (start_name, end_name, pair_key)
+        for start_name, end_name, pair_key in build_pairs_from_sequence(ordered_names)
+        if pair_key not in disabled_pair_keys
+    ]
 
 
 def image_cache_key(path: Path) -> str:
@@ -293,13 +312,19 @@ def load_compare_data_uri(path_text: str, max_width: int, file_key: str) -> str:
 def render_storyboard_component(
     items: list[dict[str, str]],
     selected_id: str,
+    disabled_pair_keys: list[str],
     component_key: str,
 ) -> dict[str, list[str] | str] | None:
     return STORYBOARD_COMPONENT(
         items=items,
         selected_id=selected_id,
+        disabled_pair_keys=disabled_pair_keys,
         key=component_key,
-        default={"ordered_ids": [item["id"] for item in items], "selected_id": selected_id},
+        default={
+            "ordered_ids": [item["id"] for item in items],
+            "selected_id": selected_id,
+            "disabled_pair_keys": disabled_pair_keys,
+        },
     )
 
 
@@ -457,12 +482,30 @@ def load_build_tab_state() -> dict[str, object]:
         return {}
 
 
+def load_ui_state() -> dict[str, str]:
+    if not UI_STATE_PATH.exists():
+        return {}
+    try:
+        return json.loads(UI_STATE_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def save_ui_state(active_workflow_step: str) -> None:
+    UI_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    UI_STATE_PATH.write_text(
+        json.dumps({"active_workflow_step": active_workflow_step}, indent=2),
+        encoding="utf-8",
+    )
+
+
 def save_build_tab_state(
     source_folder: Path,
     ordered_images: list[str],
     selected_pair_keys: list[str],
     custom_order: bool,
     pool_folder: Path | None = None,
+    disabled_pair_keys: list[str] | None = None,
     prompt_overrides: dict[str, str] | None = None,
     prompt_sources: dict[str, str] | None = None,
 ) -> None:
@@ -475,11 +518,32 @@ def save_build_tab_state(
     }
     if pool_folder is not None:
         payload["pool_folder"] = relative_folder_label(pool_folder)
+    if disabled_pair_keys:
+        payload["disabled_pair_keys"] = disabled_pair_keys
     if prompt_overrides:
         payload["prompt_overrides"] = prompt_overrides
     if prompt_sources:
         payload["prompt_sources"] = prompt_sources
     BUILD_TAB_STATE_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def build_job_state_path(source_folder: Path) -> Path:
+    BUILD_JOB_DIR.mkdir(parents=True, exist_ok=True)
+    return BUILD_JOB_DIR / f"{folder_key_text(source_folder).replace('/', '__')}.json"
+
+
+def save_build_job_state(source_folder: Path, payload: dict[str, object]) -> None:
+    build_job_state_path(source_folder).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def load_build_job_state(source_folder: Path) -> dict[str, object]:
+    path = build_job_state_path(source_folder)
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
 
 
 def save_extend_tab_state(
@@ -620,6 +684,8 @@ def generate_build_pair_prompt_with_llm(
     pair_key: str,
     start_name: str,
     end_name: str,
+    start_path: Path,
+    end_path: Path,
     base_prompt: str,
     current_prompt: str,
 ) -> str | None:
@@ -627,7 +693,7 @@ def generate_build_pair_prompt_with_llm(
     if client is None:
         return None
 
-    rewrite_request = f"""Rewrite this Kling image-to-video prompt for pair {pair_key}.
+    rewrite_request = f"""Create a Kling image-to-video prompt for pair {pair_key} by looking at the two attached stills.
 
 Return only the final prompt text.
 
@@ -639,6 +705,8 @@ Goals:
 - transition naturally from the start still to the end still
 - keep the same setting and avoid inventing a new scene unless clearly implied by the stills
 - use specific motion and continuity wording instead of abstract mood language
+- analyze the attached images instead of paraphrasing the base prompt
+- mention the most important real visual continuity cues from the stills when they matter
 
 Start still: {start_name}
 End still: {end_name}
@@ -651,9 +719,11 @@ Current working prompt:
 """
 
     try:
+        start_image = ImageOps.exif_transpose(Image.open(start_path)).convert("RGB")
+        end_image = ImageOps.exif_transpose(Image.open(end_path)).convert("RGB")
         response = client.models.generate_content(
             model="gemini-2.0-flash",
-            contents=rewrite_request,
+            contents=[rewrite_request, start_image, end_image],
         )
     except Exception:
         return None
@@ -686,6 +756,38 @@ Requirements:
 
 Start still: {start_name}
 End still: {end_name}
+Base prompt: {base_prompt}
+Current working prompt: {current_prompt}
+"""
+
+
+def build_pair_prompt_codex_request(
+    pair_key: str,
+    start_name: str,
+    end_name: str,
+    start_path: Path,
+    end_path: Path,
+    base_prompt: str,
+    current_prompt: str,
+) -> str:
+    return f"""Create a Kling image-to-video prompt for pair {pair_key}.
+
+Return only the final prompt text.
+
+Look at the two attached stills and write the prompt from the actual images, not just from the text prompt below.
+
+Requirements:
+- keep it concise and directly usable in Kling
+- use 2 to 4 short sentences
+- make the first sentence the camera move
+- preserve the same person, face, clothing, and pose continuity when relevant
+- transition naturally from the start still to the end still
+- keep the same setting and avoid inventing a new scene unless clearly implied by the stills
+
+Start still path: {start_path}
+End still path: {end_path}
+Start still name: {start_name}
+End still name: {end_name}
 Base prompt: {base_prompt}
 Current working prompt: {current_prompt}
 """
@@ -1017,17 +1119,23 @@ def render_extension_nav(
 
 
 def render_workflow_strip(active_step: str) -> None:
-    steps = [
-        ("extend", "1. Extend stills"),
-        ("build", "2. Build sequence"),
-        ("review", "3. Review clips"),
-        ("redo", "4. Retry weak clips"),
-    ]
-    chips = []
-    for step_key, label in steps:
-        classes = "workflow-step workflow-step--active" if step_key == active_step else "workflow-step"
-        chips.append(f'<span class="{classes}">{label}</span>')
-    st.markdown(f'<div class="workflow-strip">{"".join(chips)}</div>', unsafe_allow_html=True)
+    display_labels = {
+        "extend": "1. Extend stills",
+        "build": "2. Build sequence",
+        "review": "3. Review clips",
+        "redo": "4. Retry weak clips",
+    }
+    button_cols = st.columns(len(WORKFLOW_STEPS), gap="small")
+    for column, (step_key, _) in zip(button_cols, WORKFLOW_STEPS):
+        if column.button(
+            display_labels[step_key],
+            use_container_width=True,
+            key=f"workflow_button::{step_key}",
+            type="primary" if step_key == active_step else "secondary",
+        ):
+            if st.session_state.get("active_workflow_step") != step_key:
+                st.session_state["pending_workflow_step"] = step_key
+                st.rerun()
 
 
 def render_next_action_card(title: str, body: str) -> None:
@@ -1042,10 +1150,148 @@ def render_next_action_card(title: str, body: str) -> None:
     )
 
 
+def start_build_generation_job(source_folder: Path, job_payload: dict[str, object]) -> None:
+    request_path = build_job_state_path(source_folder)
+    request_path.write_text(json.dumps(job_payload, indent=2), encoding="utf-8")
+
+    creation_flags = 0
+    if os.name == "nt":
+        creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+
+    process = subprocess.Popen(
+        [
+            sys.executable,
+            str(ROOT_DIR / "generate_all_videos.py"),
+            "--request",
+            str(request_path),
+        ],
+        cwd=str(ROOT_DIR),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        creationflags=creation_flags,
+    )
+    job_payload["pid"] = process.pid
+    save_build_job_state(source_folder, job_payload)
+
+
+def stop_build_generation_job(job_state: dict[str, object]) -> bool:
+    pid = job_state.get("pid")
+    if not isinstance(pid, int) or pid <= 0:
+        return False
+    try:
+        if os.name == "nt":
+            result = subprocess.run(
+                ["taskkill", "/PID", str(pid), "/T", "/F"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            return result.returncode == 0
+        os.kill(pid, 15)
+        return True
+    except OSError:
+        return False
+
+
+def render_build_generation_progress(source_folder: Path, job_state: dict[str, object], status_path: str) -> None:
+    selected_pair_keys = [
+        str(item)
+        for item in job_state.get("selected_pair_keys", [])
+        if isinstance(item, str)
+    ]
+    if not selected_pair_keys:
+        return
+
+    try:
+        status_data = json.loads(Path(status_path).read_text(encoding="utf-8")) if Path(status_path).exists() else {}
+    except (OSError, json.JSONDecodeError):
+        status_data = {}
+
+    relevant_statuses = [
+        (pair_key, status_data.get(pair_key, {}))
+        for pair_key in selected_pair_keys
+    ]
+    done_items = [
+        (pair_key, item)
+        for pair_key, item in relevant_statuses
+        if isinstance(item, dict) and item.get("result") in {"ok", "submit_fail", "poll_fail"}
+    ]
+    ok_count = sum(1 for _, item in done_items if item.get("result") == "ok")
+    failed_count = sum(1 for _, item in done_items if item.get("result") != "ok")
+    remaining_count = len(selected_pair_keys) - len(done_items)
+    last_finished_pair = done_items[-1][0] if done_items else "-"
+    is_terminal = remaining_count == 0
+    auto_refresh_key = f"build_auto_refresh::{folder_key_text(source_folder)}"
+    if auto_refresh_key not in st.session_state:
+        st.session_state[auto_refresh_key] = False
+
+    st.markdown("**Generation progress**")
+    progress_cols = st.columns(4, gap="small")
+    progress_cols[0].markdown(
+        f"<div class='extend-summary-card'><span>Selected</span><strong>{len(selected_pair_keys)}</strong></div>",
+        unsafe_allow_html=True,
+    )
+    progress_cols[1].markdown(
+        f"<div class='extend-summary-card'><span>Completed</span><strong>{ok_count}</strong></div>",
+        unsafe_allow_html=True,
+    )
+    progress_cols[2].markdown(
+        f"<div class='extend-summary-card'><span>Failed</span><strong>{failed_count}</strong></div>",
+        unsafe_allow_html=True,
+    )
+    progress_cols[3].markdown(
+        f"<div class='extend-summary-card'><span>Remaining</span><strong>{remaining_count}</strong></div>",
+        unsafe_allow_html=True,
+    )
+
+    detail_cols = st.columns([1.3, 0.9, 0.9, 1], gap="small")
+    detail_cols[0].caption(f"Last finished pair: {last_finished_pair}")
+    if detail_cols[1].button("Refresh progress", use_container_width=True, key=f"build_refresh_progress::{folder_key_text(source_folder)}"):
+        st.rerun()
+    if detail_cols[2].button(
+        "Stop current run",
+        use_container_width=True,
+        key=f"build_stop_progress::{folder_key_text(source_folder)}",
+        disabled=is_terminal,
+    ):
+        if stop_build_generation_job(job_state):
+            job_state["stopped"] = True
+            save_build_job_state(source_folder, job_state)
+            st.session_state["build_generation_notice"] = "Requested stop for the current Kling build run."
+        else:
+            st.session_state["build_generation_notice"] = "Could not stop the current Kling build run."
+        st.rerun()
+    if detail_cols[3].button("Open videos folder", use_container_width=True, key=f"build_open_videos::{folder_key_text(source_folder)}"):
+        open_folder_in_windows(Path(str(job_state.get("video_dir", Path(status_path).parent))))
+    st.checkbox(
+        "Auto-refresh every 5 seconds",
+        key=auto_refresh_key,
+        disabled=is_terminal,
+    )
+
+    if is_terminal:
+        st.success("This generation run has reached a terminal state for all selected pairs.")
+    elif job_state.get("stopped"):
+        st.warning("This build run was stopped before all selected pairs finished.")
+    else:
+        st.info("The Kling batch is running in the background. Use Refresh progress to check new completions.")
+
+    if st.session_state.get(auto_refresh_key) and not is_terminal and not job_state.get("stopped"):
+        components.html(
+            """
+            <script>
+            setTimeout(function () {
+              window.parent.location.reload();
+            }, 5000);
+            </script>
+            """,
+            height=0,
+        )
+
+
 def render_extend_images_tab() -> None:
     st.subheader("Extend images")
     st.caption("Browse one image at a time, compare the original against the current saved extension, then upload a replacement if needed.")
-    render_workflow_strip("extend")
     workflow = "16:9 from 4:3 images"
     saved_state = load_extend_tab_state()
     pending_source_folder = st.session_state.pop("pending_extend_source_folder", None)
@@ -1493,7 +1739,6 @@ def render_extend_images_tab() -> None:
 def render_build_movie_tab() -> None:
     st.subheader("Build movie")
     st.caption("Choose the finished 16:9 stills, keep them in order, preview the Kling pairs, then generate clips or stitch the finished segments.")
-    render_workflow_strip("build")
     saved_state = load_build_tab_state()
     pending_source_folder = st.session_state.pop("pending_build_source_folder", None)
     source_folders = discover_image_folders()
@@ -1542,6 +1787,7 @@ def render_build_movie_tab() -> None:
     saved_order = saved_state.get("ordered_images", [])
     saved_folder_label = str(saved_state.get("source_folder", ""))
     saved_custom_order = bool(saved_state.get("custom_order", False))
+    saved_disabled_pair_keys = saved_state.get("disabled_pair_keys", [])
     saved_prompt_overrides = saved_state.get("prompt_overrides", {})
     saved_prompt_sources = saved_state.get("prompt_sources", {})
     use_saved_order = (
@@ -1551,12 +1797,39 @@ def render_build_movie_tab() -> None:
     )
     if custom_order_key not in st.session_state:
         st.session_state[custom_order_key] = use_saved_order
-        st.session_state[ordered_state_key] = normalize_ordered_images(saved_order if use_saved_order else [], available_names)
+        st.session_state[ordered_state_key] = normalize_ordered_images(
+            saved_order if use_saved_order else [],
+            available_names,
+            append_missing=not use_saved_order,
+        )
     elif ordered_state_key not in st.session_state:
-        st.session_state[ordered_state_key] = normalize_ordered_images(saved_order if use_saved_order else [], available_names)
+        st.session_state[ordered_state_key] = normalize_ordered_images(
+            saved_order if use_saved_order else [],
+            available_names,
+            append_missing=not use_saved_order,
+        )
     else:
-        st.session_state[ordered_state_key] = normalize_ordered_images(st.session_state[ordered_state_key], available_names)
+        st.session_state[ordered_state_key] = normalize_ordered_images(
+            st.session_state[ordered_state_key],
+            available_names,
+            append_missing=not st.session_state[custom_order_key],
+        )
     ordered_names = st.session_state[ordered_state_key]
+    disabled_pairs_key = f"build_disabled_pairs::{folder_key_text(selected_folder)}"
+    if disabled_pairs_key not in st.session_state:
+        if (
+            saved_folder_label == relative_folder_label(selected_folder)
+            and isinstance(saved_disabled_pair_keys, list)
+        ):
+            st.session_state[disabled_pairs_key] = [str(item) for item in saved_disabled_pair_keys if isinstance(item, str)]
+        else:
+            st.session_state[disabled_pairs_key] = []
+    disabled_pair_keys = {
+        pair_key
+        for pair_key in st.session_state[disabled_pairs_key]
+        if isinstance(pair_key, str)
+    }
+    st.session_state[disabled_pairs_key] = sorted(disabled_pair_keys)
     if prompt_overrides_key not in st.session_state:
         if (
             saved_folder_label == relative_folder_label(selected_folder)
@@ -1590,9 +1863,10 @@ def render_build_movie_tab() -> None:
         imported_names = [
             str(name)
             for name in pending_import.get("names", [])
-            if isinstance(name, str) and name in available_names and name not in ordered_names
+            if isinstance(name, str) and name in available_names
         ]
         if imported_names:
+            ordered_names = [name for name in ordered_names if name not in imported_names]
             mode = str(pending_import.get("mode", "after_active"))
             if mode == "end" or not ordered_names:
                 ordered_names = ordered_names + imported_names
@@ -1603,10 +1877,25 @@ def render_build_movie_tab() -> None:
             st.session_state[ordered_state_key] = ordered_names
             st.session_state[custom_order_key] = True
             st.session_state[f"build_current_image::{folder_key_text(selected_folder)}"] = imported_names[0]
+    pending_import_notice = st.session_state.pop(
+        f"build_pending_import_notice::{folder_key_text(selected_folder)}",
+        "",
+    )
+    pending_scroll_anchor = st.session_state.pop(
+        f"build_pending_scroll_anchor::{folder_key_text(selected_folder)}",
+        "",
+    )
 
     current_image_key = f"build_current_image::{folder_key_text(selected_folder)}"
     if current_image_key not in st.session_state or st.session_state[current_image_key] not in ordered_names:
         st.session_state[current_image_key] = ordered_names[0]
+
+    if pending_import_notice:
+        st.success(pending_import_notice)
+
+    st.markdown("<div id='build-storyboard-anchor'></div>", unsafe_allow_html=True)
+    if pending_scroll_anchor:
+        render_extend_scroll_restore(pending_scroll_anchor)
 
     st.markdown("**Sequence board**")
     st.caption("Drag thumbnails to reorder the movie. Click a thumbnail to make it the active still. Default order is numeric-natural, so `2` stays before `11`.")
@@ -1615,12 +1904,23 @@ def render_build_movie_tab() -> None:
             "id": name,
             "name": name,
             "thumb": load_compare_data_uri(str(source_lookup[name]), 320, image_cache_key(source_lookup[name])),
+            "outgoing_pair_key": (
+                f"{Path(name).stem}_to_{Path(ordered_names[index + 1]).stem}"
+                if index < len(ordered_names) - 1
+                else ""
+            ),
+            "outgoing_enabled": (
+                index < len(ordered_names) - 1
+                and f"{Path(name).stem}_to_{Path(ordered_names[index + 1]).stem}" not in disabled_pair_keys
+            ),
+            "next_name": ordered_names[index + 1] if index < len(ordered_names) - 1 else "",
         }
-        for name in ordered_names
+        for index, name in enumerate(ordered_names)
     ]
     storyboard_value = render_storyboard_component(
         storyboard_items,
         st.session_state[current_image_key],
+        st.session_state[disabled_pairs_key],
         component_key=f"build_storyboard::{folder_key_text(selected_folder)}",
     )
     if isinstance(storyboard_value, dict):
@@ -1629,11 +1929,47 @@ def render_build_movie_tab() -> None:
             normalized_order = normalize_ordered_images(
                 [str(name) for name in new_order],
                 available_names,
+                append_missing=False,
             )
             if normalized_order != ordered_names:
                 st.session_state[ordered_state_key] = normalized_order
                 ordered_names = normalized_order
                 st.session_state[custom_order_key] = True
+                valid_disabled_pairs = {
+                    pair_key
+                    for _, _, pair_key in build_pairs_from_sequence(ordered_names)
+                }
+                st.session_state[disabled_pairs_key] = sorted(
+                    pair_key for pair_key in st.session_state[disabled_pairs_key] if pair_key in valid_disabled_pairs
+                )
+        removed_name = str(storyboard_value.get("removed_id", "")).strip()
+        if removed_name:
+            if removed_name in ordered_names and len(ordered_names) > 2:
+                removed_index = ordered_names.index(removed_name)
+                ordered_names = [name for name in ordered_names if name != removed_name]
+                st.session_state[ordered_state_key] = ordered_names
+                st.session_state[custom_order_key] = True
+                valid_disabled_pairs = {
+                    pair_key
+                    for _, _, pair_key in build_pairs_from_sequence(ordered_names)
+                }
+                st.session_state[disabled_pairs_key] = sorted(
+                    pair_key for pair_key in st.session_state[disabled_pairs_key] if pair_key in valid_disabled_pairs
+                )
+                if st.session_state[current_image_key] == removed_name:
+                    fallback_index = max(0, min(removed_index, len(ordered_names) - 1))
+                    st.session_state[current_image_key] = ordered_names[fallback_index]
+                st.rerun()
+        new_disabled_pairs = storyboard_value.get("disabled_pair_keys", [])
+        if isinstance(new_disabled_pairs, list):
+            normalized_disabled_pairs = sorted(
+                pair_key
+                for pair_key in {str(item) for item in new_disabled_pairs}
+                if pair_key
+            )
+            if normalized_disabled_pairs != st.session_state[disabled_pairs_key]:
+                st.session_state[disabled_pairs_key] = normalized_disabled_pairs
+                st.rerun()
         selected_name = str(storyboard_value.get("selected_id", "")).strip()
         if selected_name in ordered_names:
             st.session_state[current_image_key] = selected_name
@@ -1660,7 +1996,7 @@ def render_build_movie_tab() -> None:
             st.session_state[custom_order_key] = True
             st.rerun()
         if action_cols[3].button("Use natural order", use_container_width=True):
-            st.session_state[ordered_state_key] = normalize_ordered_images([], available_names)
+            st.session_state[ordered_state_key] = normalize_ordered_images([], available_names, append_missing=True)
             st.session_state[current_image_key] = st.session_state[ordered_state_key][0]
             st.session_state[custom_order_key] = False
             st.rerun()
@@ -1769,20 +2105,21 @@ def render_build_movie_tab() -> None:
                 thumb_columns = st.columns(4, gap="small")
                 for index, pool_path in enumerate(pool_paths):
                     with thumb_columns[index % 4]:
+                        checked = str(pool_path) in current_pool_selection
+                        if st.checkbox(
+                            "Select",
+                            value=checked,
+                            key=f"build_pool_pick::{folder_key_text(selected_folder)}::{folder_key_text(pool_folder)}::{folder_key_text(pool_path)}",
+                        ):
+                            current_pool_selection.add(str(pool_path))
+                        else:
+                            current_pool_selection.discard(str(pool_path))
                         st.image(
                             load_display_image_bytes(str(pool_path), 320, image_cache_key(pool_path)),
                             caption=pool_path.name,
                             use_container_width=True,
                         )
-                        checked = str(pool_path) in current_pool_selection
-                        if st.checkbox(
-                            "Select",
-                            value=checked,
-                            key=f"build_pool_pick::{folder_key_text(selected_folder)}::{folder_key_text(pool_folder)}::{pool_path.name}",
-                        ):
-                            current_pool_selection.add(str(pool_path))
-                        else:
-                            current_pool_selection.discard(str(pool_path))
+                        st.caption(relative_folder_label(pool_path.parent))
                 st.session_state[selected_pool_key] = sorted(current_pool_selection)
 
                 import_cols = st.columns(2, gap="small")
@@ -1803,8 +2140,11 @@ def render_build_movie_tab() -> None:
                         "after": current_name,
                         "names": imported_names,
                     }
+                    st.session_state[f"build_pending_import_notice::{folder_key_text(selected_folder)}"] = (
+                        f"Added {len(imported_names)} image(s) after {current_name}."
+                    )
+                    st.session_state[f"build_pending_scroll_anchor::{folder_key_text(selected_folder)}"] = "build-storyboard-anchor"
                     st.session_state[selected_pool_key] = []
-                    st.success(f"Imported {len(imported_names)} image(s) into {relative_folder_label(selected_folder)}.")
                     st.rerun()
                 if import_cols[1].button(
                     "Add selected to end",
@@ -1822,13 +2162,16 @@ def render_build_movie_tab() -> None:
                         "mode": "end",
                         "names": imported_names,
                     }
+                    st.session_state[f"build_pending_import_notice::{folder_key_text(selected_folder)}"] = (
+                        f"Added {len(imported_names)} image(s) to the end of the storyboard."
+                    )
+                    st.session_state[f"build_pending_scroll_anchor::{folder_key_text(selected_folder)}"] = "build-storyboard-anchor"
                     st.session_state[selected_pool_key] = []
-                    st.success(f"Imported {len(imported_names)} image(s) into {relative_folder_label(selected_folder)}.")
                     st.rerun()
 
     folder_prompt_label = relative_folder_label(selected_folder)
     pair_rows = []
-    sequence_pairs = build_pairs_from_sequence(ordered_names)
+    sequence_pairs = active_sequence_pairs(ordered_names, disabled_pair_keys)
     for start_name, end_name, pair_key in sequence_pairs:
         base_prompt = get_pair_prompt(pair_key, folder_prompt_label)
         prompt_override = prompt_overrides.get(pair_key, "")
@@ -1846,17 +2189,22 @@ def render_build_movie_tab() -> None:
     suggested_preview_key = pair_rows[min(current_index, len(pair_rows) - 1)]["pair_key"] if pair_rows else ""
 
     selected_pairs_key = f"build_selected_pairs::{folder_key_text(selected_folder)}"
+    has_saved_pair_keys = "selected_pair_keys" in saved_state
     saved_pair_keys = saved_state.get("selected_pair_keys", [])
     default_pair_keys = [row["pair_key"] for row in pair_rows]
     if selected_pairs_key not in st.session_state:
-        if isinstance(saved_pair_keys, list):
+        if has_saved_pair_keys and isinstance(saved_pair_keys, list):
             saved_set = set(saved_pair_keys)
-            st.session_state[selected_pairs_key] = [row["pair_key"] for row in pair_rows if row["pair_key"] in saved_set] or default_pair_keys
+            st.session_state[selected_pairs_key] = [
+                row["pair_key"] for row in pair_rows if row["pair_key"] in saved_set
+            ]
         else:
             st.session_state[selected_pairs_key] = default_pair_keys
     else:
         current_selected = set(st.session_state[selected_pairs_key])
-        st.session_state[selected_pairs_key] = [row["pair_key"] for row in pair_rows if row["pair_key"] in current_selected] or default_pair_keys
+        st.session_state[selected_pairs_key] = [
+            row["pair_key"] for row in pair_rows if row["pair_key"] in current_selected
+        ]
 
     save_build_tab_state(
         selected_folder,
@@ -1864,6 +2212,7 @@ def render_build_movie_tab() -> None:
         st.session_state[selected_pairs_key],
         st.session_state[custom_order_key],
         st.session_state.get("build_pool_folder"),
+        st.session_state[disabled_pairs_key],
         prompt_overrides,
         prompt_sources,
     )
@@ -1881,7 +2230,7 @@ def render_build_movie_tab() -> None:
         f"<div class='extend-summary-card'><span>Pairs</span><strong>{len(pair_rows)}</strong></div>",
         unsafe_allow_html=True,
     )
-    existing_segments = ordered_segment_files_for_sequence(ordered_names, os.path.join(selected_folder, "videos"))
+    existing_segments = set(ordered_segment_files_for_pair_keys([row["pair_key"] for row in pair_rows], os.path.join(selected_folder, "videos")))
     summary_cols[3].markdown(
         f"<div class='extend-summary-card'><span>Segments ready</span><strong>{len(existing_segments)}</strong></div>",
         unsafe_allow_html=True,
@@ -1892,6 +2241,19 @@ def render_build_movie_tab() -> None:
     )
 
     st.markdown("**Pair preview**")
+    if not pair_rows:
+        st.info("No active transitions right now. Turn at least one bridge back on in the storyboard to generate or stitch clips.")
+        save_build_tab_state(
+            selected_folder,
+            ordered_names,
+            [],
+            st.session_state[custom_order_key],
+            st.session_state.get("build_pool_folder"),
+            st.session_state[disabled_pairs_key],
+            prompt_overrides,
+            prompt_sources,
+        )
+        return
     pair_keys = [row["pair_key"] for row in pair_rows]
     missing_pair_keys = [
         row["pair_key"]
@@ -1916,15 +2278,15 @@ def render_build_movie_tab() -> None:
     pair_action_cols = st.columns(3, gap="small")
     if pair_action_cols[0].button("Select all pairs", use_container_width=True, key=f"build_select_all::{folder_key_text(selected_folder)}"):
         st.session_state[selected_pairs_key] = pair_keys
-        save_build_tab_state(selected_folder, ordered_names, st.session_state[selected_pairs_key], st.session_state[custom_order_key], st.session_state.get("build_pool_folder"), prompt_overrides, prompt_sources)
+        save_build_tab_state(selected_folder, ordered_names, st.session_state[selected_pairs_key], st.session_state[custom_order_key], st.session_state.get("build_pool_folder"), st.session_state[disabled_pairs_key], prompt_overrides, prompt_sources)
         st.rerun()
     if pair_action_cols[1].button("Only missing segments", use_container_width=True, key=f"build_select_missing::{folder_key_text(selected_folder)}"):
         st.session_state[selected_pairs_key] = missing_pair_keys or pair_keys
-        save_build_tab_state(selected_folder, ordered_names, st.session_state[selected_pairs_key], st.session_state[custom_order_key], st.session_state.get("build_pool_folder"), prompt_overrides, prompt_sources)
+        save_build_tab_state(selected_folder, ordered_names, st.session_state[selected_pairs_key], st.session_state[custom_order_key], st.session_state.get("build_pool_folder"), st.session_state[disabled_pairs_key], prompt_overrides, prompt_sources)
         st.rerun()
     if pair_action_cols[2].button("Clear selection", use_container_width=True, key=f"build_clear_pairs::{folder_key_text(selected_folder)}"):
         st.session_state[selected_pairs_key] = []
-        save_build_tab_state(selected_folder, ordered_names, st.session_state[selected_pairs_key], st.session_state[custom_order_key], st.session_state.get("build_pool_folder"), prompt_overrides, prompt_sources)
+        save_build_tab_state(selected_folder, ordered_names, st.session_state[selected_pairs_key], st.session_state[custom_order_key], st.session_state.get("build_pool_folder"), st.session_state[disabled_pairs_key], prompt_overrides, prompt_sources)
         st.rerun()
     with st.expander("Customize pair selection", expanded=False):
         st.multiselect(
@@ -1939,6 +2301,7 @@ def render_build_movie_tab() -> None:
         st.session_state[selected_pairs_key],
         st.session_state[custom_order_key],
         st.session_state.get("build_pool_folder"),
+        st.session_state[disabled_pairs_key],
         prompt_overrides,
         prompt_sources,
     )
@@ -1998,7 +2361,7 @@ def render_build_movie_tab() -> None:
         "gemini": "Gemini rewrite",
     }.get(preview_row["prompt_source"], "Custom prompt")
     st.caption(
-        f"Prompt source: {prompt_source_label}. Edit it directly, generate a new draft with Gemini, or copy the brief below into any other LLM."
+        f"Prompt source: {prompt_source_label}. The prompt box below is the exact text Kling will use for this pair."
     )
     prompt_text = st.text_area(
         "Prompt for this pair",
@@ -2018,7 +2381,9 @@ def render_build_movie_tab() -> None:
         prompt_overrides.pop(preview_pair_key, None)
         prompt_sources.pop(preview_pair_key, None)
 
-    prompt_action_cols = st.columns(3, gap="small")
+    helper_mode_key = f"build_prompt_helper_mode::{folder_key_text(selected_folder)}::{preview_pair_key}"
+    helper_mode = st.session_state.get(helper_mode_key, "")
+    prompt_action_cols = st.columns(4, gap="small")
     if prompt_action_cols[0].button(
         "Generate with Gemini",
         use_container_width=True,
@@ -2028,6 +2393,8 @@ def render_build_movie_tab() -> None:
             preview_pair_key,
             preview_row["start"],
             preview_row["end"],
+            source_lookup[preview_row["start"]],
+            source_lookup[preview_row["end"]],
             preview_row["base_prompt"],
             normalized_prompt_text or preview_row["base_prompt"],
         )
@@ -2043,11 +2410,20 @@ def render_build_movie_tab() -> None:
                 st.session_state[selected_pairs_key],
                 st.session_state[custom_order_key],
                 st.session_state.get("build_pool_folder"),
+                st.session_state[disabled_pairs_key],
                 prompt_overrides,
                 prompt_sources,
             )
             st.rerun()
     if prompt_action_cols[1].button(
+        "Ask Codex",
+        use_container_width=True,
+        key=f"build_prepare_codex::{folder_key_text(selected_folder)}::{preview_pair_key}",
+    ):
+        st.session_state[helper_mode_key] = "codex"
+        st.session_state[f"build_pending_scroll_anchor::{folder_key_text(selected_folder)}"] = "build-prompt-helper-anchor"
+        st.rerun()
+    if prompt_action_cols[2].button(
         "Reset to default",
         use_container_width=True,
         key=f"build_reset_prompt::{folder_key_text(selected_folder)}::{preview_pair_key}",
@@ -2061,17 +2437,40 @@ def render_build_movie_tab() -> None:
             st.session_state[selected_pairs_key],
             st.session_state[custom_order_key],
             st.session_state.get("build_pool_folder"),
+            st.session_state[disabled_pairs_key],
             prompt_overrides,
             prompt_sources,
         )
         st.rerun()
-    prompt_action_cols[2].markdown(
+    prompt_action_cols[3].markdown(
         f"<div class='extend-summary-card'><span>Used by Kling</span><strong>{'Custom prompt' if preview_pair_key in prompt_overrides else 'Default prompt'}</strong></div>",
         unsafe_allow_html=True,
     )
-    with st.expander("Ask Gemini or any other LLM", expanded=False):
+    with st.expander("Optional: create a new prompt with Codex or another LLM", expanded=helper_mode == "codex"):
+        if helper_mode == "codex":
+            st.markdown("<div id='build-prompt-helper-anchor'></div>", unsafe_allow_html=True)
+            render_extend_scroll_restore("build-prompt-helper-anchor")
+        st.caption(
+            "This is only a helper brief for an external LLM. It is not the prompt Kling will use unless you paste the new result back into the prompt box above."
+        )
+        if helper_mode == "codex":
+            st.info("Paste this request here in Codex with the two still images if you want me to write the exact Kling prompt.")
+            st.text_area(
+                "Ask Codex with this request",
+                value=build_pair_prompt_codex_request(
+                    preview_pair_key,
+                    preview_row["start"],
+                    preview_row["end"],
+                    source_lookup[preview_row["start"]],
+                    source_lookup[preview_row["end"]],
+                    preview_row["base_prompt"],
+                    normalized_prompt_text or preview_row["base_prompt"],
+                ),
+                height=260,
+                key=f"build_prompt_codex_brief::{folder_key_text(selected_folder)}::{preview_pair_key}",
+            )
         st.text_area(
-            "LLM brief you can copy",
+            "Copy this helper brief for another LLM",
             value=build_pair_prompt_brief(
                 preview_pair_key,
                 preview_row["start"],
@@ -2088,18 +2487,22 @@ def render_build_movie_tab() -> None:
         st.session_state[selected_pairs_key],
         st.session_state[custom_order_key],
         st.session_state.get("build_pool_folder"),
+        st.session_state[disabled_pairs_key],
         prompt_overrides,
         prompt_sources,
     )
 
     videos_dir = os.path.join(selected_folder, "videos")
     status_path = os.path.join(videos_dir, "status.json")
+    build_job = load_build_job_state(selected_folder)
+    if build_job:
+        render_build_generation_progress(selected_folder, build_job, status_path)
     action_cols = st.columns([1, 1, 1.2], gap="small")
     use_credits_key = f"build_use_kling::{folder_key_text(selected_folder)}"
     if use_credits_key not in st.session_state:
         st.session_state[use_credits_key] = False
     st.caption(
-        f"Generate clips for {len(st.session_state[selected_pairs_key])} selected pair(s). Stitch the movie after at least one segment exists."
+        f"Generate clips for {len(st.session_state[selected_pairs_key])} selected pair(s). The run starts in the background, and progress is tracked from the status file."
     )
     action_cols[0].checkbox("Use Kling credits", key=use_credits_key)
     if action_cols[1].button("Generate clips", use_container_width=True, type="primary"):
@@ -2108,20 +2511,26 @@ def render_build_movie_tab() -> None:
         elif not st.session_state[use_credits_key]:
             st.warning("Tick `Use Kling credits` before starting Kling generation.")
         else:
-            with st.spinner("Generating selected pairs with Kling..."):
-                generation_prompt_map = {
-                    row["pair_key"]: row["prompt"]
-                    for row in pair_rows
-                }
-                generation_results = generate_pairs_for_sequence(
-                    ordered_names,
-                    image_dir=str(selected_folder),
-                    video_dir=videos_dir,
-                    status_path=status_path,
-                    selected_keys=st.session_state[selected_pairs_key],
-                    prompt_overrides=generation_prompt_map,
-                )
-            st.session_state[f"build_generation_results::{folder_key_text(selected_folder)}"] = generation_results
+            generation_prompt_map = {
+                row["pair_key"]: row["prompt"]
+                for row in pair_rows
+            }
+            job_payload = {
+                "started_at": time.time(),
+                "source_folder": str(selected_folder),
+                "ordered_names": ordered_names,
+                "selected_pair_keys": st.session_state[selected_pairs_key],
+                "video_dir": videos_dir,
+                "status_path": status_path,
+                "prompt_overrides": generation_prompt_map,
+            }
+            save_build_job_state(selected_folder, job_payload)
+            start_build_generation_job(selected_folder, job_payload)
+            st.session_state[f"build_generation_results::{folder_key_text(selected_folder)}"] = None
+            st.session_state["build_generation_notice"] = (
+                f"Started Kling generation for {len(st.session_state[selected_pairs_key])} pair(s). "
+                "Watch the progress card below."
+            )
             st.rerun()
     if action_cols[2].button(
         "Stitch movie",
@@ -2129,14 +2538,18 @@ def render_build_movie_tab() -> None:
         disabled=not existing_segments,
     ):
         try:
-            stitch_result = stitch_sequence(
-                ordered_names,
+            stitch_result = stitch_pair_keys(
+                [row["pair_key"] for row in pair_rows],
                 videos_dir=videos_dir,
                 output_file=os.path.join(videos_dir, "full_movie.mp4"),
             )
             st.success(f"Stitched {len(stitch_result['segments'])} segments into {relative_folder_label(Path(stitch_result['output_file']))}.")
         except Exception as exc:
             st.error(f"Stitch failed: {exc}")
+
+    generation_notice = st.session_state.pop("build_generation_notice", "")
+    if generation_notice:
+        st.success(generation_notice)
 
     generation_results = st.session_state.get(f"build_generation_results::{folder_key_text(selected_folder)}")
     if generation_results:
@@ -2506,21 +2919,131 @@ def inject_styles() -> None:
     )
 
 
-def sidebar_controls() -> tuple[str, str]:
-    st.sidebar.header("Review Run")
-    run_id = st.sidebar.text_input("Run ID", value=DEFAULT_RUN_ID).strip() or DEFAULT_RUN_ID
-
-    st.sidebar.header("Quick view")
-    status_filter = st.sidebar.radio(
-        "Show",
-        options=STATUS_FILTERS,
-        index=STATUS_FILTERS.index("Needs review"),
-        format_func=lambda item: FILTER_LABELS[item],
+def sidebar_controls() -> tuple[str, str, str]:
+    pending_workflow_step = st.session_state.pop("pending_workflow_step", None)
+    saved_ui_state = load_ui_state()
+    saved_workflow_step = str(saved_ui_state.get("active_workflow_step", "extend"))
+    if "active_workflow_step" not in st.session_state and saved_workflow_step in WORKFLOW_LABELS:
+        st.session_state["active_workflow_step"] = saved_workflow_step
+    if pending_workflow_step in WORKFLOW_LABELS:
+        st.session_state["active_workflow_step"] = pending_workflow_step
+    st.sidebar.header("Workflow")
+    active_step = st.sidebar.radio(
+        "Section",
+        options=[item[0] for item in WORKFLOW_STEPS],
+        index=[item[0] for item in WORKFLOW_STEPS].index(st.session_state.get("active_workflow_step", "extend")),
+        format_func=lambda item: WORKFLOW_LABELS[item],
+        key="active_workflow_step",
         label_visibility="collapsed",
     )
+    save_ui_state(active_step)
 
-    st.sidebar.caption("Review the queue, approve what works, and send weak clips for another pass.")
-    return run_id, status_filter
+    run_id = DEFAULT_RUN_ID
+    if active_step in {"review", "redo"}:
+        st.sidebar.header("Review Run")
+        run_id = st.sidebar.text_input("Run ID", value=DEFAULT_RUN_ID, key="sidebar_run_id").strip() or DEFAULT_RUN_ID
+
+    if active_step == "extend":
+        render_extend_sidebar_controls()
+        status_filter = st.session_state.get("sidebar_status_filter", "Needs review")
+    elif active_step == "build":
+        render_build_sidebar_controls()
+        status_filter = st.session_state.get("sidebar_status_filter", "Needs review")
+    elif active_step == "review":
+        st.sidebar.header("Quick view")
+        status_filter = st.sidebar.radio(
+            "Show",
+            options=STATUS_FILTERS,
+            index=STATUS_FILTERS.index(st.session_state.get("sidebar_status_filter", "Needs review"))
+            if st.session_state.get("sidebar_status_filter", "Needs review") in STATUS_FILTERS
+            else STATUS_FILTERS.index("Needs review"),
+            format_func=lambda item: FILTER_LABELS[item],
+            key="sidebar_status_filter",
+            label_visibility="collapsed",
+        )
+        st.sidebar.caption("Review the queue, approve what works, and send weak clips for another pass.")
+    else:
+        render_redo_sidebar_controls(run_id)
+        status_filter = st.session_state.get("sidebar_status_filter", "Needs review")
+
+    return run_id, status_filter, active_step
+
+
+def render_sidebar_summary_cards(items: list[tuple[str, str]]) -> None:
+    card_cols = st.sidebar.columns(len(items), gap="small")
+    for column, (label, value) in zip(card_cols, items):
+        column.markdown(
+            f"<div class='extend-summary-card'><span>{label}</span><strong>{value}</strong></div>",
+            unsafe_allow_html=True,
+        )
+
+
+def render_extend_sidebar_controls() -> None:
+    saved_state = load_extend_tab_state()
+    source_folder = path_from_saved_text(str(saved_state.get("source_folder", relative_folder_label(OUTPAINTED_DIR))))
+    output_text = str(saved_state.get("output_folder", DEFAULT_EXTENSION_OUTPUT_DIR))
+    output_folder = resolve_extension_output_dir(output_text) or ROOT_DIR / DEFAULT_EXTENSION_OUTPUT_DIR
+    active_image = str(saved_state.get("active_image", "-")) or "-"
+
+    st.sidebar.header("Extend board")
+    render_sidebar_summary_cards(
+        [
+            ("Source", relative_folder_label(source_folder)),
+            ("Output", relative_folder_label(output_folder)),
+        ]
+    )
+    st.sidebar.markdown(
+        f"<div class='extend-details-card'><div><span>Active image</span><strong>{active_image}</strong></div><div><span>Only missing</span><strong>{'Yes' if saved_state.get('only_missing', False) else 'No'}</strong></div></div>",
+        unsafe_allow_html=True,
+    )
+    button_cols = st.sidebar.columns(2, gap="small")
+    if button_cols[0].button("Open source", use_container_width=True, key="sidebar_open_extend_source"):
+        open_folder_in_windows(source_folder)
+    if button_cols[1].button("Open output", use_container_width=True, key="sidebar_open_extend_output"):
+        open_folder_in_windows(output_folder)
+    st.sidebar.caption("Pick the working folders, step through images, and compare the saved extension against the original.")
+
+
+def render_build_sidebar_controls() -> None:
+    saved_state = load_build_tab_state()
+    source_folder = path_from_saved_text(str(saved_state.get("source_folder", "kling_test")))
+    ordered_images = [str(item) for item in saved_state.get("ordered_images", []) if isinstance(item, str)]
+    active_key = f"build_current_image::{folder_key_text(source_folder)}"
+    active_image = st.session_state.get(active_key) or (ordered_images[0] if ordered_images else "-")
+    active_index = ordered_images.index(active_image) + 1 if active_image in ordered_images else 0
+    custom_order = bool(saved_state.get("custom_order", False))
+
+    st.sidebar.header("Build board")
+    render_sidebar_summary_cards(
+        [
+            ("Images", str(len(ordered_images))),
+            ("Pairs", str(max(0, len(ordered_images) - 1))),
+        ]
+    )
+    st.sidebar.markdown(
+        f"<div class='extend-details-card'><div><span>Folder</span><strong>{relative_folder_label(source_folder)}</strong></div><div><span>Active still</span><strong>{active_image}</strong></div><div><span>Position</span><strong>{active_index} of {len(ordered_images) if ordered_images else 0}</strong></div><div><span>Order</span><strong>{'Custom' if custom_order else 'Natural'}</strong></div></div>",
+        unsafe_allow_html=True,
+    )
+    if st.sidebar.button("Open build folder", use_container_width=True, key="sidebar_open_build_source"):
+        open_folder_in_windows(source_folder)
+    st.sidebar.caption("Arrange the storyboard first, then generate clips from the current sequence.")
+
+
+def render_redo_sidebar_controls(run_id: str) -> None:
+    redo_requests = load_redo_queue(run_id)
+    queued = len([item for item in redo_requests if item.status == "queued"])
+    waiting = len([item for item in redo_requests if item.status == "waiting_review"])
+    failed = len([item for item in redo_requests if item.status == "failed"])
+
+    st.sidebar.header("Retry board")
+    render_sidebar_summary_cards(
+        [
+            ("Queued", str(queued)),
+            ("Ready", str(waiting)),
+            ("Failed", str(failed)),
+        ]
+    )
+    st.sidebar.caption("Preview retry prompts, generate the selected reruns, then review the new versions.")
 
 
 def select_pair(pairs, pair_rows, status_filter: str):
@@ -2661,7 +3184,6 @@ def render_review_panel(
     status_filter: str,
 ) -> None:
     st.subheader(pair_label(selected_pair.pair_id))
-    render_workflow_strip("review")
     render_next_action_card(
         "Next action",
         "Approve the current version if it works. Otherwise save a redo or discussion review and move on.",
@@ -3125,7 +3647,6 @@ def render_compare_card(clip, full_width: bool = False) -> None:
 
 def render_redo_queue(redo_requests, review_lookup, winners, run_id: str) -> None:
     st.subheader("Redo queue")
-    render_workflow_strip("redo")
     render_next_action_card(
         "Next action",
         "Preview the rewritten prompts first, then generate only the retries worth spending credits on.",
@@ -3505,9 +4026,18 @@ def next_import_target_path(source_path: Path, target_dir: Path) -> Path:
 
     stem = source_path.stem
     suffix = source_path.suffix
+    source_tag = re.sub(r"[^A-Za-z0-9]+", "_", source_path.parent.name).strip("_").lower()
+    if source_tag:
+        candidate = target_dir / f"{stem}__{source_tag}{suffix}"
+        if not candidate.exists():
+            return candidate
+
     index = 2
     while True:
-        candidate = target_dir / f"{stem}_pool{index}{suffix}"
+        if source_tag:
+            candidate = target_dir / f"{stem}__{source_tag}_{index}{suffix}"
+        else:
+            candidate = target_dir / f"{stem}_pool{index}{suffix}"
         if not candidate.exists():
             return candidate
         index += 1
