@@ -1311,7 +1311,16 @@ def render_prepare_tab() -> None:
     st.caption("Uses Gemini AI to intelligently extend your photos to a consistent 4:3 format while preserving faces and subjects.")
 
     if not raw_images:
-        st.info("No source photos found in the project root. Upload photos in the previous step first.")
+        st.markdown(
+            """
+            <div class="empty-state-card">
+                <div class="empty-icon">&#128247;</div>
+                <h3>No source photos found</h3>
+                <p>Upload your family photos in the Upload Photos step first, then come back here to normalize them.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
     else:
         normalize_progress = len(outpainted_images) / len(raw_images) if raw_images else 0
         st.progress(min(normalize_progress, 1.0), text=f"{len(outpainted_images)} of {len(raw_images)} normalized")
@@ -1353,7 +1362,16 @@ def render_prepare_tab() -> None:
     st.caption("Expand 4:3 images to 16:9 widescreen for Kling video generation. Use the extension browser below to review and adjust each image.")
 
     if not outpainted_images:
-        st.info("Complete Phase A first. Once your photos are normalized to 4:3, you can extend them to 16:9 here.")
+        st.markdown(
+            """
+            <div class="empty-state-card">
+                <div class="empty-icon">&#128248;</div>
+                <h3>No normalized images yet</h3>
+                <p>Complete Phase A above first. Once your photos are normalized to 4:3, you can extend them to 16:9 here.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
     else:
         extend_progress = len(extended_images) / len(outpainted_images) if outpainted_images else 0
         st.progress(min(extend_progress, 1.0), text=f"{len(extended_images)} of {len(outpainted_images)} extended")
