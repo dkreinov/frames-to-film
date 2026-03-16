@@ -1277,6 +1277,134 @@ def render_upload_tab() -> None:
         )
 
 
+def render_prepare_tab() -> None:
+    st.subheader("Prepare Images")
+    st.caption("Normalize your photos to a consistent format for AI video generation. Two phases: first 4:3, then 16:9.")
+
+    source_dir = ROOT_DIR
+    raw_images = sorted(
+        [
+            path for path in source_dir.iterdir()
+            if path.is_file() and path.suffix.lower() in RAW_IMAGE_EXTENSIONS
+        ],
+        key=lambda p: p.name.lower(),
+    ) if source_dir.exists() else []
+    outpainted_images = sorted(
+        [
+            path for path in OUTPAINTED_DIR.iterdir()
+            if path.is_file() and path.suffix.lower() in RAW_IMAGE_EXTENSIONS
+        ],
+        key=lambda p: p.name.lower(),
+    ) if OUTPAINTED_DIR.exists() else []
+    kling_dir = ROOT_DIR / "kling_test"
+    extended_images = sorted(
+        [
+            path for path in kling_dir.iterdir()
+            if path.is_file() and path.suffix.lower() in RAW_IMAGE_EXTENSIONS
+        ],
+        key=lambda p: p.name.lower(),
+    ) if kling_dir.exists() else []
+
+    summary_cols = st.columns(4, gap="small")
+    summary_cols[0].markdown(
+        f"<div class='extend-summary-card'><span>Source photos</span><strong>{len(raw_images)}</strong></div>",
+        unsafe_allow_html=True,
+    )
+    summary_cols[1].markdown(
+        f"<div class='extend-summary-card'><span>Normalized (4:3)</span><strong>{len(outpainted_images)}</strong></div>",
+        unsafe_allow_html=True,
+    )
+    summary_cols[2].markdown(
+        f"<div class='extend-summary-card'><span>Extended (16:9)</span><strong>{len(extended_images)}</strong></div>",
+        unsafe_allow_html=True,
+    )
+    phase_a_done = len(outpainted_images) >= len(raw_images) if raw_images else False
+    phase_b_done = len(extended_images) >= len(outpainted_images) if outpainted_images else False
+    overall_status = "All done" if phase_a_done and phase_b_done else "In progress" if outpainted_images or extended_images else "Not started"
+    summary_cols[3].markdown(
+        f"<div class='extend-summary-card'><span>Status</span><strong>{overall_status}</strong></div>",
+        unsafe_allow_html=True,
+    )
+
+    # --- Phase A: Normalize to 4:3 ---
+    st.markdown(
+        """
+        <div class="phase-header">
+            <div class="phase-badge">Phase A</div>
+            <div class="phase-title">Normalize to 4:3 aspect ratio</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.caption("Uses Gemini AI to intelligently extend your photos to a consistent 4:3 format while preserving faces and subjects.")
+
+    if not raw_images:
+        st.info("No source photos found in the project root. Upload photos in the previous step first.")
+    else:
+        normalize_progress = len(outpainted_images) / len(raw_images) if raw_images else 0
+        st.progress(min(normalize_progress, 1.0), text=f"{len(outpainted_images)} of {len(raw_images)} normalized")
+
+        normalize_cols = st.columns([1.2, 1, 1], gap="small")
+        if normalize_cols[0].button(
+            "Run 4:3 normalize",
+            use_container_width=True,
+            type="primary",
+            key="prepare_run_normalize",
+        ):
+            creation_flags = 0
+            if os.name == "nt":
+                creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+            subprocess.Popen(
+                [sys.executable, str(ROOT_DIR / "outpaint_images.py")],
+                cwd=str(ROOT_DIR),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=creation_flags,
+            )
+            st.success("Started normalization process in the background. Click Refresh to check progress.")
+        if normalize_cols[1].button("Open outpainted folder", use_container_width=True, key="prepare_open_outpainted"):
+            OUTPAINTED_DIR.mkdir(parents=True, exist_ok=True)
+            open_folder_in_windows(OUTPAINTED_DIR)
+        if normalize_cols[2].button("Refresh", use_container_width=True, key="prepare_refresh_a"):
+            st.rerun()
+
+    # --- Phase B: Extend to 16:9 ---
+    st.markdown(
+        """
+        <div class="phase-header">
+            <div class="phase-badge">Phase B</div>
+            <div class="phase-title">Extend to 16:9 cinematic format</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.caption("Expand 4:3 images to 16:9 widescreen for Kling video generation. Use the extension browser below to review and adjust each image.")
+
+    if not outpainted_images:
+        st.info("Complete Phase A first. Once your photos are normalized to 4:3, you can extend them to 16:9 here.")
+    else:
+        extend_progress = len(extended_images) / len(outpainted_images) if outpainted_images else 0
+        st.progress(min(extend_progress, 1.0), text=f"{len(extended_images)} of {len(outpainted_images)} extended")
+
+        st.caption("For detailed per-image extension controls, use the extension browser below.")
+
+    render_extend_images_tab()
+
+    if phase_a_done and phase_b_done:
+        st.markdown(
+            """
+            <div class="success-banner">
+                <div class="success-icon">&#9989;</div>
+                <div>
+                    <div class="success-text">All images prepared</div>
+                    <div class="success-detail">Move to Build Sequence to arrange your photos and set up video transitions.</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
 def render_workflow_strip(active_step: str) -> None:
     display_labels = {
         "extend": "1. Extend stills",
