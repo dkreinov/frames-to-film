@@ -4391,7 +4391,7 @@ def render_review_panel(
         elif len(selected_pair.versions) > 1:
             winner_button_label = f"Accept v{current_clip.version} as the winner"
 
-        if st.button(winner_button_label, use_container_width=True):
+        if st.button(winner_button_label, use_container_width=True, type="primary"):
             save_winner(selected_pair.pair_id, current_clip.version, run_id=run_id)
             if waiting_review is not None:
                 accept_review_version(selected_pair.pair_id, current_clip.version, run_id=run_id)
