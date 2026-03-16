@@ -3175,6 +3175,136 @@ def render_generate_tab() -> None:
         st.info("No pairs configured. Go back to Build Sequence to set up your storyboard.")
 
 
+def render_export_tab(run_id: str) -> None:
+    st.subheader("Export Movie")
+    st.caption("Combine all approved video clips into your final movie file.")
+
+    saved_state = load_build_tab_state()
+    source_folder_text = str(saved_state.get("source_folder", ""))
+    if not source_folder_text:
+        st.markdown(
+            """
+            <div class="empty-state-card">
+                <div class="empty-icon">&#127916;</div>
+                <h3>No project configured</h3>
+                <p>Set up your sequence in Build Sequence and generate video clips before exporting.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+
+    source_folder = path_from_saved_text(source_folder_text)
+    ordered_names = saved_state.get("ordered_images", [])
+    disabled_pair_keys = set(saved_state.get("disabled_pair_keys", []))
+    sequence_pairs = active_sequence_pairs(ordered_names, disabled_pair_keys)
+    pair_keys = [pair_key for _, _, pair_key in sequence_pairs]
+    videos_dir = os.path.join(source_folder, "videos")
+
+    existing_segments = set(ordered_segment_files_for_pair_keys(pair_keys, videos_dir))
+    total_pairs = len(pair_keys)
+    ready_count = sum(1 for pair_key in pair_keys if f"seg_{pair_key}.mp4" in existing_segments)
+
+    pairs = discover_clip_pairs()
+    reviews = load_reviews(run_id)
+    winners = load_winners(run_id)
+    review_lookup = {(item.pair_id, item.version): item for item in reviews}
+    queued_redo_lookup: dict[tuple[str, int], object] = {}
+    pair_rows = build_pair_rows(pairs, review_lookup, queued_redo_lookup, winners) if pairs else []
+    approved_count = sum(1 for row in pair_rows if row["status"] == "Approved")
+    total_reviewed = len(pair_rows)
+
+    summary_cols = st.columns(4, gap="small")
+    summary_cols[0].markdown(
+        f"<div class='extend-summary-card'><span>Total pairs</span><strong>{total_pairs}</strong></div>",
+        unsafe_allow_html=True,
+    )
+    summary_cols[1].markdown(
+        f"<div class='extend-summary-card'><span>Clips ready</span><strong>{ready_count}</strong></div>",
+        unsafe_allow_html=True,
+    )
+    summary_cols[2].markdown(
+        f"<div class='extend-summary-card'><span>Approved</span><strong>{approved_count}</strong></div>",
+        unsafe_allow_html=True,
+    )
+    export_ready = ready_count > 0
+    status_text = "Ready to export" if export_ready else "No clips available"
+    summary_cols[3].markdown(
+        f"<div class='extend-summary-card'><span>Status</span><strong>{status_text}</strong></div>",
+        unsafe_allow_html=True,
+    )
+
+    if ready_count > 0:
+        progress_value = ready_count / total_pairs if total_pairs > 0 else 0
+        st.progress(progress_value, text=f"{ready_count} of {total_pairs} clips available for export")
+
+    output_path = os.path.join(videos_dir, "full_movie.mp4")
+    movie_exists = os.path.exists(output_path)
+
+    if movie_exists:
+        st.markdown(
+            f"""
+            <div class="success-banner">
+                <div class="success-icon">&#127910;</div>
+                <div>
+                    <div class="success-text">Movie file ready</div>
+                    <div class="success-detail">{relative_folder_label(Path(output_path))}</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.video(output_path)
+
+    render_next_action_card(
+        "Export",
+        f"Combine {ready_count} video clip(s) into one continuous movie file. "
+        + ("This will replace the existing movie file." if movie_exists else "The movie will be saved in the videos folder."),
+    )
+
+    export_cols = st.columns([1.2, 1, 1], gap="small")
+    if export_cols[0].button(
+        "Build Final Movie",
+        use_container_width=True,
+        type="primary",
+        disabled=not export_ready,
+        key="export_build_movie",
+    ):
+        with st.spinner("Stitching video segments..."):
+            try:
+                stitch_result = stitch_pair_keys(
+                    pair_keys,
+                    videos_dir=videos_dir,
+                    output_file=output_path,
+                )
+                st.success(
+                    f"Stitched {len(stitch_result['segments'])} segments into "
+                    f"{relative_folder_label(Path(stitch_result['output_file']))}."
+                )
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Stitch failed: {exc}")
+
+    if export_cols[1].button("Open videos folder", use_container_width=True, key="export_open_videos"):
+        Path(videos_dir).mkdir(parents=True, exist_ok=True)
+        open_folder_in_windows(Path(videos_dir))
+
+    if export_cols[2].button("Refresh", use_container_width=True, key="export_refresh"):
+        st.rerun()
+
+    if not export_ready:
+        st.markdown(
+            """
+            <div class="empty-state-card">
+                <div class="empty-icon">&#128249;</div>
+                <h3>No clips to export yet</h3>
+                <p>Generate video clips in the Generate Videos step, then review them before exporting your final movie.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
 def render_review_and_fix_tab(run_id: str, status_filter: str) -> None:
     st.subheader("Review & Fix")
     st.caption("Watch each generated video clip. Approve the ones that look good, flag issues on the rest, and queue weak clips for regeneration.")
