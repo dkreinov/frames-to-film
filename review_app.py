@@ -1048,7 +1048,7 @@ def render_extension_nav(
     *,
     include_picker: bool,
 ) -> str:
-    nav_cols = st.columns([1, 1, 1.2, 1.1] if include_picker else [1, 1, 1.2, 1.2], gap="small")
+    nav_cols = st.columns(4, gap="small")
     if nav_cols[0].button(
         "Previous image",
         use_container_width=True,
@@ -4184,7 +4184,7 @@ def select_pair(pairs, pair_rows, status_filter: str):
     current_index = visible_pair_ids.index(st.session_state.selected_pair_id)
     render_sidebar_queue_summary(pair_rows, visible_pair_ids, current_index)
 
-    button_cols = st.sidebar.columns([1, 1, 1.45], gap="small")
+    button_cols = st.sidebar.columns(3, gap="small")
     if button_cols[0].button("Back", use_container_width=True, disabled=current_index == 0):
         set_selected_pair(visible_pair_ids[current_index - 1])
         st.rerun()
