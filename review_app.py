@@ -2701,7 +2701,7 @@ def render_build_movie_tab() -> None:
         st.session_state[helper_pair_key] = preview_pair_key
         st.session_state[helper_mode_key] = ""
     helper_mode = st.session_state.get(helper_mode_key, "")
-    prompt_action_cols = st.columns(5, gap="small")
+    prompt_action_cols = st.columns(4, gap="small")
     if prompt_action_cols[0].button(
         "Generate with Gemini",
         use_container_width=True,
@@ -2793,10 +2793,7 @@ def render_build_movie_tab() -> None:
             prompt_sources,
         )
         st.rerun()
-    prompt_action_cols[4].markdown(
-        f"<div class='extend-summary-card'><span>Used by Kling</span><strong>{'Custom prompt' if preview_pair_key in prompt_overrides else 'Default prompt'}</strong></div>",
-        unsafe_allow_html=True,
-    )
+    st.caption(f"Kling will use: {'Custom prompt' if preview_pair_key in prompt_overrides else 'Default prompt'}")
     save_build_tab_state(
         selected_folder,
         ordered_names,
