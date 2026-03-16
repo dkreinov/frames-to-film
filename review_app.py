@@ -2634,13 +2634,7 @@ def render_build_movie_tab() -> None:
         prompt_overrides.pop(preview_pair_key, None)
         prompt_sources.pop(preview_pair_key, None)
 
-    helper_mode_key = f"build_prompt_helper_mode::{folder_key_text(selected_folder)}::{preview_pair_key}"
-    helper_pair_key = f"build_prompt_helper_pair::{folder_key_text(selected_folder)}"
-    if st.session_state.get(helper_pair_key) != preview_pair_key:
-        st.session_state[helper_pair_key] = preview_pair_key
-        st.session_state[helper_mode_key] = ""
-    helper_mode = st.session_state.get(helper_mode_key, "")
-    prompt_action_cols = st.columns(4, gap="small")
+    prompt_action_cols = st.columns(3, gap="small")
     if prompt_action_cols[0].button(
         "Generate with Gemini",
         use_container_width=True,
@@ -2705,14 +2699,6 @@ def render_build_movie_tab() -> None:
             )
             st.rerun()
     if prompt_action_cols[2].button(
-        "Ask Codex",
-        use_container_width=True,
-        key=f"build_prepare_codex::{folder_key_text(selected_folder)}::{preview_pair_key}",
-    ):
-        st.session_state[helper_mode_key] = "codex"
-        st.session_state[f"build_pending_scroll_anchor::{folder_key_text(selected_folder)}"] = "build-prompt-helper-anchor"
-        st.rerun()
-    if prompt_action_cols[3].button(
         "Reset to default",
         use_container_width=True,
         key=f"build_reset_prompt::{folder_key_text(selected_folder)}::{preview_pair_key}",
@@ -2720,7 +2706,6 @@ def render_build_movie_tab() -> None:
         prompt_overrides.pop(preview_pair_key, None)
         prompt_sources.pop(preview_pair_key, None)
         st.session_state[pending_prompt_key] = preview_row["base_prompt"]
-        st.session_state[helper_mode_key] = ""
         save_build_tab_state(
             selected_folder,
             ordered_names,
@@ -2827,55 +2812,6 @@ def render_build_movie_tab() -> None:
             st.success(f"Stitched {len(stitch_result['segments'])} segments into {relative_folder_label(Path(stitch_result['output_file']))}.")
         except Exception as exc:
             st.error(f"Stitch failed: {exc}")
-
-    with st.expander("Optional: create a new prompt with Codex or another LLM", expanded=helper_mode == "codex"):
-        if helper_mode == "codex":
-            st.markdown("<div id='build-prompt-helper-anchor'></div>", unsafe_allow_html=True)
-            render_extend_scroll_restore("build-prompt-helper-anchor")
-        if helper_mode == "codex":
-            st.caption("This helper does not change Kling directly. Paste the result back into the main prompt box if you want to use it.")
-            st.info("Paste this request here in Codex with the two still images if you want me to write the exact Kling prompt.")
-            st.text_area(
-                "Ask Codex with this request",
-                value=build_pair_prompt_codex_request(
-                    preview_pair_key,
-                    preview_row["start"],
-                    preview_row["end"],
-                    source_lookup[preview_row["start"]],
-                    source_lookup[preview_row["end"]],
-                    preview_row["base_prompt"],
-                    normalized_prompt_text or preview_row["base_prompt"],
-                ),
-                height=260,
-                key=f"build_prompt_codex_brief::{folder_key_text(selected_folder)}::{preview_pair_key}",
-            )
-            with st.expander("Use another LLM instead", expanded=False):
-                st.text_area(
-                    "Copy this helper brief",
-                    value=build_pair_prompt_brief(
-                        preview_pair_key,
-                        preview_row["start"],
-                        preview_row["end"],
-                        preview_row["base_prompt"],
-                        normalized_prompt_text or preview_row["base_prompt"],
-                    ),
-                    height=180,
-                    key=f"build_prompt_brief::{folder_key_text(selected_folder)}::{preview_pair_key}",
-                )
-        else:
-            st.caption("This helper does not change Kling directly. Paste the result back into the main prompt box if you want to use it.")
-            st.text_area(
-                "Copy this helper brief for another LLM",
-                value=build_pair_prompt_brief(
-                    preview_pair_key,
-                    preview_row["start"],
-                    preview_row["end"],
-                    preview_row["base_prompt"],
-                    normalized_prompt_text or preview_row["base_prompt"],
-                ),
-                height=180,
-                key=f"build_prompt_brief::{folder_key_text(selected_folder)}::{preview_pair_key}",
-            )
 
     build_job = load_build_job_state(selected_folder)
     if build_job:
