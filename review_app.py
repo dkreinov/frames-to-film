@@ -2357,7 +2357,7 @@ def render_build_movie_tab() -> None:
                 if pending_pool_folder is not None and pending_pool_folder in pool_folders:
                     st.session_state[pool_folder_key] = pending_pool_folder
 
-                pool_cols = st.columns([1.4, 0.45, 0.35], gap="small")
+                pool_cols = st.columns([1.55, 0.5, 0.45], gap="small")
                 pool_folder = pool_cols[0].selectbox(
                     "Pool folder",
                     options=pool_folders,
@@ -2601,7 +2601,7 @@ def render_build_movie_tab() -> None:
     if preview_key not in st.session_state or st.session_state[preview_key] not in preview_options:
         st.session_state[preview_key] = suggested_preview_key or preview_options[0]
     preview_index = preview_options.index(st.session_state[preview_key]) if preview_options else 0
-    preview_action_cols = st.columns([1.1, 1.1, 1.3, 1.3, 2.2], gap="small")
+    preview_action_cols = st.columns(4, gap="small")
     if preview_action_cols[0].button(
         "Previous pair",
         use_container_width=True,
