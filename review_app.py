@@ -1810,19 +1810,8 @@ def render_extend_images_tab() -> None:
         f"{image_cache_key(source_path)}::{image_cache_key(target_path) if target_path.exists() else 'missing'}"
     )
 
-    active_summary_cols = st.columns(3, gap="small")
-    active_summary_cols[0].markdown(
-        f"<div class='extend-summary-card extend-summary-card--active'><span>Active image</span><strong>{active_name}</strong></div>",
-        unsafe_allow_html=True,
-    )
-    active_summary_cols[1].markdown(
-        f"<div class='extend-summary-card'><span>Status</span><strong>{'Ready' if target_path.exists() else 'Needs extension'}</strong></div>",
-        unsafe_allow_html=True,
-    )
-    active_summary_cols[2].markdown(
-        f"<div class='extend-summary-card'><span>Prompt profile</span><strong>{detected_profile}</strong></div>",
-        unsafe_allow_html=True,
-    )
+    status_text = "Ready" if target_path.exists() else "Needs extension"
+    st.caption(f"**{active_name}** | {status_text} | Profile: {detected_profile}")
     if target_variants:
         st.selectbox(
             "Saved version",
