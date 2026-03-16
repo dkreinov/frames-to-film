@@ -1376,8 +1376,13 @@ def render_prepare_tab() -> None:
         extend_progress = len(extended_images) / len(outpainted_images) if outpainted_images else 0
         st.progress(min(extend_progress, 1.0), text=f"{len(extended_images)} of {len(outpainted_images)} extended")
 
-    with st.expander("Per-image extension controls", expanded=False):
-        st.caption("Browse images one at a time, compare originals vs extended versions, run Gemini API, or upload manual results.")
+    show_extension_browser = st.checkbox(
+        "Show per-image extension controls",
+        value=False,
+        key="prepare_show_extension_browser",
+        help="Open the detailed image browser to extend images one at a time with Gemini API or manual upload.",
+    )
+    if show_extension_browser:
         render_extend_images_tab()
 
     if phase_a_done and phase_b_done:
@@ -3340,7 +3345,12 @@ def render_review_and_fix_tab(run_id: str, status_filter: str) -> None:
 
     queued_items = [item for item in redo_requests if item.status == "queued"]
     if queued_items:
-        with st.expander(f"Fix Queue ({len(queued_items)} queued)", expanded=False):
+        show_fix_queue = st.checkbox(
+            f"Show Fix Queue ({len(queued_items)} queued)",
+            value=False,
+            key="review_show_fix_queue",
+        )
+        if show_fix_queue:
             render_redo_queue(redo_requests, review_lookup, winners, run_id)
 
 
