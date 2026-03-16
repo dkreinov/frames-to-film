@@ -116,8 +116,7 @@ STATUS_SHORT_LABELS = {
 WORKFLOW_STEPS = [
     ("upload", "Upload Photos"),
     ("prepare", "Prepare Images"),
-    ("sequence", "Build Sequence"),
-    ("generate", "Generate Videos"),
+    ("sequence", "Build & Generate"),
     ("review", "Review & Fix"),
     ("export", "Export Movie"),
 ]
@@ -172,8 +171,6 @@ def main() -> None:
         render_prepare_tab()
     elif active_step == "sequence":
         render_build_movie_tab()
-    elif active_step == "generate":
-        render_generate_tab()
     elif active_step == "review":
         render_review_and_fix_tab(run_id, status_filter)
     elif active_step == "export":
@@ -3991,7 +3988,7 @@ def sidebar_controls() -> tuple[str, str, str]:
     saved_ui_state = load_ui_state()
     saved_workflow_step = str(saved_ui_state.get("active_workflow_step", "upload"))
     # Map old step keys to new ones for users with saved state from the previous workflow
-    step_migration = {"extend": "prepare", "build": "sequence", "redo": "review"}
+    step_migration = {"extend": "prepare", "build": "sequence", "redo": "review", "generate": "sequence"}
     if saved_workflow_step in step_migration:
         saved_workflow_step = step_migration[saved_workflow_step]
     if "active_workflow_step" not in st.session_state and saved_workflow_step in WORKFLOW_LABELS:
