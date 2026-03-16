@@ -1645,24 +1645,28 @@ def render_extend_images_tab() -> None:
 
     with workspace_cols[1]:
         st.markdown("**Output folder**")
-        output_cols = st.columns([0.95, 1.25, 0.5, 0.45], gap="small")
-        selected_output_preset = output_cols[0].selectbox(
+        selected_output_preset = st.selectbox(
             "Output folder preset",
             options=output_preset_options,
             key=output_preset_key,
             label_visibility="collapsed",
-            help="Pick an existing folder quickly, or switch to Custom and type any project-relative output path.",
+            help="Pick an existing folder quickly, or switch to Custom and type any path.",
         )
         if selected_output_preset != "Custom...":
             st.session_state[output_text_key] = selected_output_preset
 
-        output_folder_text = output_cols[1].text_input(
-            "Output folder",
-            key=output_text_key,
-            label_visibility="collapsed",
-            help="Images are treated as the same item only when the same filename already exists in this chosen output folder. You can type any relative project path here.",
-        )
-        if output_cols[2].button("Browse...", use_container_width=True, key="browse_output_folder"):
+        if selected_output_preset == "Custom...":
+            output_folder_text = st.text_input(
+                "Output folder",
+                key=output_text_key,
+                label_visibility="collapsed",
+                help="Type any relative project path here.",
+            )
+        else:
+            output_folder_text = st.session_state.get(output_text_key, selected_output_preset)
+
+        output_action_cols = st.columns([1, 1], gap="small")
+        if output_action_cols[0].button("Browse...", use_container_width=True, key="browse_output_folder"):
             picked_output = browse_for_folder(path_from_saved_text(output_folder_text))
             if picked_output is not None:
                 pending_output_text = relative_folder_label(picked_output)
@@ -1673,7 +1677,7 @@ def render_extend_images_tab() -> None:
                     else "Custom..."
                 )
                 st.rerun()
-        if output_cols[3].button("Open", use_container_width=True, key="open_output_folder"):
+        if output_action_cols[1].button("Open", use_container_width=True, key="open_output_folder"):
             open_folder_in_windows(path_from_saved_text(output_folder_text))
         st.caption("This is where API and manual results will be saved.")
 
