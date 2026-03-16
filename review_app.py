@@ -2980,6 +2980,201 @@ def render_build_movie_tab() -> None:
         st.dataframe(generation_results, use_container_width=True, hide_index=True, height=260)
 
 
+def render_generate_tab() -> None:
+    st.subheader("Generate Videos")
+    st.caption("Create AI video transitions between your sequenced images using Kling. Monitor progress and manage generation runs.")
+
+    saved_state = load_build_tab_state()
+    source_folder_text = str(saved_state.get("source_folder", ""))
+    if not source_folder_text:
+        st.markdown(
+            """
+            <div class="empty-state-card">
+                <div class="empty-icon">&#127916;</div>
+                <h3>No sequence configured</h3>
+                <p>Go to Build Sequence first to arrange your images and set up the pairs for video generation.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+
+    source_folder = path_from_saved_text(source_folder_text)
+    ordered_names = saved_state.get("ordered_images", [])
+    if not ordered_names or len(ordered_names) < 2:
+        st.markdown(
+            """
+            <div class="empty-state-card">
+                <div class="empty-icon">&#127916;</div>
+                <h3>Need at least 2 images</h3>
+                <p>Go to Build Sequence and arrange at least 2 images to create video transitions between them.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+
+    disabled_pair_keys = set(saved_state.get("disabled_pair_keys", []))
+    sequence_pairs = active_sequence_pairs(ordered_names, disabled_pair_keys)
+    videos_dir = os.path.join(source_folder, "videos")
+    status_path = os.path.join(videos_dir, "status.json")
+
+    try:
+        status_data = json.loads(Path(status_path).read_text(encoding="utf-8")) if Path(status_path).exists() else {}
+    except (OSError, json.JSONDecodeError):
+        status_data = {}
+
+    existing_segments = set(ordered_segment_files_for_pair_keys(
+        [pair_key for _, _, pair_key in sequence_pairs],
+        videos_dir,
+    ))
+
+    total_pairs = len(sequence_pairs)
+    done_count = 0
+    failed_count = 0
+    generating_count = 0
+    pending_count = 0
+
+    segment_cards_html = []
+    for start_name, end_name, pair_key in sequence_pairs:
+        pair_status = status_data.get(pair_key, {})
+        seg_file = f"seg_{pair_key}.mp4"
+        if isinstance(pair_status, dict) and pair_status.get("result") == "ok":
+            status_label = "Done"
+            status_class = "segment-card--done"
+            done_count += 1
+        elif isinstance(pair_status, dict) and pair_status.get("result") in {"submit_fail", "poll_fail"}:
+            status_label = "Failed"
+            status_class = "segment-card--failed"
+            failed_count += 1
+        elif seg_file in existing_segments:
+            status_label = "Done"
+            status_class = "segment-card--done"
+            done_count += 1
+        elif isinstance(pair_status, dict) and pair_status.get("task_id"):
+            status_label = "Generating..."
+            status_class = "segment-card--generating"
+            generating_count += 1
+        else:
+            status_label = "Pending"
+            status_class = ""
+            pending_count += 1
+
+        segment_cards_html.append(
+            f'<div class="segment-card {status_class}">'
+            f'<div class="seg-name">{pair_key}</div>'
+            f'<div class="seg-status">{status_label}</div>'
+            f'</div>'
+        )
+
+    summary_cols = st.columns(5, gap="small")
+    summary_cols[0].markdown(
+        f"<div class='extend-summary-card'><span>Total pairs</span><strong>{total_pairs}</strong></div>",
+        unsafe_allow_html=True,
+    )
+    summary_cols[1].markdown(
+        f"<div class='extend-summary-card'><span>Done</span><strong>{done_count}</strong></div>",
+        unsafe_allow_html=True,
+    )
+    summary_cols[2].markdown(
+        f"<div class='extend-summary-card'><span>Generating</span><strong>{generating_count}</strong></div>",
+        unsafe_allow_html=True,
+    )
+    summary_cols[3].markdown(
+        f"<div class='extend-summary-card'><span>Pending</span><strong>{pending_count}</strong></div>",
+        unsafe_allow_html=True,
+    )
+    summary_cols[4].markdown(
+        f"<div class='extend-summary-card'><span>Failed</span><strong>{failed_count}</strong></div>",
+        unsafe_allow_html=True,
+    )
+
+    progress_value = done_count / total_pairs if total_pairs > 0 else 0
+    st.progress(progress_value, text=f"{done_count} of {total_pairs} video clips generated")
+
+    if done_count == total_pairs and total_pairs > 0:
+        st.markdown(
+            """
+            <div class="success-banner">
+                <div class="success-icon">&#127916;</div>
+                <div>
+                    <div class="success-text">All video clips generated</div>
+                    <div class="success-detail">Move to Review & Fix to watch each clip and approve or redo any that need work.</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    render_next_action_card(
+        "Generation controls",
+        "Start a Kling generation run, or go back to Build Sequence to adjust pairs and prompts before generating.",
+    )
+
+    control_cols = st.columns([1.2, 1, 1, 1], gap="small")
+    use_credits_key = "generate_tab_use_kling"
+    if use_credits_key not in st.session_state:
+        st.session_state[use_credits_key] = False
+    with control_cols[0]:
+        st.checkbox("Confirm credit use", key=use_credits_key)
+
+    selected_pair_keys = saved_state.get("selected_pair_keys", [pair_key for _, _, pair_key in sequence_pairs])
+    prompt_overrides = saved_state.get("prompt_overrides", {})
+    all_pair_keys = [pair_key for _, _, pair_key in sequence_pairs]
+    folder_prompt_label = relative_folder_label(source_folder)
+    generation_prompt_map = {}
+    for pair_key in all_pair_keys:
+        override = prompt_overrides.get(pair_key, "")
+        base = get_pair_prompt(pair_key, folder_prompt_label)
+        generation_prompt_map[pair_key] = override or base
+
+    generate_enabled = bool(st.session_state[use_credits_key]) and pending_count > 0
+    if control_cols[1].button(
+        "Generate all pending",
+        use_container_width=True,
+        type="primary",
+        disabled=not generate_enabled,
+        key="generate_tab_start",
+    ):
+        missing_keys = [
+            pair_key for _, _, pair_key in sequence_pairs
+            if f"seg_{pair_key}.mp4" not in existing_segments
+        ]
+        job_payload = {
+            "started_at": time.time(),
+            "source_folder": str(source_folder),
+            "ordered_names": ordered_names,
+            "selected_pair_keys": missing_keys,
+            "video_dir": videos_dir,
+            "status_path": status_path,
+            "prompt_overrides": generation_prompt_map,
+        }
+        save_build_job_state(source_folder, job_payload)
+        start_build_generation_job(source_folder, job_payload)
+        st.success(f"Started Kling generation for {len(missing_keys)} pending pair(s). Use Refresh to monitor progress.")
+        st.rerun()
+
+    if control_cols[2].button("Refresh", use_container_width=True, key="generate_tab_refresh"):
+        st.rerun()
+
+    if control_cols[3].button("Open videos folder", use_container_width=True, key="generate_tab_open_videos"):
+        Path(videos_dir).mkdir(parents=True, exist_ok=True)
+        open_folder_in_windows(Path(videos_dir))
+
+    build_job = load_build_job_state(source_folder)
+    if build_job:
+        render_build_generation_progress(source_folder, build_job, status_path)
+
+    st.markdown("**Segment status**")
+    if segment_cards_html:
+        st.markdown(
+            '<div class="segment-grid">' + "".join(segment_cards_html) + "</div>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.info("No pairs configured. Go back to Build Sequence to set up your storyboard.")
+
+
 def inject_styles() -> None:
     st.markdown(
         """
