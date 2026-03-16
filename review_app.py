@@ -2015,8 +2015,8 @@ def render_extend_images_tab() -> None:
 
 
 def render_build_movie_tab() -> None:
-    st.subheader("Build Sequence")
-    st.caption("Arrange your prepared 16:9 images in the order you want them to appear in the final movie. Each consecutive pair becomes one video transition.")
+    st.subheader("Build & Generate")
+    st.caption("Arrange your images, edit prompts for each transition, then generate video clips.")
     saved_state = load_build_tab_state()
     pending_source_folder = st.session_state.pop("pending_build_source_folder", None)
     source_folders = discover_image_folders()
@@ -2510,27 +2510,10 @@ def render_build_movie_tab() -> None:
         prompt_sources,
     )
 
-    summary_cols = st.columns(4, gap="small")
-    summary_cols[0].markdown(
-        f"<div class='extend-summary-card'><span>Source</span><strong>{relative_folder_label(selected_folder)}</strong></div>",
-        unsafe_allow_html=True,
-    )
-    summary_cols[1].markdown(
-        f"<div class='extend-summary-card'><span>Images</span><strong>{len(ordered_names)}</strong></div>",
-        unsafe_allow_html=True,
-    )
-    summary_cols[2].markdown(
-        f"<div class='extend-summary-card'><span>Pairs</span><strong>{len(pair_rows)}</strong></div>",
-        unsafe_allow_html=True,
-    )
     existing_segments = set(ordered_segment_files_for_pair_keys([row["pair_key"] for row in pair_rows], os.path.join(selected_folder, "videos")))
-    summary_cols[3].markdown(
-        f"<div class='extend-summary-card'><span>Segments ready</span><strong>{len(existing_segments)}</strong></div>",
-        unsafe_allow_html=True,
-    )
-    render_next_action_card(
-        "Next action",
-        "Arrange your photos in order, preview the video transitions, then generate clips. When all clips are ready, move to Review.",
+    st.caption(
+        f"{len(ordered_names)} images | {len(pair_rows)} pairs | "
+        f"{len(existing_segments)} of {len(pair_rows)} clips ready"
     )
 
     st.markdown("**Pair preview**")
