@@ -2037,8 +2037,8 @@ def render_extend_images_tab() -> None:
 
 
 def render_build_movie_tab() -> None:
-    st.subheader("Build movie")
-    st.caption("Choose the finished 16:9 stills, keep them in order, preview the Kling pairs, then generate clips or stitch the finished segments.")
+    st.subheader("Build Sequence")
+    st.caption("Arrange your prepared 16:9 images in the order you want them to appear in the final movie. Each consecutive pair becomes one video transition.")
     saved_state = load_build_tab_state()
     pending_source_folder = st.session_state.pop("pending_build_source_folder", None)
     source_folders = discover_image_folders()
@@ -2075,7 +2075,16 @@ def render_build_movie_tab() -> None:
 
     source_paths = discover_orderable_images(selected_folder)
     if not source_paths:
-        st.info("No image files were found in this folder.")
+        st.markdown(
+            """
+            <div class="empty-state-card">
+                <div class="empty-icon">&#127910;</div>
+                <h3>No images found</h3>
+                <p>This folder has no image files yet. Go back to Prepare Images to extend your photos to 16:9 format, or select a different source folder above.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         return
 
     available_names = [path.name for path in source_paths]
@@ -2195,8 +2204,8 @@ def render_build_movie_tab() -> None:
     if pending_scroll_anchor:
         render_extend_scroll_restore(pending_scroll_anchor)
 
-    st.markdown("**Sequence board**")
-    st.caption("Drag thumbnails to reorder the movie. Click a thumbnail to make it the active still. Default order is numeric-natural, so `2` stays before `11`.")
+    st.markdown("**Storyboard**")
+    st.caption("Drag thumbnails to reorder your movie sequence. Click a thumbnail to select it. Each pair of consecutive images becomes one video transition.")
     storyboard_items = [
         {
             "id": name,
@@ -2543,7 +2552,7 @@ def render_build_movie_tab() -> None:
     )
     render_next_action_card(
         "Next action",
-        "Arrange the storyboard first, then generate clips. Stitch the movie only after some segments are ready.",
+        "Arrange your photos in order, preview the video transitions, then generate clips. When all clips are ready, move to Review.",
     )
 
     st.markdown("**Pair preview**")
@@ -3718,7 +3727,7 @@ def render_build_sidebar_controls() -> None:
     )
     if st.sidebar.button("Open build folder", use_container_width=True, key="sidebar_open_build_source"):
         open_folder_in_windows(source_folder)
-    st.sidebar.caption("Arrange the storyboard first, then generate clips from the current sequence.")
+    st.sidebar.caption("Arrange the storyboard, then generate video clips from the current sequence.")
 
 
 def render_redo_sidebar_controls(run_id: str) -> None:
