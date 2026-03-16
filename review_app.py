@@ -1881,14 +1881,6 @@ def render_extend_images_tab() -> None:
     if pending_scroll_anchor:
         render_extend_scroll_restore(pending_scroll_anchor)
 
-    render_extension_nav(
-        visible_names,
-        browser_rows,
-        active_key,
-        visible_names.index(active_name),
-        include_picker=False,
-    )
-
     action_col, meta_col = st.columns([1.15, 0.85], gap="large")
     with action_col:
         st.markdown("**Create or replace**")
