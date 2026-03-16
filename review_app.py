@@ -3175,6 +3175,94 @@ def render_generate_tab() -> None:
         st.info("No pairs configured. Go back to Build Sequence to set up your storyboard.")
 
 
+def render_review_and_fix_tab(run_id: str, status_filter: str) -> None:
+    st.subheader("Review & Fix")
+    st.caption("Watch each generated video clip. Approve the ones that look good, flag issues on the rest, and queue weak clips for regeneration.")
+
+    pairs = discover_clip_pairs()
+    if not pairs:
+        st.markdown(
+            """
+            <div class="empty-state-card">
+                <div class="empty-icon">&#127909;</div>
+                <h3>No video clips to review</h3>
+                <p>Generate video clips first in the Generate Videos step, then come back here to review them.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+
+    reviews = load_reviews(run_id)
+    redo_requests = load_redo_queue(run_id)
+    winners = load_winners(run_id)
+
+    review_lookup = {(item.pair_id, item.version): item for item in reviews}
+    queued_redo_lookup = {
+        (item.pair_id, item.source_version): item
+        for item in redo_requests
+        if item.status == "queued"
+    }
+    waiting_review_lookup = {
+        (item.pair_id, item.target_version): item
+        for item in redo_requests
+        if item.status == "waiting_review" and item.target_version is not None
+    }
+    pair_rows = build_pair_rows(pairs, review_lookup, queued_redo_lookup, winners)
+
+    total_clips = len(pair_rows)
+    approved_count = sum(1 for row in pair_rows if row["status"] == "Approved")
+    unreviewed_count = sum(1 for row in pair_rows if row["status"] == "Needs review")
+    redo_count = sum(1 for row in pair_rows if row["status"] == "Redo queued")
+
+    summary_html = (
+        f'<div class="progress-summary">'
+        f'<div class="progress-item"><span>Total</span><strong>{total_clips}</strong></div>'
+        f'<div class="progress-item"><span>Approved</span><strong>{approved_count}</strong></div>'
+        f'<div class="progress-item"><span>Unreviewed</span><strong>{unreviewed_count}</strong></div>'
+        f'<div class="progress-item"><span>Needs redo</span><strong>{redo_count}</strong></div>'
+        f'</div>'
+    )
+    st.markdown(summary_html, unsafe_allow_html=True)
+
+    if approved_count == total_clips:
+        st.markdown(
+            """
+            <div class="success-banner">
+                <div class="success-icon">&#127881;</div>
+                <div>
+                    <div class="success-text">All clips approved!</div>
+                    <div class="success-detail">Your movie is ready. Move to Export Movie to create the final video.</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    progress_value = approved_count / total_clips if total_clips > 0 else 0
+    st.progress(progress_value, text=f"{approved_count} of {total_clips} clips approved")
+
+    selected_pair = select_pair(pairs, pair_rows, status_filter)
+    render_review_panel(
+        selected_pair,
+        review_lookup,
+        queued_redo_lookup,
+        waiting_review_lookup,
+        winners,
+        run_id,
+        pair_rows,
+        progress_counts(pair_rows),
+        status_filter,
+    )
+    with st.expander("Inbox overview", expanded=False):
+        render_inbox(pair_rows, status_filter, selected_pair.pair_id)
+
+    queued_items = [item for item in redo_requests if item.status == "queued"]
+    if queued_items:
+        with st.expander(f"Fix Queue ({len(queued_items)} queued)", expanded=False):
+            render_redo_queue(redo_requests, review_lookup, winners, run_id)
+
+
 def inject_styles() -> None:
     st.markdown(
         """
