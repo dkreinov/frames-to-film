@@ -1840,19 +1840,18 @@ def render_extend_images_tab() -> None:
     if swap_compare_key not in st.session_state:
         st.session_state[swap_compare_key] = bool(saved_state.get("swap_compare_sides", True))
 
-    compare_controls = st.columns([1.2, 1, 1], gap="small")
-    compare_mode = compare_controls[0].radio(
+    compare_left, compare_right = st.columns([1.4, 1], gap="small")
+    compare_mode = compare_left.radio(
         "Compare mode",
         options=["Overlay slider", "Stacked", "Side by side"],
         horizontal=True,
         label_visibility="collapsed",
     )
-    large_view = compare_controls[1].checkbox("Large compare view", value=True)
-    swap_compare_sides = compare_controls[2].checkbox(
-        "Swap compare sides",
+    large_view = compare_right.checkbox("Large view", value=True)
+    swap_compare_sides = compare_right.checkbox(
+        "Swap sides",
         key=swap_compare_key,
     )
-    st.caption("Use left/right buttons above to move quickly through the folder.")
     save_extend_tab_state(
         selected_folder,
         output_folder_text,
