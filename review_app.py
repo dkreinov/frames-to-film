@@ -2664,7 +2664,7 @@ def render_build_movie_tab() -> None:
         "gemini_cinematic": "Gemini cinematic rewrite",
     }.get(preview_row["prompt_source"], "Custom prompt")
     st.caption(
-        f"Prompt source: {prompt_source_label}. The prompt box below is the exact text Kling will use for this pair."
+        f"Prompt source: {prompt_source_label}. Edits below are saved automatically when you switch pairs."
     )
     prompt_text = st.text_area(
         "Prompt for this pair",
@@ -2782,7 +2782,10 @@ def render_build_movie_tab() -> None:
             prompt_sources,
         )
         st.rerun()
-    st.caption(f"Kling will use: {'Custom prompt' if preview_pair_key in prompt_overrides else 'Default prompt'}")
+    if preview_pair_key in prompt_overrides:
+        st.success(f"Custom prompt active for {preview_pair_key}. Kling will use your edited version.")
+    else:
+        st.caption(f"Using default prompt for {preview_pair_key}.")
     save_build_tab_state(
         selected_folder,
         ordered_names,
