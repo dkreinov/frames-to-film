@@ -4161,21 +4161,9 @@ def select_pair(pairs, pair_rows, status_filter: str):
     current_index = visible_pair_ids.index(st.session_state.selected_pair_id)
     render_sidebar_queue_summary(pair_rows, visible_pair_ids, current_index)
 
-    button_cols = st.sidebar.columns(3, gap="small")
-    if button_cols[0].button("Back", use_container_width=True, disabled=current_index == 0):
-        set_selected_pair(visible_pair_ids[current_index - 1])
-        st.rerun()
-    if button_cols[1].button(
-        "Next",
-        use_container_width=True,
-        disabled=current_index == len(visible_pair_ids) - 1,
-    ):
-        set_selected_pair(visible_pair_ids[current_index + 1])
-        st.rerun()
-
     next_review_pair = next_pair_needing_review(filtered_pair_ids, st.session_state.selected_pair_id)
-    if button_cols[2].button(
-        "Next unreviewed",
+    if st.sidebar.button(
+        "Jump to next unreviewed",
         use_container_width=True,
         disabled=next_review_pair is None,
     ) and next_review_pair is not None:
