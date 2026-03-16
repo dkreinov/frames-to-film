@@ -114,10 +114,12 @@ STATUS_SHORT_LABELS = {
 }
 
 WORKFLOW_STEPS = [
-    ("extend", "Extend images"),
-    ("build", "Build movie"),
-    ("review", "Review"),
-    ("redo", "Redo queue"),
+    ("upload", "Upload Photos"),
+    ("prepare", "Prepare Images"),
+    ("sequence", "Build Sequence"),
+    ("generate", "Generate Videos"),
+    ("review", "Review & Fix"),
+    ("export", "Export Movie"),
 ]
 WORKFLOW_LABELS = dict(WORKFLOW_STEPS)
 
@@ -164,50 +166,20 @@ def main() -> None:
 
     render_workflow_strip(active_step)
 
-    if active_step == "extend":
-        render_extend_images_tab()
-    elif active_step == "build":
+    if active_step == "upload":
+        render_upload_tab()
+    elif active_step == "prepare":
+        render_prepare_tab()
+    elif active_step == "sequence":
         render_build_movie_tab()
+    elif active_step == "generate":
+        render_generate_tab()
+    elif active_step == "review":
+        render_review_and_fix_tab(run_id, status_filter)
+    elif active_step == "export":
+        render_export_tab(run_id)
     else:
-        pairs = discover_clip_pairs()
-        reviews = load_reviews(run_id)
-        redo_requests = load_redo_queue(run_id)
-        winners = load_winners(run_id)
-
-        review_lookup = {(item.pair_id, item.version): item for item in reviews}
-        queued_redo_lookup = {
-            (item.pair_id, item.source_version): item
-            for item in redo_requests
-            if item.status == "queued"
-        }
-        waiting_review_lookup = {
-            (item.pair_id, item.target_version): item
-            for item in redo_requests
-            if item.status == "waiting_review" and item.target_version is not None
-        }
-        pair_rows = build_pair_rows(pairs, review_lookup, queued_redo_lookup, winners)
-
-        if active_step == "review":
-            if not pairs:
-                st.error("No generated clips were found in kling_test/videos.")
-                return
-
-            selected_pair = select_pair(pairs, pair_rows, status_filter)
-            render_review_panel(
-                selected_pair,
-                review_lookup,
-                queued_redo_lookup,
-                waiting_review_lookup,
-                winners,
-                run_id,
-                pair_rows,
-                progress_counts(pair_rows),
-                status_filter,
-            )
-            with st.expander("Inbox overview", expanded=False):
-                render_inbox(pair_rows, status_filter, selected_pair.pair_id)
-        else:
-            render_redo_queue(redo_requests, review_lookup, winners, run_id)
+        render_upload_tab()
 
     error_message = st.session_state.pop("redo_run_error", "")
     if error_message:
@@ -1407,15 +1379,18 @@ def render_prepare_tab() -> None:
 
 def render_workflow_strip(active_step: str) -> None:
     display_labels = {
-        "extend": "1. Extend stills",
-        "build": "2. Build sequence",
-        "review": "3. Review clips",
-        "redo": "4. Retry weak clips",
+        "upload": "Upload Photos",
+        "prepare": "Prepare Images",
+        "sequence": "Build Sequence",
+        "generate": "Generate Videos",
+        "review": "Review & Fix",
+        "export": "Export Movie",
     }
     button_cols = st.columns(len(WORKFLOW_STEPS), gap="small")
-    for column, (step_key, _) in zip(button_cols, WORKFLOW_STEPS):
+    for step_number, (column, (step_key, _)) in enumerate(zip(button_cols, WORKFLOW_STEPS), start=1):
+        label = f"{step_number}. {display_labels[step_key]}"
         if column.button(
-            display_labels[step_key],
+            label,
             use_container_width=True,
             key=f"workflow_button::{step_key}",
             type="primary" if step_key == active_step else "secondary",
@@ -4028,16 +4003,25 @@ def inject_styles() -> None:
 def sidebar_controls() -> tuple[str, str, str]:
     pending_workflow_step = st.session_state.pop("pending_workflow_step", None)
     saved_ui_state = load_ui_state()
-    saved_workflow_step = str(saved_ui_state.get("active_workflow_step", "extend"))
+    saved_workflow_step = str(saved_ui_state.get("active_workflow_step", "upload"))
+    # Map old step keys to new ones for users with saved state from the previous workflow
+    step_migration = {"extend": "prepare", "build": "sequence", "redo": "review"}
+    if saved_workflow_step in step_migration:
+        saved_workflow_step = step_migration[saved_workflow_step]
     if "active_workflow_step" not in st.session_state and saved_workflow_step in WORKFLOW_LABELS:
         st.session_state["active_workflow_step"] = saved_workflow_step
     if pending_workflow_step in WORKFLOW_LABELS:
         st.session_state["active_workflow_step"] = pending_workflow_step
     st.sidebar.header("Workflow")
+    step_keys = [item[0] for item in WORKFLOW_STEPS]
+    current_step = st.session_state.get("active_workflow_step", "upload")
+    if current_step not in step_keys:
+        current_step = step_migration.get(current_step, "upload")
+        st.session_state["active_workflow_step"] = current_step
     active_step = st.sidebar.radio(
         "Section",
-        options=[item[0] for item in WORKFLOW_STEPS],
-        index=[item[0] for item in WORKFLOW_STEPS].index(st.session_state.get("active_workflow_step", "extend")),
+        options=step_keys,
+        index=step_keys.index(current_step),
         format_func=lambda item: WORKFLOW_LABELS[item],
         key="active_workflow_step",
         label_visibility="collapsed",
@@ -4045,14 +4029,14 @@ def sidebar_controls() -> tuple[str, str, str]:
     save_ui_state(active_step)
 
     run_id = DEFAULT_RUN_ID
-    if active_step in {"review", "redo"}:
-        st.sidebar.header("Review Run")
-        run_id = st.sidebar.text_input("Run ID", value=DEFAULT_RUN_ID, key="sidebar_run_id").strip() or DEFAULT_RUN_ID
+    if active_step in {"review", "export"}:
+        st.sidebar.header("Project")
+        run_id = st.sidebar.text_input("Project ID", value=DEFAULT_RUN_ID, key="sidebar_run_id").strip() or DEFAULT_RUN_ID
 
-    if active_step == "extend":
+    if active_step == "prepare":
         render_extend_sidebar_controls()
         status_filter = st.session_state.get("sidebar_status_filter", "Needs review")
-    elif active_step == "build":
+    elif active_step == "sequence":
         render_build_sidebar_controls()
         status_filter = st.session_state.get("sidebar_status_filter", "Needs review")
     elif active_step == "review":
@@ -4067,9 +4051,8 @@ def sidebar_controls() -> tuple[str, str, str]:
             key="sidebar_status_filter",
             label_visibility="collapsed",
         )
-        st.sidebar.caption("Review the queue, approve what works, and send weak clips for another pass.")
+        st.sidebar.caption("Watch each clip, approve the good ones, and flag issues on the rest.")
     else:
-        render_redo_sidebar_controls(run_id)
         status_filter = st.session_state.get("sidebar_status_filter", "Needs review")
 
     return run_id, status_filter, active_step
