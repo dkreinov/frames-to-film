@@ -4414,16 +4414,17 @@ def render_review_panel(
                 st.write(f"File: `{current_clip.filename}`")
                 st.write(f"Path: `{current_clip.video_path}`")
 
-            st.caption("Use the primary button only when this version is approved. Save review keeps redo and discussion decisions without jumping away.")
-            submit_cols = st.columns(2, gap="medium")
-            save_only = submit_cols[0].form_submit_button("Save review", use_container_width=True)
-            approve_and_next = submit_cols[1].form_submit_button(
-                "Approve and next",
-                type="primary",
-                use_container_width=True,
-                disabled=decision != "approve",
-            )
-            submitted = save_only or approve_and_next
+            if decision == "approve":
+                submit_label = "Approve and next"
+                submit_type = "primary"
+            elif decision == "redo":
+                submit_label = "Save and queue redo"
+                submit_type = "secondary"
+            else:
+                submit_label = "Save review"
+                submit_type = "secondary"
+            submitted = st.form_submit_button(submit_label, type=submit_type, use_container_width=True)
+            approve_and_next = submitted and decision == "approve"
 
             if submitted:
                 record = ReviewRecord(
