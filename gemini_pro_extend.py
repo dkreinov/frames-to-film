@@ -78,16 +78,32 @@ def save_download_as_source_type(download_path: Path, destination_path: Path) ->
 
 
 def wait_for_login(page) -> None:
-    page.goto("https://gemini.google.com/app?hl=en", wait_until="load")
-    time.sleep(2)
+    try:
+        page.goto("https://gemini.google.com/app?hl=en", wait_until="domcontentloaded")
+    except PlaywrightTimeoutError:
+        pass
+    except Exception:
+        pass
+    time.sleep(3)
     if page.locator("button[aria-label^='Google Account:']").count():
+        return
+    if "accounts.google.com" not in page.url and page.locator("textarea, [role='textbox']").count():
         return
 
     print("Gemini login is required in the opened Chrome window.", flush=True)
     print("Log in, wait until Gemini opens, then press Enter here to continue.", flush=True)
     input()
-    page.goto("https://gemini.google.com/app?hl=en", wait_until="load")
-    time.sleep(2)
+    try:
+        page.goto("https://gemini.google.com/app?hl=en", wait_until="domcontentloaded")
+    except PlaywrightTimeoutError:
+        pass
+    except Exception:
+        pass
+    time.sleep(3)
+    if page.locator("button[aria-label^='Google Account:']").count():
+        return
+    if "accounts.google.com" not in page.url and page.locator("textarea, [role='textbox']").count():
+        return
     if not page.locator("button[aria-label^='Google Account:']").count():
         raise RuntimeError("Gemini login was not detected.")
 
