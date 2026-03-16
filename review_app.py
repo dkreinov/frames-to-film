@@ -142,8 +142,8 @@ STORYBOARD_COMPONENT = components.declare_component(
 
 def main() -> None:
     st.set_page_config(
-        page_title="Olga Movie Review",
-        page_icon="M",
+        page_title="AI Movie Studio",
+        page_icon="&#127916;",
         layout="wide",
     )
     inject_styles()
@@ -151,8 +151,8 @@ def main() -> None:
     st.markdown(
         """
         <div class="hero-banner">
-            <h1>Olga Movie Review</h1>
-            <p>Review clips, compare rebuilt versions, and queue smarter retries without losing story continuity.</p>
+            <h1>AI Movie Studio</h1>
+            <p>Turn your family photos into a cinematic movie. Upload, prepare, sequence, generate, review, and export — all in one place.</p>
         </div>
         """,
         unsafe_allow_html=True,
