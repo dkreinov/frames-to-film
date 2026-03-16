@@ -1165,6 +1165,118 @@ def render_extension_thumbnail_board(
                     st.caption(status_text)
 
 
+def render_upload_tab() -> None:
+    st.subheader("Upload Photos")
+    st.caption("Start here. Add your family photos to a project folder. These raw images will be prepared and extended in the next step.")
+
+    target_dir = OUTPAINTED_DIR.parent
+    upload_folder_key = "upload_target_folder"
+    if upload_folder_key not in st.session_state:
+        st.session_state[upload_folder_key] = target_dir
+
+    existing_images = sorted(
+        [
+            path
+            for path in target_dir.iterdir()
+            if path.is_file() and path.suffix.lower() in RAW_IMAGE_EXTENSIONS
+        ],
+        key=lambda p: p.name.lower(),
+    ) if target_dir.exists() else []
+
+    summary_cols = st.columns(3, gap="small")
+    summary_cols[0].markdown(
+        f"<div class='extend-summary-card'><span>Project folder</span><strong>{relative_folder_label(target_dir)}</strong></div>",
+        unsafe_allow_html=True,
+    )
+    summary_cols[1].markdown(
+        f"<div class='extend-summary-card'><span>Photos loaded</span><strong>{len(existing_images)}</strong></div>",
+        unsafe_allow_html=True,
+    )
+    outpainted_count = len(list(OUTPAINTED_DIR.glob("*.jpg"))) + len(list(OUTPAINTED_DIR.glob("*.jpeg"))) + len(list(OUTPAINTED_DIR.glob("*.png"))) if OUTPAINTED_DIR.exists() else 0
+    summary_cols[2].markdown(
+        f"<div class='extend-summary-card'><span>Already normalized (4:3)</span><strong>{outpainted_count}</strong></div>",
+        unsafe_allow_html=True,
+    )
+
+    render_next_action_card(
+        "How it works",
+        "Upload your photos here, then move to Prepare Images to normalize them to a consistent format for video generation.",
+    )
+
+    st.markdown(
+        """
+        <div class="upload-zone">
+            <h4>Drop your photos below</h4>
+            <p>Supported formats: JPG, JPEG, PNG</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    uploaded_files = st.file_uploader(
+        "Upload photos",
+        type=["jpg", "jpeg", "png"],
+        accept_multiple_files=True,
+        key="upload_photos_uploader",
+        label_visibility="collapsed",
+    )
+    if uploaded_files:
+        target_dir.mkdir(parents=True, exist_ok=True)
+        saved_count = 0
+        for uploaded_file in uploaded_files:
+            dest = target_dir / uploaded_file.name
+            if not dest.exists():
+                dest.write_bytes(uploaded_file.getvalue())
+                saved_count += 1
+        if saved_count > 0:
+            st.success(f"Saved {saved_count} new photo(s) to {relative_folder_label(target_dir)}.")
+            st.rerun()
+        else:
+            st.info("All uploaded files already exist in the project folder.")
+
+    folder_actions = st.columns([1, 1, 2], gap="small")
+    if folder_actions[0].button("Open project folder", use_container_width=True, key="upload_open_folder"):
+        open_folder_in_windows(target_dir)
+    if folder_actions[1].button("Refresh", use_container_width=True, key="upload_refresh"):
+        st.rerun()
+
+    if not existing_images:
+        st.markdown(
+            """
+            <div class="empty-state-card">
+                <div class="empty-icon">&#128247;</div>
+                <h3>No photos yet</h3>
+                <p>Upload your family photos using the uploader above, or place them directly in the project folder.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+
+    st.markdown(f"**Photo gallery** ({len(existing_images)} images)")
+    thumb_cols = st.columns(6, gap="small")
+    for index, image_path in enumerate(existing_images):
+        with thumb_cols[index % 6]:
+            st.image(
+                load_display_image_bytes(str(image_path), 300, image_cache_key(image_path)),
+                caption=image_path.name,
+                use_container_width=True,
+            )
+
+    if len(existing_images) >= 2:
+        st.markdown(
+            """
+            <div class="success-banner">
+                <div class="success-icon">&#9989;</div>
+                <div>
+                    <div class="success-text">Ready for the next step</div>
+                    <div class="success-detail">Click "Prepare Images" in the workflow above to normalize your photos to a consistent format.</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
 def render_workflow_strip(active_step: str) -> None:
     display_labels = {
         "extend": "1. Extend stills",
