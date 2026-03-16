@@ -2591,13 +2591,7 @@ def render_build_movie_tab() -> None:
         st.session_state[selected_pairs_key] = []
         save_build_tab_state(selected_folder, ordered_names, st.session_state[selected_pairs_key], st.session_state[custom_order_key], st.session_state.get("build_pool_folder"), st.session_state[disabled_pairs_key], prompt_overrides, prompt_sources)
         st.rerun()
-    with st.expander("Customize pair selection", expanded=False):
-        st.multiselect(
-            "Pairs to generate",
-            options=pair_keys,
-            key=selected_pairs_key,
-            help="Choose which consecutive pairs to send to Kling from this sequence.",
-        )
+    st.caption(f"{len(st.session_state[selected_pairs_key])} of {len(pair_keys)} pairs selected for generation.")
     save_build_tab_state(
         selected_folder,
         ordered_names,
