@@ -2581,31 +2581,7 @@ def render_build_movie_tab() -> None:
     preview_options = [row["pair_key"] for row in pair_rows]
     if preview_key not in st.session_state or st.session_state[preview_key] not in preview_options:
         st.session_state[preview_key] = suggested_preview_key or preview_options[0]
-    preview_index = preview_options.index(st.session_state[preview_key]) if preview_options else 0
-    preview_action_cols = st.columns(4, gap="small")
-    if preview_action_cols[0].button(
-        "Previous pair",
-        use_container_width=True,
-        key=f"build_preview_previous::{folder_key_text(selected_folder)}",
-        disabled=preview_index == 0,
-    ):
-        st.session_state[preview_key] = preview_options[preview_index - 1]
-        st.rerun()
-    if preview_action_cols[1].button(
-        "Next pair",
-        use_container_width=True,
-        key=f"build_preview_next::{folder_key_text(selected_folder)}",
-        disabled=preview_index == len(preview_options) - 1,
-    ):
-        st.session_state[preview_key] = preview_options[preview_index + 1]
-        st.rerun()
-    if preview_action_cols[2].button("Preview active transition", use_container_width=True, key=f"build_preview_active::{folder_key_text(selected_folder)}"):
-        st.session_state[preview_key] = suggested_preview_key or preview_options[0]
-        st.rerun()
-    if preview_action_cols[3].button("Preview first missing", use_container_width=True, key=f"build_preview_missing::{folder_key_text(selected_folder)}", disabled=not missing_pair_keys):
-        st.session_state[preview_key] = missing_pair_keys[0]
-        st.rerun()
-    preview_pair_key = st.selectbox("Preview pair", options=preview_options, key=preview_key)
+    preview_pair_key = st.selectbox("Select a pair to preview and edit its prompt", options=preview_options, key=preview_key)
     preview_row = next(row for row in pair_rows if row["pair_key"] == preview_pair_key)
     preview_cols = st.columns(2, gap="large")
     preview_cols[0].image(
