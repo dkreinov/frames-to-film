@@ -4261,7 +4261,7 @@ def render_inbox(pair_rows, status_filter: str, selected_pair_id: str) -> None:
     discussion = count_rows(pair_rows, "Needs discussion")
     unreviewed = count_rows(pair_rows, "Needs review")
 
-    metric_cols = st.columns(4)
+    metric_cols = st.columns(4, gap="small")
     metric_cols[0].metric("Unreviewed", unreviewed)
     metric_cols[1].metric("Approved", approved)
     metric_cols[2].metric("Needs redo", redo)
@@ -4773,7 +4773,7 @@ def render_redo_queue(redo_requests, review_lookup, winners, run_id: str) -> Non
     waiting_review_requests = [item for item in redo_requests if item.status == "waiting_review"]
     failed_requests = [item for item in redo_requests if item.status == "failed"]
 
-    metric_cols = st.columns(3)
+    metric_cols = st.columns(3, gap="small")
     metric_cols[0].metric("Queued to rerun", len(queued_requests))
     metric_cols[1].metric("New version ready", len(waiting_review_requests))
     metric_cols[2].metric("Retry failed", len(failed_requests))
@@ -4802,7 +4802,7 @@ def render_redo_queue(redo_requests, review_lookup, winners, run_id: str) -> Non
         )
 
     st.caption("Preview the rewritten prompts first, then run only the retries you want to spend credits on.")
-    control_cols = st.columns([1.1, 1, 1.3], gap="large")
+    control_cols = st.columns(3, gap="small")
     if control_cols[0].button("Preview retry prompts", use_container_width=True):
         if not selected_queue_keys:
             st.warning("Select at least one queued retry to preview.")
