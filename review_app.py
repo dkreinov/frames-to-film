@@ -1376,9 +1376,9 @@ def render_prepare_tab() -> None:
         extend_progress = len(extended_images) / len(outpainted_images) if outpainted_images else 0
         st.progress(min(extend_progress, 1.0), text=f"{len(extended_images)} of {len(outpainted_images)} extended")
 
-        st.caption("For detailed per-image extension controls, use the extension browser below.")
-
-    render_extend_images_tab()
+    with st.expander("Per-image extension controls", expanded=False):
+        st.caption("Browse images one at a time, compare originals vs extended versions, run Gemini API, or upload manual results.")
+        render_extend_images_tab()
 
     if phase_a_done and phase_b_done:
         st.markdown(
