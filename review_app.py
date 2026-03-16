@@ -688,10 +688,21 @@ def generate_build_pair_prompt_with_llm(
     end_path: Path,
     base_prompt: str,
     current_prompt: str,
+    *,
+    imaginative: bool = False,
 ) -> str | None:
     client = get_extend_api_client()
     if client is None:
         return None
+
+    extra_goals = ""
+    if imaginative:
+        extra_goals = """
+- keep the prompt grounded in the real stills, but make the transition more cinematic and imaginative
+- prefer a clear visual handoff, reveal, reframing, or memory-like transition instead of a plain morph
+- stay believable for Kling and avoid surreal invention unless it is clearly supported by the images
+- do not lose the main identity, setting, or story continuity while making it more expressive
+"""
 
     rewrite_request = f"""Create a Kling image-to-video prompt for pair {pair_key} by looking at the two attached stills.
 
@@ -707,6 +718,7 @@ Goals:
 - use specific motion and continuity wording instead of abstract mood language
 - analyze the attached images instead of paraphrasing the base prompt
 - mention the most important real visual continuity cues from the stills when they matter
+{extra_goals}
 
 Start still: {start_name}
 End still: {end_name}
@@ -1064,7 +1076,7 @@ def render_extension_nav(
     *,
     include_picker: bool,
 ) -> str:
-    nav_cols = st.columns([1, 1, 1.2, 1.1, 2.0] if include_picker else [1, 1, 1.2, 1.2], gap="small")
+    nav_cols = st.columns([1, 1, 1.2, 1.1] if include_picker else [1, 1, 1.2, 1.2], gap="small")
     if nav_cols[0].button(
         "Previous image",
         use_container_width=True,
@@ -1097,25 +1109,60 @@ def render_extension_nav(
             st.session_state["pending_extend_scroll_anchor"] = "extend-compare-anchor"
             st.session_state[active_key] = pending_names[0]
             st.rerun()
-    if include_picker and nav_cols[3].button(
-        "Jump to compare",
-        use_container_width=True,
-        key=f"{active_key}::jump_compare",
-    ):
-        st.session_state["pending_extend_scroll_anchor"] = "extend-compare-anchor"
-        st.rerun()
     if include_picker:
-        selected_name = nav_cols[4].selectbox(
-            "Active image",
-            options=visible_names,
-            index=visible_names.index(st.session_state[active_key]),
-            label_visibility="collapsed",
-        )
-        st.session_state[active_key] = selected_name
-        return selected_name
+        if nav_cols[3].button(
+            "Jump to compare",
+            use_container_width=True,
+            key=f"{active_key}::jump_compare",
+        ):
+            st.session_state["pending_extend_scroll_anchor"] = "extend-compare-anchor"
+            st.rerun()
+        return st.session_state[active_key]
 
     nav_cols[3].caption("Use these buttons while comparing to move without scrolling up.")
     return st.session_state[active_key]
+
+
+def render_extension_thumbnail_board(
+    visible_names: list[str],
+    browser_rows: list[dict[str, str]],
+    source_lookup: dict[str, Path],
+    active_key: str,
+) -> None:
+    status_lookup = {row["image"]: row["status"] for row in browser_rows}
+    with st.expander("Thumbnail browser", expanded=True):
+        st.caption("Click a still to make it active. The compare view below updates from the active still.")
+
+        columns_per_row = 6
+        for row_start in range(0, len(visible_names), columns_per_row):
+            row_names = visible_names[row_start : row_start + columns_per_row]
+            tile_cols = st.columns(len(row_names), gap="small")
+            for tile_col, image_name in zip(tile_cols, row_names):
+                is_active = st.session_state[active_key] == image_name
+                status_text = status_lookup.get(image_name, "")
+                button_label = "Current" if is_active else "Select"
+                with tile_col:
+                    st.markdown(
+                        f"<div class='extend-thumb-title'>{image_name}</div>",
+                        unsafe_allow_html=True,
+                    )
+                    st.image(
+                        load_display_image_bytes(
+                            str(source_lookup[image_name]),
+                            260,
+                            image_cache_key(source_lookup[image_name]),
+                        ),
+                        use_container_width=True,
+                    )
+                    if st.button(
+                        button_label,
+                        key=f"{active_key}::thumb::{image_name}",
+                        use_container_width=True,
+                        disabled=is_active,
+                    ):
+                        st.session_state[active_key] = image_name
+                        st.rerun()
+                    st.caption(status_text)
 
 
 def render_workflow_strip(active_step: str) -> None:
@@ -1221,11 +1268,18 @@ def render_build_generation_progress(source_folder: Path, job_state: dict[str, o
     remaining_count = len(selected_pair_keys) - len(done_items)
     last_finished_pair = done_items[-1][0] if done_items else "-"
     is_terminal = remaining_count == 0
+    total_count = len(selected_pair_keys)
+    finished_count = len(done_items)
+    progress_value = 0.0 if total_count == 0 else finished_count / total_count
+    progress_label = f"{finished_count} of {total_count} pair(s) finished"
+    if failed_count:
+        progress_label += f" ({failed_count} failed)"
     auto_refresh_key = f"build_auto_refresh::{folder_key_text(source_folder)}"
     if auto_refresh_key not in st.session_state:
         st.session_state[auto_refresh_key] = False
 
-    st.markdown("**Generation progress**")
+    st.markdown("**Latest build run**")
+    st.progress(progress_value, text=progress_label)
     progress_cols = st.columns(4, gap="small")
     progress_cols[0].markdown(
         f"<div class='extend-summary-card'><span>Selected</span><strong>{len(selected_pair_keys)}</strong></div>",
@@ -1270,7 +1324,7 @@ def render_build_generation_progress(source_folder: Path, job_state: dict[str, o
     )
 
     if is_terminal:
-        st.success("This generation run has reached a terminal state for all selected pairs.")
+        st.success("This build run has reached a terminal state for all selected pairs.")
     elif job_state.get("stopped"):
         st.warning("This build run was stopped before all selected pairs finished.")
     else:
@@ -1470,6 +1524,12 @@ def render_extend_images_tab() -> None:
         active_key,
         current_index,
         include_picker=True,
+    )
+    render_extension_thumbnail_board(
+        visible_names,
+        browser_rows,
+        source_lookup,
+        active_key,
     )
 
     active_name = selected_name
@@ -1830,30 +1890,28 @@ def render_build_movie_tab() -> None:
         if isinstance(pair_key, str)
     }
     st.session_state[disabled_pairs_key] = sorted(disabled_pair_keys)
-    if prompt_overrides_key not in st.session_state:
-        if (
-            saved_folder_label == relative_folder_label(selected_folder)
-            and isinstance(saved_prompt_overrides, dict)
-        ):
-            st.session_state[prompt_overrides_key] = {
-                str(key): str(value)
-                for key, value in saved_prompt_overrides.items()
-                if isinstance(key, str) and isinstance(value, str)
-            }
-        else:
-            st.session_state[prompt_overrides_key] = {}
-    if prompt_sources_key not in st.session_state:
-        if (
-            saved_folder_label == relative_folder_label(selected_folder)
-            and isinstance(saved_prompt_sources, dict)
-        ):
-            st.session_state[prompt_sources_key] = {
-                str(key): str(value)
-                for key, value in saved_prompt_sources.items()
-                if isinstance(key, str) and isinstance(value, str)
-            }
-        else:
-            st.session_state[prompt_sources_key] = {}
+    if (
+        saved_folder_label == relative_folder_label(selected_folder)
+        and isinstance(saved_prompt_overrides, dict)
+    ):
+        st.session_state[prompt_overrides_key] = {
+            str(key): str(value)
+            for key, value in saved_prompt_overrides.items()
+            if isinstance(key, str) and isinstance(value, str)
+        }
+    elif prompt_overrides_key not in st.session_state:
+        st.session_state[prompt_overrides_key] = {}
+    if (
+        saved_folder_label == relative_folder_label(selected_folder)
+        and isinstance(saved_prompt_sources, dict)
+    ):
+        st.session_state[prompt_sources_key] = {
+            str(key): str(value)
+            for key, value in saved_prompt_sources.items()
+            if isinstance(key, str) and isinstance(value, str)
+        }
+    elif prompt_sources_key not in st.session_state:
+        st.session_state[prompt_sources_key] = {}
     prompt_overrides = st.session_state[prompt_overrides_key]
     prompt_sources = st.session_state[prompt_sources_key]
 
@@ -2056,6 +2114,7 @@ def render_build_movie_tab() -> None:
         )
         with st.expander("Add from another folder", expanded=False):
             pending_pool_folder = st.session_state.pop("pending_build_pool_folder", None)
+            pending_pool_notice = st.session_state.pop("pending_build_pool_notice", "")
             pool_folders = [folder for folder in discover_image_folders() if folder.resolve() != selected_folder.resolve()]
             initial_pool_folder = path_from_saved_text(str(saved_state.get("pool_folder", relative_folder_label(selected_folder))))
             if initial_pool_folder.resolve() == selected_folder.resolve():
@@ -2067,6 +2126,8 @@ def render_build_movie_tab() -> None:
             if not pool_folders:
                 st.caption("No additional image folders were found.")
             else:
+                if pending_pool_notice:
+                    st.warning(pending_pool_notice)
                 pool_folder_key = "build_pool_folder"
                 if pool_folder_key not in st.session_state or st.session_state[pool_folder_key] not in pool_folders:
                     st.session_state[pool_folder_key] = initial_pool_folder
@@ -2084,7 +2145,12 @@ def render_build_movie_tab() -> None:
                 if pool_cols[1].button("Browse...", use_container_width=True, key="browse_build_pool_folder"):
                     picked_pool = browse_for_folder(pool_folder)
                     if picked_pool is not None:
-                        st.session_state["pending_build_pool_folder"] = picked_pool
+                        if picked_pool.resolve() == selected_folder.resolve():
+                            st.session_state["pending_build_pool_notice"] = (
+                                "That folder is already the active build folder. Pick a different pool folder to import from."
+                            )
+                        else:
+                            st.session_state["pending_build_pool_folder"] = picked_pool
                         st.rerun()
                 if pool_cols[2].button("Open", use_container_width=True, key="open_build_pool_folder"):
                     open_folder_in_windows(pool_folder)
@@ -2260,6 +2326,7 @@ def render_build_movie_tab() -> None:
         for row in pair_rows
         if f"seg_{row['pair_key']}.mp4" not in existing_segments
     ]
+    existing_pair_keys = [pair_key for pair_key in pair_keys if pair_key not in missing_pair_keys]
     selected_count = len(st.session_state[selected_pairs_key])
     missing_count = len(missing_pair_keys)
     pair_summary_cols = st.columns(3, gap="small")
@@ -2349,16 +2416,22 @@ def render_build_movie_tab() -> None:
     )
     prompt_widget_key = f"build_prompt_preview::{folder_key_text(selected_folder)}::{preview_pair_key}"
     pending_prompt_key = f"build_pending_prompt::{folder_key_text(selected_folder)}::{preview_pair_key}"
+    prompt_sync_key = f"build_prompt_sync::{folder_key_text(selected_folder)}"
     pending_prompt = st.session_state.pop(pending_prompt_key, None)
+    source_prompt_text = preview_row["prompt"]
+    prompt_sync_signature = f"{preview_pair_key}::{source_prompt_text}"
     if pending_prompt is not None:
         st.session_state[prompt_widget_key] = pending_prompt
-    elif prompt_widget_key not in st.session_state:
-        st.session_state[prompt_widget_key] = preview_row["prompt"]
+        st.session_state[prompt_sync_key] = f"{preview_pair_key}::{pending_prompt}"
+    elif st.session_state.get(prompt_sync_key) != prompt_sync_signature:
+        st.session_state[prompt_widget_key] = source_prompt_text
+        st.session_state[prompt_sync_key] = prompt_sync_signature
 
     prompt_source_label = {
         "default": "Default library prompt",
         "manual": "Manual edit",
         "gemini": "Gemini rewrite",
+        "gemini_cinematic": "Gemini cinematic rewrite",
     }.get(preview_row["prompt_source"], "Custom prompt")
     st.caption(
         f"Prompt source: {prompt_source_label}. The prompt box below is the exact text Kling will use for this pair."
@@ -2382,8 +2455,12 @@ def render_build_movie_tab() -> None:
         prompt_sources.pop(preview_pair_key, None)
 
     helper_mode_key = f"build_prompt_helper_mode::{folder_key_text(selected_folder)}::{preview_pair_key}"
+    helper_pair_key = f"build_prompt_helper_pair::{folder_key_text(selected_folder)}"
+    if st.session_state.get(helper_pair_key) != preview_pair_key:
+        st.session_state[helper_pair_key] = preview_pair_key
+        st.session_state[helper_mode_key] = ""
     helper_mode = st.session_state.get(helper_mode_key, "")
-    prompt_action_cols = st.columns(4, gap="small")
+    prompt_action_cols = st.columns(5, gap="small")
     if prompt_action_cols[0].button(
         "Generate with Gemini",
         use_container_width=True,
@@ -2416,6 +2493,38 @@ def render_build_movie_tab() -> None:
             )
             st.rerun()
     if prompt_action_cols[1].button(
+        "Make more cinematic",
+        use_container_width=True,
+        key=f"build_generate_cinematic_prompt::{folder_key_text(selected_folder)}::{preview_pair_key}",
+    ):
+        generated_prompt = generate_build_pair_prompt_with_llm(
+            preview_pair_key,
+            preview_row["start"],
+            preview_row["end"],
+            source_lookup[preview_row["start"]],
+            source_lookup[preview_row["end"]],
+            preview_row["base_prompt"],
+            normalized_prompt_text or preview_row["base_prompt"],
+            imaginative=True,
+        )
+        if generated_prompt is None:
+            st.warning("Gemini prompt generation is not available right now.")
+        else:
+            prompt_overrides[preview_pair_key] = generated_prompt
+            prompt_sources[preview_pair_key] = "gemini_cinematic"
+            st.session_state[pending_prompt_key] = generated_prompt
+            save_build_tab_state(
+                selected_folder,
+                ordered_names,
+                st.session_state[selected_pairs_key],
+                st.session_state[custom_order_key],
+                st.session_state.get("build_pool_folder"),
+                st.session_state[disabled_pairs_key],
+                prompt_overrides,
+                prompt_sources,
+            )
+            st.rerun()
+    if prompt_action_cols[2].button(
         "Ask Codex",
         use_container_width=True,
         key=f"build_prepare_codex::{folder_key_text(selected_folder)}::{preview_pair_key}",
@@ -2423,7 +2532,7 @@ def render_build_movie_tab() -> None:
         st.session_state[helper_mode_key] = "codex"
         st.session_state[f"build_pending_scroll_anchor::{folder_key_text(selected_folder)}"] = "build-prompt-helper-anchor"
         st.rerun()
-    if prompt_action_cols[2].button(
+    if prompt_action_cols[3].button(
         "Reset to default",
         use_container_width=True,
         key=f"build_reset_prompt::{folder_key_text(selected_folder)}::{preview_pair_key}",
@@ -2431,6 +2540,7 @@ def render_build_movie_tab() -> None:
         prompt_overrides.pop(preview_pair_key, None)
         prompt_sources.pop(preview_pair_key, None)
         st.session_state[pending_prompt_key] = preview_row["base_prompt"]
+        st.session_state[helper_mode_key] = ""
         save_build_tab_state(
             selected_folder,
             ordered_names,
@@ -2442,45 +2552,10 @@ def render_build_movie_tab() -> None:
             prompt_sources,
         )
         st.rerun()
-    prompt_action_cols[3].markdown(
+    prompt_action_cols[4].markdown(
         f"<div class='extend-summary-card'><span>Used by Kling</span><strong>{'Custom prompt' if preview_pair_key in prompt_overrides else 'Default prompt'}</strong></div>",
         unsafe_allow_html=True,
     )
-    with st.expander("Optional: create a new prompt with Codex or another LLM", expanded=helper_mode == "codex"):
-        if helper_mode == "codex":
-            st.markdown("<div id='build-prompt-helper-anchor'></div>", unsafe_allow_html=True)
-            render_extend_scroll_restore("build-prompt-helper-anchor")
-        st.caption(
-            "This is only a helper brief for an external LLM. It is not the prompt Kling will use unless you paste the new result back into the prompt box above."
-        )
-        if helper_mode == "codex":
-            st.info("Paste this request here in Codex with the two still images if you want me to write the exact Kling prompt.")
-            st.text_area(
-                "Ask Codex with this request",
-                value=build_pair_prompt_codex_request(
-                    preview_pair_key,
-                    preview_row["start"],
-                    preview_row["end"],
-                    source_lookup[preview_row["start"]],
-                    source_lookup[preview_row["end"]],
-                    preview_row["base_prompt"],
-                    normalized_prompt_text or preview_row["base_prompt"],
-                ),
-                height=260,
-                key=f"build_prompt_codex_brief::{folder_key_text(selected_folder)}::{preview_pair_key}",
-            )
-        st.text_area(
-            "Copy this helper brief for another LLM",
-            value=build_pair_prompt_brief(
-                preview_pair_key,
-                preview_row["start"],
-                preview_row["end"],
-                preview_row["base_prompt"],
-                normalized_prompt_text or preview_row["base_prompt"],
-            ),
-            height=220,
-            key=f"build_prompt_brief::{folder_key_text(selected_folder)}::{preview_pair_key}",
-        )
     save_build_tab_state(
         selected_folder,
         ordered_names,
@@ -2494,22 +2569,59 @@ def render_build_movie_tab() -> None:
 
     videos_dir = os.path.join(selected_folder, "videos")
     status_path = os.path.join(videos_dir, "status.json")
-    build_job = load_build_job_state(selected_folder)
-    if build_job:
-        render_build_generation_progress(selected_folder, build_job, status_path)
-    action_cols = st.columns([1, 1, 1.2], gap="small")
+    selected_existing_pair_keys = [
+        pair_key
+        for pair_key in st.session_state[selected_pairs_key]
+        if pair_key in existing_pair_keys
+    ]
+    selected_missing_pair_keys = [
+        pair_key
+        for pair_key in st.session_state[selected_pairs_key]
+        if pair_key in missing_pair_keys
+    ]
+    action_cols = st.columns([1.1, 1.25, 1.2], gap="small")
     use_credits_key = f"build_use_kling::{folder_key_text(selected_folder)}"
     if use_credits_key not in st.session_state:
         st.session_state[use_credits_key] = False
-    st.caption(
-        f"Generate clips for {len(st.session_state[selected_pairs_key])} selected pair(s). The run starts in the background, and progress is tracked from the status file."
-    )
-    action_cols[0].checkbox("Use Kling credits", key=use_credits_key)
-    if action_cols[1].button("Generate clips", use_container_width=True, type="primary"):
+    if st.session_state[selected_pairs_key]:
+        if selected_existing_pair_keys and not selected_missing_pair_keys:
+            generation_caption = (
+                f"{len(selected_existing_pair_keys)} selected pair(s) already have saved clips. "
+                "Starting Kling again will rerun them and replace those segment files."
+            )
+        elif selected_existing_pair_keys and selected_missing_pair_keys:
+            generation_caption = (
+                f"{len(selected_missing_pair_keys)} selected pair(s) are missing and "
+                f"{len(selected_existing_pair_keys)} already exist. Starting Kling will generate the missing clips and rerun the existing ones."
+            )
+        else:
+            generation_caption = (
+                f"Generate clips for {len(st.session_state[selected_pairs_key])} selected pair(s). "
+                "The run starts in the background, and progress is tracked from the status file."
+            )
+    else:
+        generation_caption = "Choose at least one pair to generate."
+    st.caption(generation_caption)
+    with action_cols[0]:
+        st.markdown("**Kling run**")
+        st.checkbox("Confirm credit use", key=use_credits_key)
+    if st.session_state[selected_pairs_key]:
+        if selected_existing_pair_keys and not selected_missing_pair_keys:
+            generate_button_label = "Regenerate clips"
+        elif selected_existing_pair_keys:
+            generate_button_label = "Generate / rerun clips"
+        elif len(st.session_state[selected_pairs_key]) == 1:
+            generate_button_label = "Generate clip"
+        else:
+            generate_button_label = "Generate clips"
+    else:
+        generate_button_label = "Generate clips"
+    generate_button_enabled = bool(st.session_state[selected_pairs_key]) and bool(st.session_state[use_credits_key])
+    if action_cols[1].button(generate_button_label, use_container_width=True, type="primary", disabled=not generate_button_enabled):
         if not st.session_state[selected_pairs_key]:
             st.warning("Choose at least one pair to generate.")
         elif not st.session_state[use_credits_key]:
-            st.warning("Tick `Use Kling credits` before starting Kling generation.")
+            st.warning("Tick `Confirm Kling credit use` before starting Kling generation.")
         else:
             generation_prompt_map = {
                 row["pair_key"]: row["prompt"]
@@ -2532,6 +2644,8 @@ def render_build_movie_tab() -> None:
                 "Watch the progress card below."
             )
             st.rerun()
+    if not st.session_state[use_credits_key]:
+        st.caption("Turn on `Confirm credit use` to enable Kling generation for this selection.")
     if action_cols[2].button(
         "Stitch movie",
         use_container_width=True,
@@ -2547,6 +2661,66 @@ def render_build_movie_tab() -> None:
         except Exception as exc:
             st.error(f"Stitch failed: {exc}")
 
+    with st.expander("Optional: create a new prompt with Codex or another LLM", expanded=helper_mode == "codex"):
+        if helper_mode == "codex":
+            st.markdown("<div id='build-prompt-helper-anchor'></div>", unsafe_allow_html=True)
+            render_extend_scroll_restore("build-prompt-helper-anchor")
+        if helper_mode == "codex":
+            st.caption("This helper does not change Kling directly. Paste the result back into the main prompt box if you want to use it.")
+            st.info("Paste this request here in Codex with the two still images if you want me to write the exact Kling prompt.")
+            st.text_area(
+                "Ask Codex with this request",
+                value=build_pair_prompt_codex_request(
+                    preview_pair_key,
+                    preview_row["start"],
+                    preview_row["end"],
+                    source_lookup[preview_row["start"]],
+                    source_lookup[preview_row["end"]],
+                    preview_row["base_prompt"],
+                    normalized_prompt_text or preview_row["base_prompt"],
+                ),
+                height=260,
+                key=f"build_prompt_codex_brief::{folder_key_text(selected_folder)}::{preview_pair_key}",
+            )
+            with st.expander("Use another LLM instead", expanded=False):
+                st.text_area(
+                    "Copy this helper brief",
+                    value=build_pair_prompt_brief(
+                        preview_pair_key,
+                        preview_row["start"],
+                        preview_row["end"],
+                        preview_row["base_prompt"],
+                        normalized_prompt_text or preview_row["base_prompt"],
+                    ),
+                    height=180,
+                    key=f"build_prompt_brief::{folder_key_text(selected_folder)}::{preview_pair_key}",
+                )
+        else:
+            st.caption("This helper does not change Kling directly. Paste the result back into the main prompt box if you want to use it.")
+            st.text_area(
+                "Copy this helper brief for another LLM",
+                value=build_pair_prompt_brief(
+                    preview_pair_key,
+                    preview_row["start"],
+                    preview_row["end"],
+                    preview_row["base_prompt"],
+                    normalized_prompt_text or preview_row["base_prompt"],
+                ),
+                height=180,
+                key=f"build_prompt_brief::{folder_key_text(selected_folder)}::{preview_pair_key}",
+            )
+
+    build_job = load_build_job_state(selected_folder)
+    if build_job:
+        latest_run_pair_keys = [
+            str(item)
+            for item in build_job.get("selected_pair_keys", [])
+            if isinstance(item, str)
+        ]
+        if latest_run_pair_keys != list(st.session_state[selected_pairs_key]):
+            st.caption("The progress block below shows the latest started build run for this folder. Your current pair selection is different.")
+        render_build_generation_progress(selected_folder, build_job, status_path)
+
     generation_notice = st.session_state.pop("build_generation_notice", "")
     if generation_notice:
         st.success(generation_notice)
@@ -2561,7 +2735,9 @@ def inject_styles() -> None:
     st.markdown(
         """
         <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
         .stApp {
+            font-family: 'Space Grotesk', sans-serif;
             background:
                 radial-gradient(circle at top left, rgba(180, 83, 9, 0.18), transparent 24%),
                 radial-gradient(circle at top right, rgba(220, 38, 38, 0.10), transparent 22%),
@@ -2597,6 +2773,8 @@ def inject_styles() -> None:
         }
         .hero-banner h1 {
             color: #fff7ed;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 700;
             letter-spacing: -0.03em;
             line-height: 1.02;
             margin: 0 0 0.18rem;
@@ -2607,11 +2785,13 @@ def inject_styles() -> None:
             margin: 0;
             max-width: 58rem;
         }
+        /* --- Step indicator strip --- */
         .workflow-strip {
             display: flex;
             flex-wrap: wrap;
-            gap: 0.55rem;
+            gap: 0.35rem;
             margin: 0.35rem 0 0.95rem;
+            align-items: center;
         }
         .workflow-step {
             background: rgba(255, 248, 239, 0.84);
@@ -2619,15 +2799,43 @@ def inject_styles() -> None:
             border-radius: 999px;
             color: #8b5e3c;
             display: inline-flex;
-            font-size: 0.84rem;
+            align-items: center;
+            gap: 0.4rem;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 0.82rem;
             font-weight: 600;
-            padding: 0.42rem 0.78rem;
+            padding: 0.38rem 0.75rem;
+            transition: all 0.15s ease-out;
         }
         .workflow-step--active {
             background: linear-gradient(180deg, #fff1df 0%, #ffe2c2 100%);
-            border-color: rgba(194, 120, 67, 0.30);
+            border-color: rgba(194, 120, 67, 0.35);
             color: #9a3412;
+            box-shadow: 0 4px 12px rgba(194, 120, 67, 0.18);
         }
+        .workflow-step .step-number {
+            background: rgba(139, 94, 60, 0.14);
+            border-radius: 50%;
+            color: #8b5e3c;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.72rem;
+            font-weight: 700;
+            height: 22px;
+            width: 22px;
+            flex-shrink: 0;
+        }
+        .workflow-step--active .step-number {
+            background: linear-gradient(180deg, #c85a2b 0%, #9a3412 100%);
+            color: #fff;
+        }
+        .workflow-connector {
+            color: #d4a574;
+            font-size: 0.7rem;
+            margin: 0 0.1rem;
+        }
+        /* --- Action cards --- */
         .next-action-card {
             background: linear-gradient(180deg, rgba(255, 245, 232, 0.96) 0%, rgba(255, 237, 213, 0.88) 100%);
             border: 1px solid rgba(194, 120, 67, 0.20);
@@ -2639,6 +2847,7 @@ def inject_styles() -> None:
         .next-action-card span {
             color: #8b5e3c;
             display: block;
+            font-family: 'Space Grotesk', sans-serif;
             font-size: 0.76rem;
             font-weight: 700;
             letter-spacing: 0.03em;
@@ -2651,6 +2860,162 @@ def inject_styles() -> None:
             font-size: 0.95rem;
             line-height: 1.35;
         }
+        /* --- Empty state card --- */
+        .empty-state-card {
+            background: linear-gradient(180deg, rgba(255, 252, 248, 0.95) 0%, rgba(255, 245, 232, 0.90) 100%);
+            border: 2px dashed rgba(194, 120, 67, 0.25);
+            border-radius: 18px;
+            padding: 2.5rem 2rem;
+            text-align: center;
+            margin: 1rem 0;
+        }
+        .empty-state-card .empty-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.8rem;
+            opacity: 0.6;
+        }
+        .empty-state-card h3 {
+            color: #7c2d12;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 700;
+            font-size: 1.2rem;
+            margin: 0 0 0.4rem;
+        }
+        .empty-state-card p {
+            color: #8b5e3c;
+            font-size: 0.92rem;
+            margin: 0;
+            max-width: 32rem;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        /* --- Phase header --- */
+        .phase-header {
+            background: linear-gradient(180deg, rgba(255, 248, 239, 0.96) 0%, rgba(255, 245, 232, 0.92) 100%);
+            border: 1px solid rgba(194, 120, 67, 0.16);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+            padding: 0.65rem 0.9rem;
+            margin: 0.8rem 0 0.6rem;
+        }
+        .phase-header .phase-badge {
+            background: linear-gradient(180deg, #c85a2b 0%, #9a3412 100%);
+            border-radius: 10px;
+            color: #fff;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            padding: 0.3rem 0.6rem;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .phase-header .phase-title {
+            color: #3f2415;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+        .phase-header .phase-status {
+            color: #8b5e3c;
+            font-size: 0.82rem;
+            margin-left: auto;
+        }
+        /* --- Progress summary bar --- */
+        .progress-summary {
+            background: rgba(255, 250, 245, 0.92);
+            border: 1px solid rgba(194, 120, 67, 0.16);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            padding: 0.7rem 1rem;
+            margin: 0.5rem 0 0.8rem;
+        }
+        .progress-summary .progress-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.15rem;
+        }
+        .progress-summary .progress-item span {
+            color: #8b5e3c;
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+        .progress-summary .progress-item strong {
+            color: #3f2415;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+        /* --- Success banner --- */
+        .success-banner {
+            background: linear-gradient(180deg, #ecfdf5 0%, #d1fae5 100%);
+            border: 1px solid #6ee7b7;
+            border-radius: 14px;
+            padding: 0.8rem 1rem;
+            margin: 0.6rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+        }
+        .success-banner .success-icon {
+            font-size: 1.5rem;
+        }
+        .success-banner .success-text {
+            color: #065f46;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        .success-banner .success-detail {
+            color: #047857;
+            font-size: 0.85rem;
+        }
+        /* --- Segment status grid --- */
+        .segment-grid {
+            display: grid;
+            gap: 0.5rem;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            margin: 0.6rem 0;
+        }
+        .segment-card {
+            background: rgba(255, 250, 245, 0.92);
+            border: 1px solid rgba(194, 120, 67, 0.14);
+            border-radius: 12px;
+            padding: 0.55rem 0.7rem;
+            font-size: 0.82rem;
+        }
+        .segment-card--done {
+            border-color: #6ee7b7;
+            background: rgba(236, 253, 245, 0.6);
+        }
+        .segment-card--generating {
+            border-color: #fbbf24;
+            background: rgba(255, 251, 235, 0.6);
+            animation: pulse-border 2s ease-in-out infinite;
+        }
+        .segment-card--failed {
+            border-color: #fca5a5;
+            background: rgba(254, 242, 242, 0.6);
+        }
+        .segment-card .seg-name {
+            font-weight: 600;
+            color: #3f2415;
+            margin-bottom: 0.2rem;
+        }
+        .segment-card .seg-status {
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        @keyframes pulse-border {
+            0%, 100% { border-color: #fbbf24; }
+            50% { border-color: #f59e0b; box-shadow: 0 0 8px rgba(245, 158, 11, 0.2); }
+        }
+        /* --- Info cards --- */
         .extend-summary-card,
         .extend-details-card {
             background: rgba(255, 250, 245, 0.88);
@@ -2684,6 +3049,7 @@ def inject_styles() -> None:
         .extend-details-card strong {
             color: #3f2415;
             display: block;
+            font-family: 'Space Grotesk', sans-serif;
             font-size: 1rem;
             line-height: 1.3;
             overflow-wrap: anywhere;
@@ -2701,6 +3067,17 @@ def inject_styles() -> None:
             min-height: 78px;
             padding: 0.7rem 0.8rem;
         }
+        .extend-thumb-title {
+            color: #7c2d12;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 0.82rem;
+            font-weight: 700;
+            line-height: 1.2;
+            margin: 0 0 0.35rem;
+            min-height: 2rem;
+            overflow-wrap: anywhere;
+        }
+        /* --- Sidebar --- */
         [data-testid="stSidebar"] h2,
         [data-testid="stSidebar"] p,
         [data-testid="stSidebar"] label,
@@ -2729,6 +3106,10 @@ def inject_styles() -> None:
             color: #7c2d12 !important;
             font-weight: 700 !important;
         }
+        /* --- Typography --- */
+        h1, h2, h3 {
+            font-family: 'Space Grotesk', sans-serif;
+        }
         h1 {
             margin-top: 0;
             margin-bottom: 0.25rem;
@@ -2754,6 +3135,7 @@ def inject_styles() -> None:
             border-color: #e6b17e;
             color: #9a3412;
         }
+        /* --- Metrics --- */
         [data-testid="stMetric"] {
             background: rgba(255, 251, 245, 0.92);
             border: 1px solid #edd5bd;
@@ -2765,6 +3147,7 @@ def inject_styles() -> None:
         [data-testid="stMetric"] p {
             margin-bottom: 0;
         }
+        /* --- Buttons --- */
         [data-testid="stButton"] > button,
         [data-testid="stFormSubmitButton"] > button {
             background: linear-gradient(180deg, #fffaf4 0%, #fff1df 100%);
@@ -2772,16 +3155,19 @@ def inject_styles() -> None:
             border-radius: 14px;
             box-shadow: 0 10px 22px rgba(120, 53, 15, 0.10);
             color: #7c2d12;
+            font-family: 'Space Grotesk', sans-serif;
             font-weight: 600;
             min-height: 46px;
             padding: 0.65rem 1rem;
             white-space: nowrap;
+            transition: all 0.15s ease-out;
         }
         [data-testid="stButton"] > button:hover,
         [data-testid="stFormSubmitButton"] > button:hover {
             background: linear-gradient(180deg, #fff5e8 0%, #ffe8cf 100%);
             border-color: #d48a50;
             color: #9a3412;
+            transform: translateY(-1px);
         }
         button[kind="primary"] {
             background: linear-gradient(180deg, #c85a2b 0%, #8f2d18 100%) !important;
@@ -2822,6 +3208,7 @@ def inject_styles() -> None:
             border-color: rgba(245, 158, 11, 0.18) !important;
             color: rgba(255, 243, 224, 0.72) !important;
         }
+        /* --- Expanders / Forms --- */
         [data-testid="stExpander"] {
             background: rgba(255, 252, 248, 0.9);
             border: 1px solid #efd9c6;
@@ -2837,6 +3224,7 @@ def inject_styles() -> None:
             border-radius: 18px;
             padding: 0.85rem 0.95rem 0.4rem;
         }
+        /* --- Review elements --- */
         .review-guide {
             border: 1px solid #efd9c6;
             border-radius: 14px;
@@ -2912,6 +3300,62 @@ def inject_styles() -> None:
             min-height: 46px;
             min-width: 100px;
             padding: 0 0.85rem;
+        }
+        /* --- Upload area --- */
+        .upload-zone {
+            background: linear-gradient(180deg, rgba(255, 252, 248, 0.92) 0%, rgba(255, 245, 232, 0.85) 100%);
+            border: 2px dashed rgba(194, 120, 67, 0.30);
+            border-radius: 18px;
+            padding: 2rem 1.5rem;
+            text-align: center;
+            transition: all 0.2s ease-out;
+        }
+        .upload-zone:hover {
+            border-color: rgba(194, 120, 67, 0.50);
+            background: linear-gradient(180deg, rgba(255, 248, 239, 0.96) 0%, rgba(255, 237, 213, 0.90) 100%);
+        }
+        .upload-zone h4 {
+            color: #7c2d12;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600;
+            margin: 0 0 0.4rem;
+        }
+        .upload-zone p {
+            color: #8b5e3c;
+            font-size: 0.88rem;
+            margin: 0;
+        }
+        /* --- Image gallery grid --- */
+        .gallery-grid {
+            display: grid;
+            gap: 0.6rem;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            margin: 0.6rem 0;
+        }
+        .gallery-item {
+            background: rgba(255, 250, 245, 0.88);
+            border: 1px solid rgba(194, 120, 67, 0.14);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.15s ease-out;
+        }
+        .gallery-item:hover {
+            border-color: rgba(194, 120, 67, 0.35);
+            box-shadow: 0 6px 16px rgba(120, 53, 15, 0.10);
+        }
+        .gallery-item img {
+            width: 100%;
+            aspect-ratio: 4/3;
+            object-fit: cover;
+        }
+        .gallery-item .gallery-caption {
+            color: #3f2415;
+            font-size: 0.75rem;
+            font-weight: 500;
+            padding: 0.3rem 0.5rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
         </style>
         """,
@@ -3006,12 +3450,20 @@ def render_extend_sidebar_controls() -> None:
 
 def render_build_sidebar_controls() -> None:
     saved_state = load_build_tab_state()
-    source_folder = path_from_saved_text(str(saved_state.get("source_folder", "kling_test")))
-    ordered_images = [str(item) for item in saved_state.get("ordered_images", []) if isinstance(item, str)]
+    source_folder = st.session_state.get("build_source_folder")
+    if not isinstance(source_folder, Path):
+        source_folder = path_from_saved_text(str(saved_state.get("source_folder", "kling_test")))
+    ordered_state_key = f"build_ordered_images::{folder_key_text(source_folder)}"
+    ordered_images = st.session_state.get(ordered_state_key)
+    if not isinstance(ordered_images, list):
+        ordered_images = [str(item) for item in saved_state.get("ordered_images", []) if isinstance(item, str)]
+    else:
+        ordered_images = [str(item) for item in ordered_images]
     active_key = f"build_current_image::{folder_key_text(source_folder)}"
     active_image = st.session_state.get(active_key) or (ordered_images[0] if ordered_images else "-")
     active_index = ordered_images.index(active_image) + 1 if active_image in ordered_images else 0
-    custom_order = bool(saved_state.get("custom_order", False))
+    custom_order_key = f"build_custom_order::{folder_key_text(source_folder)}"
+    custom_order = bool(st.session_state.get(custom_order_key, saved_state.get("custom_order", False)))
 
     st.sidebar.header("Build board")
     render_sidebar_summary_cards(
