@@ -2821,10 +2821,6 @@ def render_build_movie_tab() -> None:
         for pair_key in st.session_state[selected_pairs_key]
         if pair_key in missing_pair_keys
     ]
-    action_cols = st.columns([1.1, 1.25, 1.2], gap="small")
-    use_credits_key = f"build_use_kling::{folder_key_text(selected_folder)}"
-    if use_credits_key not in st.session_state:
-        st.session_state[use_credits_key] = False
     if st.session_state[selected_pairs_key]:
         if selected_existing_pair_keys and not selected_missing_pair_keys:
             generation_caption = (
@@ -2844,51 +2840,42 @@ def render_build_movie_tab() -> None:
     else:
         generation_caption = "Choose at least one pair to generate."
     st.caption(generation_caption)
-    with action_cols[0]:
-        st.markdown("**Kling run**")
-        st.checkbox("Confirm credit use", key=use_credits_key)
     if st.session_state[selected_pairs_key]:
         if selected_existing_pair_keys and not selected_missing_pair_keys:
-            generate_button_label = "Regenerate clips"
+            generate_button_label = "Regenerate clips (uses credits)"
         elif selected_existing_pair_keys:
-            generate_button_label = "Generate / rerun clips"
+            generate_button_label = "Generate / rerun clips (uses credits)"
         elif len(st.session_state[selected_pairs_key]) == 1:
-            generate_button_label = "Generate clip"
+            generate_button_label = "Generate clip (uses credits)"
         else:
-            generate_button_label = "Generate clips"
+            generate_button_label = "Generate clips (uses credits)"
     else:
-        generate_button_label = "Generate clips"
-    generate_button_enabled = bool(st.session_state[selected_pairs_key]) and bool(st.session_state[use_credits_key])
-    if action_cols[1].button(generate_button_label, use_container_width=True, type="primary", disabled=not generate_button_enabled):
-        if not st.session_state[selected_pairs_key]:
-            st.warning("Choose at least one pair to generate.")
-        elif not st.session_state[use_credits_key]:
-            st.warning("Tick `Confirm Kling credit use` before starting Kling generation.")
-        else:
-            generation_prompt_map = {
-                row["pair_key"]: row["prompt"]
-                for row in pair_rows
-            }
-            job_payload = {
-                "started_at": time.time(),
-                "source_folder": str(selected_folder),
-                "ordered_names": ordered_names,
-                "selected_pair_keys": st.session_state[selected_pairs_key],
-                "video_dir": videos_dir,
-                "status_path": status_path,
-                "prompt_overrides": generation_prompt_map,
-            }
-            save_build_job_state(selected_folder, job_payload)
-            start_build_generation_job(selected_folder, job_payload)
-            st.session_state[f"build_generation_results::{folder_key_text(selected_folder)}"] = None
-            st.session_state["build_generation_notice"] = (
-                f"Started Kling generation for {len(st.session_state[selected_pairs_key])} pair(s). "
-                "Watch the progress card below."
-            )
-            st.rerun()
-    if not st.session_state[use_credits_key]:
-        st.caption("Turn on `Confirm credit use` to enable Kling generation for this selection.")
-    if action_cols[2].button(
+        generate_button_label = "Generate clips (uses credits)"
+    generate_button_enabled = bool(st.session_state[selected_pairs_key])
+    action_cols = st.columns(2, gap="small")
+    if action_cols[0].button(generate_button_label, use_container_width=True, type="primary", disabled=not generate_button_enabled):
+        generation_prompt_map = {
+            row["pair_key"]: row["prompt"]
+            for row in pair_rows
+        }
+        job_payload = {
+            "started_at": time.time(),
+            "source_folder": str(selected_folder),
+            "ordered_names": ordered_names,
+            "selected_pair_keys": st.session_state[selected_pairs_key],
+            "video_dir": videos_dir,
+            "status_path": status_path,
+            "prompt_overrides": generation_prompt_map,
+        }
+        save_build_job_state(selected_folder, job_payload)
+        start_build_generation_job(selected_folder, job_payload)
+        st.session_state[f"build_generation_results::{folder_key_text(selected_folder)}"] = None
+        st.session_state["build_generation_notice"] = (
+            f"Started Kling generation for {len(st.session_state[selected_pairs_key])} pair(s). "
+            "Watch the progress card below."
+        )
+        st.rerun()
+    if action_cols[1].button(
         "Stitch movie",
         use_container_width=True,
         disabled=not existing_segments,
@@ -3104,13 +3091,6 @@ def render_generate_tab() -> None:
         "Start a Kling generation run, or go back to Build Sequence to adjust pairs and prompts before generating.",
     )
 
-    control_cols = st.columns([1.2, 1, 1, 1], gap="small")
-    use_credits_key = "generate_tab_use_kling"
-    if use_credits_key not in st.session_state:
-        st.session_state[use_credits_key] = False
-    with control_cols[0]:
-        st.checkbox("Confirm credit use", key=use_credits_key)
-
     selected_pair_keys = saved_state.get("selected_pair_keys", [pair_key for _, _, pair_key in sequence_pairs])
     prompt_overrides = saved_state.get("prompt_overrides", {})
     all_pair_keys = [pair_key for _, _, pair_key in sequence_pairs]
@@ -3121,9 +3101,10 @@ def render_generate_tab() -> None:
         base = get_pair_prompt(pair_key, folder_prompt_label)
         generation_prompt_map[pair_key] = override or base
 
-    generate_enabled = bool(st.session_state[use_credits_key]) and pending_count > 0
-    if control_cols[1].button(
-        "Generate all pending",
+    control_cols = st.columns(3, gap="small")
+    generate_enabled = pending_count > 0
+    if control_cols[0].button(
+        "Generate all pending (uses credits)",
         use_container_width=True,
         type="primary",
         disabled=not generate_enabled,
@@ -3147,10 +3128,10 @@ def render_generate_tab() -> None:
         st.success(f"Started Kling generation for {len(missing_keys)} pending pair(s). Use Refresh to monitor progress.")
         st.rerun()
 
-    if control_cols[2].button("Refresh", use_container_width=True, key="generate_tab_refresh"):
+    if control_cols[1].button("Refresh", use_container_width=True, key="generate_tab_refresh"):
         st.rerun()
 
-    if control_cols[3].button("Open videos folder", use_container_width=True, key="generate_tab_open_videos"):
+    if control_cols[2].button("Open videos folder", use_container_width=True, key="generate_tab_open_videos"):
         Path(videos_dir).mkdir(parents=True, exist_ok=True)
         open_folder_in_windows(Path(videos_dir))
 
