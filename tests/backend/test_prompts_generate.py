@@ -86,6 +86,51 @@ def test_api_generator_calls_gemini_once_per_pair(tmp_path: Path, monkeypatch: p
     assert saved == out
 
 
+# --- Phase 4 sub-plan 4 Step 1: pair_keys honour order.json ---
+
+def test_pair_keys_use_numeric_sort_when_no_order_json(tmp_path: Path) -> None:
+    """Without order.json, fall back to numeric-stem sort (existing behaviour)."""
+    from backend.services.prompts import _pair_keys_for_project
+
+    _seed_kling(tmp_path, 3)
+    assert _pair_keys_for_project(tmp_path) == ["1_to_2", "2_to_3"]
+
+
+def test_pair_keys_honour_order_json_when_present(tmp_path: Path) -> None:
+    """With order.json, pair_keys follow the saved order (not numeric sort)."""
+    from backend.services.prompts import _pair_keys_for_project
+
+    _seed_kling(tmp_path, 3)
+    (tmp_path / "order.json").write_text(
+        json.dumps({"order": ["3.jpg", "1.jpg", "2.jpg"]})
+    )
+    assert _pair_keys_for_project(tmp_path) == ["3_to_1", "1_to_2"]
+
+
+def test_pair_keys_fall_back_when_order_references_missing_files(tmp_path: Path) -> None:
+    """If order.json references frames that no longer exist, drop them and
+    fall back to numeric sort if nothing valid remains."""
+    from backend.services.prompts import _pair_keys_for_project
+
+    _seed_kling(tmp_path, 3)
+    (tmp_path / "order.json").write_text(
+        json.dumps({"order": ["ghost.jpg", "also-ghost.jpg"]})
+    )
+    # All referenced files are missing -> fall back to numeric sort.
+    assert _pair_keys_for_project(tmp_path) == ["1_to_2", "2_to_3"]
+
+
+def test_mock_generator_pairs_follow_order_json(tmp_path: Path) -> None:
+    """End-to-end: writing order.json before mock-gen yields prompts.json
+    keyed by the reordered pair_keys."""
+    _seed_kling(tmp_path, 4)
+    (tmp_path / "order.json").write_text(
+        json.dumps({"order": ["4.jpg", "2.jpg", "1.jpg", "3.jpg"]})
+    )
+    out = generate_prompts_mock(tmp_path, style="cinematic")
+    assert list(out.keys()) == ["4_to_2", "2_to_1", "1_to_3"]
+
+
 def test_api_generator_falls_back_to_preset_on_api_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """If a Gemini call raises, the resolver falls back to the style preset for that pair."""
     from backend.services import prompts as prompts_mod

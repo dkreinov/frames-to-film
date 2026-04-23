@@ -80,14 +80,42 @@ def _sort_key(filename: str) -> tuple[int, str]:
     return (9999, base)
 
 
+def _load_order(project_dir: Path) -> list[str] | None:
+    """Return the Storyboard-saved order (Phase 4 sub-plan 3) if present.
+    Mirrors backend/services/generate.py::_load_order so prompts + videos
+    use the same precedence rule."""
+    pj = project_dir / "order.json"
+    if not pj.is_file():
+        return None
+    try:
+        data = json.loads(pj.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
+    raw = data.get("order")
+    if isinstance(raw, list) and all(isinstance(x, str) for x in raw):
+        return raw
+    return None
+
+
 def _pair_keys_for_project(project_dir: Path) -> list[str]:
     img_dir = project_dir / "kling_test"
     if not img_dir.is_dir():
         raise FileNotFoundError(f"kling_test dir missing: {img_dir}")
-    frames = sorted(img_dir.glob("*.jpg"), key=lambda p: _sort_key(p.name))
-    if len(frames) < 2:
-        raise FileNotFoundError(f"need >=2 jpgs in {img_dir}, got {len(frames)}")
-    return [f"{a.stem}_to_{b.stem}" for a, b in zip(frames, frames[1:])]
+    all_frames = sorted(img_dir.glob("*.jpg"), key=lambda p: _sort_key(p.name))
+    if len(all_frames) < 2:
+        raise FileNotFoundError(f"need >=2 jpgs in {img_dir}, got {len(all_frames)}")
+
+    # Prefer the Storyboard-saved order, filtered to frames that still
+    # exist on disk. Fall back to numeric sort if order.json is absent
+    # or references only missing files.
+    explicit = _load_order(project_dir)
+    if explicit:
+        existing = {p.name: p for p in all_frames}
+        ordered = [existing[name] for name in explicit if name in existing]
+        if len(ordered) >= 2:
+            return [f"{a.stem}_to_{b.stem}" for a, b in zip(ordered, ordered[1:])]
+
+    return [f"{a.stem}_to_{b.stem}" for a, b in zip(all_frames, all_frames[1:])]
 
 
 def generate_prompts_mock(project_dir: Path | str, style: str = "cinematic") -> dict[str, str]:
