@@ -44,3 +44,12 @@ export interface StageOutputs {
   stage: string
   outputs: string[]
 }
+
+export type StylePreset = 'cinematic' | 'nostalgic' | 'vintage' | 'playful'
+
+export type PromptsMap = Record<string, string>
+
+export interface VideoItem {
+  name: string
+  pair_key: string
+}

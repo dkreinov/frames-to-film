@@ -1,4 +1,15 @@
-import type { Health, Project, ProjectCreate, Upload, Job, JobRef, StageOutputs } from './types'
+import type {
+  Health,
+  Project,
+  ProjectCreate,
+  Upload,
+  Job,
+  JobRef,
+  StageOutputs,
+  StylePreset,
+  PromptsMap,
+  VideoItem,
+} from './types'
 
 export const API_BASE =
   (import.meta as unknown as { env?: { VITE_API_BASE?: string } }).env?.VITE_API_BASE ??
@@ -121,4 +132,78 @@ export function artifactUrl(projectId: string, stage: string, name: string): str
   return `${API_BASE}/projects/${projectId}/artifacts/${stage}/${encodeURIComponent(name)}`
 }
 
-export type { Health, Project, ProjectCreate, Upload, Job, JobRef, StageOutputs }
+export async function startPromptsGeneration(
+  projectId: string,
+  mode: 'mock' | 'api' = 'mock',
+  style: StylePreset = 'cinematic'
+): Promise<JobRef> {
+  return parse<JobRef>(
+    await fetch(`${API_BASE}/projects/${projectId}/prompts/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode, style }),
+    })
+  )
+}
+
+export async function getPrompts(
+  projectId: string
+): Promise<PromptsMap | null> {
+  const res = await fetch(`${API_BASE}/projects/${projectId}/prompts`)
+  if (res.status === 404) return null
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new ApiError(res.status, `${res.status}: ${text}`)
+  }
+  return (await res.json()) as PromptsMap
+}
+
+export async function savePrompts(
+  projectId: string,
+  prompts: PromptsMap
+): Promise<PromptsMap> {
+  return parse<PromptsMap>(
+    await fetch(`${API_BASE}/projects/${projectId}/prompts`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompts }),
+    })
+  )
+}
+
+export async function startGenerate(
+  projectId: string,
+  mode: 'mock' | 'api' = 'mock'
+): Promise<JobRef> {
+  return parse<JobRef>(
+    await fetch(`${API_BASE}/projects/${projectId}/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode }),
+    })
+  )
+}
+
+export async function listVideos(projectId: string): Promise<VideoItem[]> {
+  const body = await parse<{ videos: VideoItem[] }>(
+    await fetch(`${API_BASE}/projects/${projectId}/videos`)
+  )
+  return body.videos
+}
+
+export function videoUrl(projectId: string, name: string): string {
+  return `${API_BASE}/projects/${projectId}/artifacts/kling_test/videos/${encodeURIComponent(name)}`
+}
+
+export type {
+  Health,
+  Project,
+  ProjectCreate,
+  Upload,
+  Job,
+  JobRef,
+  StageOutputs,
+  StylePreset,
+  PromptsMap,
+  VideoItem,
+}
