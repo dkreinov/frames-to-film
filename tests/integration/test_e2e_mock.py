@@ -65,8 +65,26 @@ def test_full_mock_pipeline_end_to_end(client) -> None:
         assert r.status_code == 201, r.text
     assert len(c.get(f"/projects/{pid}/uploads").json()) == 6
 
-    # 4. run all four stage jobs and assert each lands in 'done'
-    for stage in ("prepare", "extend", "generate", "stitch"):
+    # 4. run all stage jobs in order and assert each lands in 'done'.
+    # prepare -> extend -> prompts/generate (Phase 3) -> generate -> stitch
+    for stage in ("prepare", "extend"):
+        r = c.post(f"/projects/{pid}/{stage}", json={"mode": "mock"})
+        assert r.status_code == 202, f"{stage} POST -> {r.status_code}: {r.text}"
+        job_id = r.json()["job_id"]
+        assert c.get(f"/projects/{pid}/jobs/{job_id}").json()["status"] == "done"
+
+    # Phase 3: prompt auto-generation stage (new).
+    r = c.post(
+        f"/projects/{pid}/prompts/generate",
+        json={"mode": "mock", "style": "cinematic"},
+    )
+    assert r.status_code == 202, r.text
+    prompts_job = r.json()["job_id"]
+    assert c.get(f"/projects/{pid}/jobs/{prompts_job}").json()["status"] == "done"
+    prompts = c.get(f"/projects/{pid}/prompts").json()
+    assert len(prompts) == 5, prompts
+
+    for stage in ("generate", "stitch"):
         r = c.post(f"/projects/{pid}/{stage}", json={"mode": "mock"})
         assert r.status_code == 202, f"{stage} POST -> {r.status_code}: {r.text}"
         job_id = r.json()["job_id"]
