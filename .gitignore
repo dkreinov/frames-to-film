@@ -36,3 +36,7 @@ work_log.md
 # Exceptions — track test fixture assets under tests/fixtures/ even though *.png is globally ignored.
 !tests/fixtures/
 !tests/fixtures/**
+
+# Exceptions — track golden screenshots under docs/design/golden/
+!docs/design/golden/
+!docs/design/golden/**
