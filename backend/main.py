@@ -13,6 +13,7 @@ from backend.routers import (
     extend,
     generate,
     jobs,
+    outputs,
     prepare,
     projects,
     prompts,
@@ -45,6 +46,7 @@ app.include_router(review.router)
 app.include_router(stitch.router)
 app.include_router(artifacts.router)
 app.include_router(prompts.router)
+app.include_router(outputs.router)
 
 
 @app.get("/health")
