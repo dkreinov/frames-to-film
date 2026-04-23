@@ -97,3 +97,19 @@ def test_generate_scoped_to_user(client) -> None:
     pid = c.post("/projects", json={"name": "A"}, headers={"X-User-ID": "alice"}).json()["project_id"]
     r = c.post(f"/projects/{pid}/generate", json={"mode": "mock"}, headers={"X-User-ID": "bob"})
     assert r.status_code == 404
+
+
+def test_generate_respects_order_json(client, project_ready_for_generate: str) -> None:
+    """When order.json is set, mock generate produces seg pairs in that order."""
+    c, _, storage = client
+    # Reverse the natural sort: 6,5,4,3,2,1 → expect seg_6_to_5, seg_5_to_4, etc.
+    c.put(
+        f"/projects/{project_ready_for_generate}/order",
+        json={"order": ["6.jpg", "5.jpg", "4.jpg", "3.jpg", "2.jpg", "1.jpg"]},
+    )
+    c.post(f"/projects/{project_ready_for_generate}/generate", json={"mode": "mock"})
+    videos = storage / "local" / project_ready_for_generate / "kling_test" / "videos"
+    names = sorted(p.name for p in videos.glob("seg_*.mp4"))
+    expected = sorted(["seg_6_to_5.mp4", "seg_5_to_4.mp4", "seg_4_to_3.mp4",
+                       "seg_3_to_2.mp4", "seg_2_to_1.mp4"])
+    assert names == expected

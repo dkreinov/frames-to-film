@@ -23,6 +23,11 @@ _RUN_LOCK = threading.Lock()
 # Guarded by _RUN_LOCK so concurrent FastAPI api-mode jobs can't race.
 PROJECT_PROMPTS: dict = {}
 
+# Per-project frame ordering loaded by run() from `<project>/order.json`.
+# When non-empty, main() uses this instead of get_image_sequence().
+# Guarded by _RUN_LOCK.
+PROJECT_ORDER: list = []
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # Load root .env first (optional), then olga_movie .env (overrides)
 load_dotenv(os.path.join(SCRIPT_DIR, '..', '.env'))
@@ -335,7 +340,14 @@ def main():
         return
 
     os.makedirs(VID_DIR, exist_ok=True)
-    files = get_image_sequence()
+    if PROJECT_ORDER:
+        # Storyboard-supplied ordering. Filter to existing files for safety.
+        on_disk = set(os.listdir(IMG_DIR))
+        files = [name for name in PROJECT_ORDER if name in on_disk]
+        if not files:
+            files = get_image_sequence()
+    else:
+        files = get_image_sequence()
     status = load_status()
 
     pairs = []
@@ -413,10 +425,11 @@ def run(img_dir=None, video_dir=None, project_dir=None):
     Serialised by _RUN_LOCK so concurrent FastAPI api-mode jobs can't
     race on the module globals.
     """
-    global IMG_DIR, VID_DIR, STATUS_PATH, PROJECT_PROMPTS
+    global IMG_DIR, VID_DIR, STATUS_PATH, PROJECT_PROMPTS, PROJECT_ORDER
     with _RUN_LOCK:
         prev_dirs = (IMG_DIR, VID_DIR, STATUS_PATH)
         prev_prompts = PROJECT_PROMPTS
+        prev_order = PROJECT_ORDER
         try:
             if img_dir is not None:
                 IMG_DIR = str(img_dir)
@@ -435,10 +448,26 @@ def run(img_dir=None, video_dir=None, project_dir=None):
                         PROJECT_PROMPTS = {}
                 else:
                     PROJECT_PROMPTS = {}
+
+                oj = os.path.join(str(project_dir), "order.json")
+                if os.path.isfile(oj):
+                    try:
+                        with open(oj, "r", encoding="utf-8") as fh:
+                            loaded = json.load(fh)
+                        raw = loaded.get("order") if isinstance(loaded, dict) else None
+                        if isinstance(raw, list) and all(isinstance(x, str) for x in raw):
+                            PROJECT_ORDER = raw
+                        else:
+                            PROJECT_ORDER = []
+                    except (json.JSONDecodeError, OSError):
+                        PROJECT_ORDER = []
+                else:
+                    PROJECT_ORDER = []
             main()
         finally:
             IMG_DIR, VID_DIR, STATUS_PATH = prev_dirs
             PROJECT_PROMPTS = prev_prompts
+            PROJECT_ORDER = prev_order
 
 
 if __name__ == "__main__":

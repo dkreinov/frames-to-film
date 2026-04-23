@@ -5,6 +5,7 @@ local E2E runs stay free. API mode delegates to generate_all_videos.run.
 """
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 from pathlib import Path
@@ -34,6 +35,34 @@ def _make_stub(dst: Path) -> None:
     subprocess.run(cmd, check=True, capture_output=True, timeout=60)
 
 
+def _load_order(project_dir: Path) -> list[str] | None:
+    """Return the user's saved Storyboard ordering (Phase 4 sub-plan 3),
+    or None if no order.json has been written."""
+    pj = project_dir / "order.json"
+    if not pj.is_file():
+        return None
+    try:
+        data = json.loads(pj.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
+    raw = data.get("order")
+    if isinstance(raw, list) and all(isinstance(x, str) for x in raw):
+        return raw
+    return None
+
+
+def _ordered_frames(img_dir: Path, project_dir: Path) -> list[Path]:
+    """Sort frames in img_dir by the user's order.json if present, else by
+    numeric filename. Filters to entries that actually exist on disk."""
+    explicit = _load_order(project_dir)
+    if explicit:
+        existing = {p.name: p for p in img_dir.glob("*.jpg")}
+        ordered = [existing[name] for name in explicit if name in existing]
+        if ordered:
+            return ordered
+    return sorted(img_dir.glob("*.jpg"), key=lambda p: _sort_key(p.name))
+
+
 def run_generate(project_dir: Path, mode: str) -> dict:
     project_dir = Path(project_dir)
     img_dir = project_dir / "kling_test"
@@ -44,7 +73,7 @@ def run_generate(project_dir: Path, mode: str) -> dict:
     video_dir.mkdir(parents=True, exist_ok=True)
 
     if mode == "mock":
-        frames = sorted(img_dir.glob("*.jpg"), key=lambda p: _sort_key(p.name))
+        frames = _ordered_frames(img_dir, project_dir)
         if len(frames) < 2:
             raise FileNotFoundError(f"need >=2 jpgs in {img_dir}, got {len(frames)}")
         produced: list[str] = []
