@@ -194,5 +194,26 @@ def stitch_pair_keys(pair_keys, videos_dir, output_file):
     return {"segments": files, "output_file": output_file}
 
 
+def run(img_dir=None, video_dir=None, output_file=None):
+    """Programmatic entry point used by the FastAPI backend.
+
+    Swaps module-level IMG_DIR/VID_DIR/OUTPUT_FILE for the call and
+    restores them after, so main() and CLI behavior remain unchanged.
+    """
+    global IMG_DIR, VID_DIR, OUTPUT_FILE
+    prev = (IMG_DIR, VID_DIR, OUTPUT_FILE)
+    try:
+        if img_dir is not None:
+            IMG_DIR = str(img_dir)
+        if video_dir is not None:
+            VID_DIR = str(video_dir)
+            OUTPUT_FILE = os.path.join(VID_DIR, "full_movie.mp4")
+        if output_file is not None:
+            OUTPUT_FILE = str(output_file)
+        main()
+    finally:
+        IMG_DIR, VID_DIR, OUTPUT_FILE = prev
+
+
 if __name__ == "__main__":
     main()
