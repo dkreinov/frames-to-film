@@ -21,6 +21,13 @@ export const router = createBrowserRouter([
   },
   {
     path: '/projects/:projectId/prepare',
-    element: <div className="p-8">Prepare screen — coming in next sub-plan</div>,
+    lazy: async () => {
+      const mod = await import('./PrepareScreen')
+      return { Component: mod.default }
+    },
+  },
+  {
+    path: '/projects/:projectId/storyboard',
+    element: <div className="p-8">Storyboard — coming in next sub-plan</div>,
   },
 ])
