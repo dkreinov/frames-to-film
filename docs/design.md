@@ -242,6 +242,42 @@ These cannot change without updating every later sub-plan:
   PUT (front-end translates to `null`). Owner-scoped (404 if the
   project belongs to another `user_id`). No legacy fallback —
   consumers must accept the 404 → null mapping.
+- **Prompts/pair-key precedence** (introduced by Generate sub-plan).
+  `_pair_keys_for_project(project_dir)` in
+  `backend/services/prompts.py` honours `<project>/order.json` the
+  same way `_ordered_frames` does. Any backend code that enumerates
+  pairs MUST call this helper, never re-glob. Leftover keys in
+  `prompts.json` from a prior ordering are harmless —
+  `resolve_prompt` ignores unknown keys and falls back to the style
+  preset. Trim-on-PUT is a Phase 6 cleanup, not a required contract.
+- **`PUT/GET /projects/{id}/prompts`** (introduced by Generate
+  sub-plan). PUT body `{prompts: {[pair_key]: string}}` (non-empty,
+  all string values). Full-file atomic replace via tempfile +
+  `os.replace`. Owner-scoped. GET returns the stored map or 404
+  (front-end translates to `null`). No per-key PATCH endpoint —
+  callers PUT the whole map.
+- **`GET /projects/{id}/videos`** (introduced by Generate sub-plan).
+  Returns `{videos: [{name: string, pair_key: string}]}` in the
+  sequence implied by `_ordered_frames`. Empty list when
+  `kling_test/videos/` is missing. The UI pairs each item with a
+  `PromptRow` via `pair_key`.
+- **Radix Dialog primitive** (introduced by Generate sub-plan) —
+  `components/ui/dialog.tsx` wraps `radix-ui`'s Dialog with the
+  project's zinc tokens. Any future modal/lightbox in Review /
+  Settings MUST reuse this file rather than importing Radix
+  directly or forking a second dialog component.
+- **`regenAttempted` single-shot ref pattern** (introduced by
+  Generate sub-plan). For any screen that auto-reconciles server
+  state on mount (re-run a stage when inputs drift), use a
+  `useRef(false)` guard + an explicit error branch for the second
+  failure, not a loop. Pattern proven in
+  `GenerateScreen.tsx`; covered by the "triggers one re-gen"
+  unit test.
+- **`generateStatus` 4-state variant** (introduced by Generate
+  sub-plan). User-triggered stage screens use
+  `'idle' | 'running' | 'done' | 'error'` — NOT the auto-start
+  pattern's `'pending'`. Review / Settings must pick the shape
+  that matches whether the stage auto-starts; don't mix.
 
 ## Decisions log
 

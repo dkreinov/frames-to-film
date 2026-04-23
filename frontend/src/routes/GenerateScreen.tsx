@@ -201,13 +201,15 @@ export default function GenerateScreen() {
         title="Write prompts and render"
         subtitle="Each clip is a 1-second transition between two frames. Edit the prompts, then hit Generate videos."
       >
-        <p
-          role="status"
-          aria-live="polite"
-          className="mb-3 text-sm text-muted-foreground"
-        >
-          {isSaving ? 'Saving…' : 'Saved'}
-        </p>
+        {prompts ? (
+          <p
+            role="status"
+            aria-live="polite"
+            className="mb-3 text-sm text-muted-foreground"
+          >
+            {isSaving ? 'Saving…' : 'Saved'}
+          </p>
+        ) : null}
 
         {generateStatus === 'running' ? (
           <JobProgressCard
