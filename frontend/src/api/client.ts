@@ -9,6 +9,8 @@ import type {
   StylePreset,
   PromptsMap,
   VideoItem,
+  Segment,
+  Verdict,
 } from './types'
 
 export const API_BASE =
@@ -195,6 +197,45 @@ export function videoUrl(projectId: string, name: string): string {
   return `${API_BASE}/projects/${projectId}/artifacts/kling_test/videos/${encodeURIComponent(name)}`
 }
 
+export async function listSegments(projectId: string): Promise<Segment[]> {
+  const body = await parse<{ segments: Segment[] }>(
+    await fetch(`${API_BASE}/projects/${projectId}/segments`)
+  )
+  return body.segments
+}
+
+export async function reviewSegment(
+  projectId: string,
+  segId: string,
+  verdict: Verdict,
+  notes?: string
+): Promise<Segment> {
+  return parse<Segment>(
+    await fetch(`${API_BASE}/projects/${projectId}/segments/${segId}/review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ verdict, notes: notes ?? null }),
+    })
+  )
+}
+
+export async function startStitch(
+  projectId: string,
+  mode: 'mock' | 'api' = 'mock'
+): Promise<JobRef> {
+  return parse<JobRef>(
+    await fetch(`${API_BASE}/projects/${projectId}/stitch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode }),
+    })
+  )
+}
+
+export function downloadUrl(projectId: string): string {
+  return `${API_BASE}/projects/${projectId}/download`
+}
+
 export type {
   Health,
   Project,
@@ -206,4 +247,6 @@ export type {
   StylePreset,
   PromptsMap,
   VideoItem,
+  Segment,
+  Verdict,
 }

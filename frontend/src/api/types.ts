@@ -53,3 +53,12 @@ export interface VideoItem {
   name: string
   pair_key: string
 }
+
+export type Verdict = 'winner' | 'redo' | 'bad'
+
+export interface Segment {
+  seg_id: string
+  verdict: Verdict
+  notes: string | null
+  updated_at: string
+}
