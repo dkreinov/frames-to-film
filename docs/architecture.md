@@ -1,5 +1,13 @@
 # End-to-End Pipeline for Olga Movie
 
+> **Phase 2 update (2026-04-23):** the Python scripts below are now *also*
+> driven by a FastAPI service at `backend/` exposing 14 endpoints (project
+> CRUD, uploads, four stage jobs, review, polling, artifact download).
+> Mock mode serves the `tests/fixtures/fake_project/` Cosmo fixture for
+> zero-API-cost E2E. The Streamlit `review_app.py` runs untouched alongside.
+> See `docs/backend-api.md` and `docs/roadmap/phase_2_execution.md` for
+> endpoint details and Phase-3 caveats.
+
 ## Goal
 
 Turn a mixed set of family photographs into a single stitched movie:
