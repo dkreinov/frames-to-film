@@ -102,3 +102,45 @@ def test_review_scoped_to_user(client) -> None:
         headers={"X-User-ID": "bob"},
     )
     assert r.status_code == 404
+
+
+# --- Phase 4 sub-plan 5 Step 1: GET /projects/{id}/segments ---
+
+def test_list_segments_empty_when_no_reviews(client, project_id: str) -> None:
+    c, _ = client
+    r = c.get(f"/projects/{project_id}/segments")
+    assert r.status_code == 200
+    assert r.json() == {"segments": []}
+
+
+def test_list_segments_after_reviews_returns_sorted(client, project_id: str) -> None:
+    c, _ = client
+    # Review in reverse seg_id order to prove sorting.
+    c.post(f"/projects/{project_id}/segments/seg_2_to_3/review", json={"verdict": "redo"})
+    c.post(
+        f"/projects/{project_id}/segments/seg_1_to_2/review",
+        json={"verdict": "winner", "notes": "great"},
+    )
+    r = c.get(f"/projects/{project_id}/segments")
+    assert r.status_code == 200
+    body = r.json()
+    assert [s["seg_id"] for s in body["segments"]] == ["seg_1_to_2", "seg_2_to_3"]
+    assert body["segments"][0]["verdict"] == "winner"
+    assert body["segments"][0]["notes"] == "great"
+    assert body["segments"][1]["verdict"] == "redo"
+    # each row has updated_at ISO string
+    assert body["segments"][0]["updated_at"]
+
+
+def test_list_segments_404_for_stranger(client) -> None:
+    c, _ = client
+    pid = c.post(
+        "/projects", json={"name": "A"}, headers={"X-User-ID": "alice"}
+    ).json()["project_id"]
+    c.post(
+        f"/projects/{pid}/segments/seg_1_to_2/review",
+        json={"verdict": "winner"},
+        headers={"X-User-ID": "alice"},
+    )
+    r = c.get(f"/projects/{pid}/segments", headers={"X-User-ID": "bob"})
+    assert r.status_code == 404

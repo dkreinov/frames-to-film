@@ -12,6 +12,31 @@ from backend.deps import get_db_path, get_user_id
 
 router = APIRouter(prefix="/projects/{project_id}/segments", tags=["review"])
 
+
+@router.get("")
+def list_segments(
+    project_id: str,
+    db_path: Path = Depends(get_db_path),
+    user_id: str = Depends(get_user_id),
+) -> dict:
+    """List all reviewed segments for a project, sorted by seg_id.
+
+    Returns `{segments: []}` if no reviews exist yet (200, not 404 —
+    the absence of reviews is not an error). 404 only for unknown
+    projects or projects owned by another user.
+    """
+    init_db(db_path)
+    if not _project_exists(db_path, project_id, user_id):
+        raise HTTPException(status_code=404, detail="project not found")
+    with connect(db_path) as con:
+        rows = con.execute(
+            "SELECT seg_id, verdict, notes, updated_at FROM segments"
+            " WHERE project_id = ? AND user_id = ?"
+            " ORDER BY seg_id",
+            (project_id, user_id),
+        ).fetchall()
+    return {"segments": [dict(r) for r in rows]}
+
 ALLOWED_VERDICTS = {"winner", "redo", "bad"}
 
 
