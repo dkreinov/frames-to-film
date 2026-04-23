@@ -54,3 +54,14 @@ frame_6: cleaner changed 48x48 patch at (1296, 688, 1344, 736)
 ## Reuse
 
 Do NOT hand-edit these images — Phase 6 E2E tests byte-compare against this exact set. If a frame needs to be regenerated, update the table above with a new verification snapshot.
+
+## Phase 2 consumers
+
+The Phase 2 FastAPI mock mode (`GENERATION_MODE=mock` / `{"mode":"mock"}` in stage endpoints) uses these 6 frames as the synthetic "project sources". Downstream stage artifacts are regenerated into the caller's project dir at runtime:
+
+- `prepare` copies `frame_*_gemini.png` → `<project>/outpainted/<N>.jpg`
+- `extend`  copies `<project>/outpainted/*.jpg` → `<project>/kling_test/*.jpg`
+- `generate` synthesizes 1s black ffmpeg stubs (`seg_<a>_to_<b>.mp4`)
+- `stitch` stream-copy concats the stubs → `full_movie.mp4`
+
+Pre-baked artifacts are intentionally NOT checked in — the full mock pipeline runs from these 6 frames alone. Keeps the fixture lean and avoids drift.
