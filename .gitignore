@@ -7,7 +7,6 @@ kling_test/
 pipeline_runs/
 processed/
 strips/
-tools/
 logs/
 log/
 
@@ -33,3 +32,7 @@ log/
 
 work_log.md
 *_work_log.md
+
+# Exceptions — track test fixture assets under tests/fixtures/ even though *.png is globally ignored.
+!tests/fixtures/
+!tests/fixtures/**
