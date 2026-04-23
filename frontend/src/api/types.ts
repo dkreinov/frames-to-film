@@ -39,3 +39,8 @@ export interface Job {
   created_at: string
   updated_at: string
 }
+
+export interface StageOutputs {
+  stage: string
+  outputs: string[]
+}

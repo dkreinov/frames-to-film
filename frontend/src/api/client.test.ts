@@ -11,7 +11,15 @@ import { describe, it, expect, beforeAll, afterEach, afterAll } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 
-import { getHealth, createProject, uploadFile, ApiError } from './client'
+import {
+  getHealth,
+  createProject,
+  uploadFile,
+  ApiError,
+  startPrepare,
+  listStageOutputs,
+  artifactUrl,
+} from './client'
 
 const server = setupServer(
   http.get('http://127.0.0.1:8000/health', () =>
@@ -76,5 +84,32 @@ describe('api client', () => {
     const u = await uploadFile('abc123', file)
     expect(u.upload_id).toBe('u1')
     expect(u.filename).toBe('f.png')
+  })
+
+  it('startPrepare posts {mode} and returns a job_id', async () => {
+    server.use(
+      http.post('http://127.0.0.1:8000/projects/:pid/prepare', async ({ request }) => {
+        const body = (await request.json()) as { mode: string }
+        return HttpResponse.json({ job_id: `jid-${body.mode}` }, { status: 202 })
+      })
+    )
+    const r = await startPrepare('abc123', 'mock')
+    expect(r.job_id).toBe('jid-mock')
+  })
+
+  it('listStageOutputs returns the array of names', async () => {
+    server.use(
+      http.get('http://127.0.0.1:8000/projects/:pid/outputs/:stage', () =>
+        HttpResponse.json({ stage: 'outpainted', outputs: ['1.jpg', '2.jpg'] })
+      )
+    )
+    const r = await listStageOutputs('abc123', 'outpainted')
+    expect(r.outputs).toEqual(['1.jpg', '2.jpg'])
+  })
+
+  it('artifactUrl URL-encodes the filename', () => {
+    expect(artifactUrl('p', 'outpainted', 'a b.jpg')).toBe(
+      'http://127.0.0.1:8000/projects/p/artifacts/outpainted/a%20b.jpg'
+    )
   })
 })

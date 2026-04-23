@@ -1,4 +1,4 @@
-import type { Health, Project, ProjectCreate, Upload, Job, JobRef } from './types'
+import type { Health, Project, ProjectCreate, Upload, Job, JobRef, StageOutputs } from './types'
 
 export const API_BASE =
   (import.meta as unknown as { env?: { VITE_API_BASE?: string } }).env?.VITE_API_BASE ??
@@ -56,4 +56,30 @@ export async function getJob(projectId: string, jobId: string): Promise<Job> {
   )
 }
 
-export type { Health, Project, ProjectCreate, Upload, Job, JobRef }
+export async function startPrepare(
+  projectId: string,
+  mode: 'mock' | 'api' = 'mock'
+): Promise<JobRef> {
+  return parse<JobRef>(
+    await fetch(`${API_BASE}/projects/${projectId}/prepare`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode }),
+    })
+  )
+}
+
+export async function listStageOutputs(
+  projectId: string,
+  stage: string
+): Promise<StageOutputs> {
+  return parse<StageOutputs>(
+    await fetch(`${API_BASE}/projects/${projectId}/outputs/${stage}`)
+  )
+}
+
+export function artifactUrl(projectId: string, stage: string, name: string): string {
+  return `${API_BASE}/projects/${projectId}/artifacts/${stage}/${encodeURIComponent(name)}`
+}
+
+export type { Health, Project, ProjectCreate, Upload, Job, JobRef, StageOutputs }
