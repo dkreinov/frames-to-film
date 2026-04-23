@@ -21,6 +21,7 @@ from backend.routers import (
     review,
     stitch,
     uploads,
+    videos,
 )
 
 app = FastAPI(title="olga_movie backend", version="0.4.0")
@@ -49,6 +50,7 @@ app.include_router(artifacts.router)
 app.include_router(prompts.router)
 app.include_router(outputs.router)
 app.include_router(order.router)
+app.include_router(videos.router)
 
 
 @app.get("/health")
