@@ -17,6 +17,7 @@ that. Phase 6 retires it.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -69,3 +70,35 @@ def resolve_prompt(
             except (json.JSONDecodeError, OSError):
                 pass  # fall through
     return STYLE_PRESETS.get(style, fallback)
+
+
+def _sort_key(filename: str) -> tuple[int, str]:
+    base = filename.split(".")[0]
+    m = re.match(r"^(\d+)(_([a-z]))?$", base)
+    if m:
+        return (int(m.group(1)), m.group(3) or "")
+    return (9999, base)
+
+
+def _pair_keys_for_project(project_dir: Path) -> list[str]:
+    img_dir = project_dir / "kling_test"
+    if not img_dir.is_dir():
+        raise FileNotFoundError(f"kling_test dir missing: {img_dir}")
+    frames = sorted(img_dir.glob("*.jpg"), key=lambda p: _sort_key(p.name))
+    if len(frames) < 2:
+        raise FileNotFoundError(f"need >=2 jpgs in {img_dir}, got {len(frames)}")
+    return [f"{a.stem}_to_{b.stem}" for a, b in zip(frames, frames[1:])]
+
+
+def generate_prompts_mock(project_dir: Path | str, style: str = "cinematic") -> dict[str, str]:
+    """Mock generator — writes prompts.json using the chosen style preset.
+
+    Every pair gets the same preset string (no per-image variation). Good
+    enough for CI + offline dev. No network, no API key required.
+    """
+    project_dir = Path(project_dir)
+    pairs = _pair_keys_for_project(project_dir)
+    preset = STYLE_PRESETS.get(style, FALLBACK_PROMPT)
+    out = {k: preset for k in pairs}
+    (project_dir / "prompts.json").write_text(json.dumps(out, indent=2))
+    return out
