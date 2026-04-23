@@ -459,5 +459,26 @@ def main():
     print(f"Done. {total} images in {OUT_DIR}")
 
 
+def run(src_dir=None, out_dir=None):
+    """Programmatic entry point used by the FastAPI backend.
+
+    Reassigns the module-level SRC_DIR/OUT_DIR/SCORES_PATH for the call and
+    restores them on exit so CLI behavior and process_single helpers
+    continue to work unchanged. The Phase 1 watermark_clean hook inside
+    process_single still fires after every save.
+    """
+    global SRC_DIR, OUT_DIR, SCORES_PATH
+    prev = (SRC_DIR, OUT_DIR, SCORES_PATH)
+    try:
+        if src_dir is not None:
+            SRC_DIR = str(src_dir)
+        if out_dir is not None:
+            OUT_DIR = str(out_dir)
+            SCORES_PATH = os.path.join(OUT_DIR, "scores.json")
+        main()
+    finally:
+        SRC_DIR, OUT_DIR, SCORES_PATH = prev
+
+
 if __name__ == "__main__":
     main()
