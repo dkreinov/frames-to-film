@@ -388,5 +388,24 @@ def main():
     print(f"Done. {ok}/{total} segments complete.")
 
 
+def run(img_dir=None, video_dir=None):
+    """Programmatic entry point used by the FastAPI backend.
+
+    Temporarily swaps module-level IMG_DIR/VID_DIR/STATUS_PATH for the
+    call and restores them after. CLI behavior unchanged.
+    """
+    global IMG_DIR, VID_DIR, STATUS_PATH
+    prev = (IMG_DIR, VID_DIR, STATUS_PATH)
+    try:
+        if img_dir is not None:
+            IMG_DIR = str(img_dir)
+        if video_dir is not None:
+            VID_DIR = str(video_dir)
+            STATUS_PATH = os.path.join(VID_DIR, "status.json")
+        main()
+    finally:
+        IMG_DIR, VID_DIR, STATUS_PATH = prev
+
+
 if __name__ == "__main__":
     main()
