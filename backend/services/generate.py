@@ -58,7 +58,8 @@ def run_generate(project_dir: Path, mode: str) -> dict:
 
     if mode == "api":
         from generate_all_videos import run as generate_run
-        generate_run(img_dir=img_dir, video_dir=video_dir)
+        # pass project_dir so run() picks up <project>/prompts.json if present
+        generate_run(img_dir=img_dir, video_dir=video_dir, project_dir=project_dir)
         return {"produced": [p.name for p in sorted(video_dir.glob("seg_*.mp4"))]}
 
     raise ValueError(f"unknown mode: {mode}")

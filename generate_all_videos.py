@@ -18,6 +18,11 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 _RUN_LOCK = threading.Lock()
 
+# Per-project prompt overrides loaded by run() from `<project>/prompts.json`.
+# When populated, lookups in main() prefer these over PAIR_PROMPTS.
+# Guarded by _RUN_LOCK so concurrent FastAPI api-mode jobs can't race.
+PROJECT_PROMPTS: dict = {}
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # Load root .env first (optional), then olga_movie .env (overrides)
 load_dotenv(os.path.join(SCRIPT_DIR, '..', '.env'))
@@ -253,7 +258,11 @@ def generate_pairs_for_sequence(
         out_path = os.path.join(video_dir, f"seg_{a_name}_to_{b_name}.mp4")
         path_a = os.path.join(image_dir, f_a)
         path_b = os.path.join(image_dir, f_b)
-        prompt = prompt_overrides.get(key) or PAIR_PROMPTS.get(key, FALLBACK_PROMPT)
+        prompt = (
+            prompt_overrides.get(key)
+            or PROJECT_PROMPTS.get(key)
+            or PAIR_PROMPTS.get(key, FALLBACK_PROMPT)
+        )
 
         task_id, err = submit_video(token, path_a, path_b, prompt)
         if not task_id:
@@ -361,7 +370,7 @@ def main():
         path_a = os.path.join(IMG_DIR, f_a)
         path_b = os.path.join(IMG_DIR, f_b)
 
-        prompt = PAIR_PROMPTS.get(key, FALLBACK_PROMPT)
+        prompt = PROJECT_PROMPTS.get(key) or PAIR_PROMPTS.get(key, FALLBACK_PROMPT)
         print(f"[{idx+1}/{len(pairs)}] {a_name} -> {b_name}", end=" ", flush=True)
 
         task_id, err = submit_video(token, path_a, path_b, prompt)
@@ -391,27 +400,45 @@ def main():
     print(f"Done. {ok}/{total} segments complete.")
 
 
-def run(img_dir=None, video_dir=None):
+def run(img_dir=None, video_dir=None, project_dir=None):
     """Programmatic entry point used by the FastAPI backend.
 
     Temporarily swaps module-level IMG_DIR/VID_DIR/STATUS_PATH for the
     call and restores them after. CLI behavior unchanged.
 
+    If `project_dir` is given and contains `prompts.json`, loads it into
+    the PROJECT_PROMPTS module global for the duration of main() so per-
+    project prompts take precedence over PAIR_PROMPTS during lookup.
+
     Serialised by _RUN_LOCK so concurrent FastAPI api-mode jobs can't
     race on the module globals.
     """
-    global IMG_DIR, VID_DIR, STATUS_PATH
+    global IMG_DIR, VID_DIR, STATUS_PATH, PROJECT_PROMPTS
     with _RUN_LOCK:
-        prev = (IMG_DIR, VID_DIR, STATUS_PATH)
+        prev_dirs = (IMG_DIR, VID_DIR, STATUS_PATH)
+        prev_prompts = PROJECT_PROMPTS
         try:
             if img_dir is not None:
                 IMG_DIR = str(img_dir)
             if video_dir is not None:
                 VID_DIR = str(video_dir)
                 STATUS_PATH = os.path.join(VID_DIR, "status.json")
+            if project_dir is not None:
+                pj = os.path.join(str(project_dir), "prompts.json")
+                if os.path.isfile(pj):
+                    try:
+                        with open(pj, "r", encoding="utf-8") as fh:
+                            loaded = json.load(fh)
+                        if isinstance(loaded, dict):
+                            PROJECT_PROMPTS = loaded
+                    except (json.JSONDecodeError, OSError):
+                        PROJECT_PROMPTS = {}
+                else:
+                    PROJECT_PROMPTS = {}
             main()
         finally:
-            IMG_DIR, VID_DIR, STATUS_PATH = prev
+            IMG_DIR, VID_DIR, STATUS_PATH = prev_dirs
+            PROJECT_PROMPTS = prev_prompts
 
 
 if __name__ == "__main__":
