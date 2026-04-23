@@ -1,0 +1,14 @@
+{
+  "status": "stitchmcp_generation_timed_out_after_1_attempt",
+  "attempts": [
+    {
+      "attempt": 1,
+      "model": "GEMINI_3_FLASH",
+      "device": "DESKTOP",
+      "prompt_length_chars": 256,
+      "result": "operation timed out; list_screens empty after"
+    }
+  ],
+  "retry_budget_exhausted_per_subplan": "1 attempt — matches the execution-log guidance from Upload sub-plan (Stitch generation is consistently timing out; a single fast attempt is the right budget).",
+  "fallback_in_effect": "hand-designed against the prose prompt in docs/design/phase_4_prepare_notes.md. docs/design.md remains the authoritative design system."
+}
