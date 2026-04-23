@@ -35,6 +35,9 @@ export const router = createBrowserRouter([
   },
   {
     path: '/projects/:projectId/generate',
-    element: <div className="p-8">Generate — coming in next sub-plan</div>,
+    lazy: async () => {
+      const mod = await import('./GenerateScreen')
+      return { Component: mod.default }
+    },
   },
 ])
