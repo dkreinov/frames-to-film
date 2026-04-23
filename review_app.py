@@ -26,6 +26,7 @@ from extend_image_judge import judge_extension as run_local_extension_judge
 from generate_all_videos import build_pairs_from_sequence, sort_key as natural_image_sort_key
 from image_pair_prompts import get_pair_prompt
 from outpaint_16_9 import TARGET_ASPECT_RATIO, choose_extension_prompt
+from watermark_clean import clean_if_enabled
 from redo_runner import (
     generate_automatic_retry_prompt,
     preview_redo_queue,
@@ -820,6 +821,7 @@ def run_extend_image_api(source_path: Path, target_path: Path, prompt: str) -> N
 
     target_path.parent.mkdir(parents=True, exist_ok=True)
     upscale_extend_result(result_image).save(target_path, format="JPEG", quality=95)
+    clean_if_enabled(target_path)
 
 
 def run_ai_face_judge(source_path: Path, target_path: Path) -> dict[str, str | int]:

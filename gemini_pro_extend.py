@@ -19,6 +19,8 @@ except ModuleNotFoundError as exc:
         "  C:\\Users\\nishtiak\\AppData\\Local\\Programs\\Python\\Python312\\python.exe -m pip install playwright\n"
     ) from exc
 
+from watermark_clean import clean_if_enabled
+
 
 ROOT_DIR = Path(__file__).resolve().parent
 DEFAULT_SOURCE_DIR = ROOT_DIR / "Olia_continue"
@@ -70,11 +72,13 @@ def save_download_as_source_type(download_path: Path, destination_path: Path) ->
         if image.mode not in {"RGB", "RGBA"}:
             image = image.convert("RGBA" if "A" in image.getbands() else "RGB")
         image.save(destination_path, format="PNG")
+        clean_if_enabled(destination_path)
         return
 
     if image.mode != "RGB":
         image = image.convert("RGB")
     image.save(destination_path, format="JPEG", quality=95)
+    clean_if_enabled(destination_path)
 
 
 def wait_for_login(page) -> None:

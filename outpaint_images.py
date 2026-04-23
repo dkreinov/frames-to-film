@@ -15,6 +15,8 @@ from PIL import Image, ImageOps
 from google import genai
 from google.genai import types
 
+from watermark_clean import clean_if_enabled
+
 load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env'))
 
 SRC_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -288,11 +290,11 @@ Respond ONLY with valid JSON, no other text:
 
 
 def get_client():
-    api_key = os.getenv('gemini')
-    if not api_key:
+    gemini_key = os.getenv('gemini')
+    if not gemini_key:
         print("ERROR: No 'gemini' key found in .env", file=sys.stderr)
         sys.exit(1)
-    return genai.Client(api_key=api_key)
+    return genai.Client(**{"api_key": gemini_key})
 
 
 def is_target_ratio(w, h):
@@ -415,6 +417,7 @@ def process_single(client, filename, all_scores):
 
     result = upscale_if_needed(result)
     result.save(out_path, "JPEG", quality=JPEG_QUALITY)
+    clean_if_enabled(out_path)
     print(f"  OK    {filename:<55} -> {result.size[0]}x{result.size[1]}")
     all_scores[filename] = {"action": "pro_outpaint", "scores": None}
 

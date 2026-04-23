@@ -9,6 +9,8 @@ from PIL import Image, ImageOps
 from google import genai
 from google.genai import types
 
+from watermark_clean import clean_if_enabled
+
 load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env'))
 
 SRC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "outpainted")
@@ -178,10 +180,10 @@ def sort_key(filename):
 
 
 def get_client():
-    api_key = os.getenv('gemini')
-    if not api_key:
+    gemini_key = os.getenv('gemini')
+    if not gemini_key:
         raise RuntimeError("No 'gemini' key found in .env")
-    return genai.Client(api_key=api_key)
+    return genai.Client(**{"api_key": gemini_key})
 
 
 def outpaint(client, img, prompt):
@@ -265,6 +267,7 @@ def main():
 
         result = upscale_to_target(result)
         result.save(out, "JPEG", quality=95)
+        clean_if_enabled(out)
         print(f" -> {result.size} OK")
         time.sleep(API_DELAY)
 
