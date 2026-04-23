@@ -40,4 +40,11 @@ export const router = createBrowserRouter([
       return { Component: mod.default }
     },
   },
+  {
+    path: '/projects/:projectId/review',
+    lazy: async () => {
+      const mod = await import('./ReviewScreen')
+      return { Component: mod.default }
+    },
+  },
 ])
