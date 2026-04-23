@@ -275,5 +275,24 @@ def main():
     print(f"\nDone. {done} images in {OUT_DIR}")
 
 
+def run(src_dir=None, out_dir=None):
+    """Programmatic entry point used by the FastAPI backend.
+
+    Temporarily swaps module-level SRC_DIR/OUT_DIR for the call so
+    main() and its helpers keep working unchanged. Phase 1
+    clean_if_enabled hook (line 270 inside main) still fires per save.
+    """
+    global SRC_DIR, OUT_DIR
+    prev = (SRC_DIR, OUT_DIR)
+    try:
+        if src_dir is not None:
+            SRC_DIR = str(src_dir)
+        if out_dir is not None:
+            OUT_DIR = str(out_dir)
+        main()
+    finally:
+        SRC_DIR, OUT_DIR = prev
+
+
 if __name__ == "__main__":
     main()
