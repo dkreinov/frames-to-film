@@ -9,6 +9,7 @@
  * any user input, the debounced PUT fires. We synthesise the order
  * change by re-rendering with a saved order from the server.
  */
+import { StrictMode } from 'react'
 import { describe, it, expect, beforeAll, afterEach, afterAll } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
@@ -103,5 +104,32 @@ describe('StoryboardScreen integration', () => {
     expect(labels[0]).toMatch(/Drag frame 1 \(3\.jpg\)/)
     expect(labels[1]).toMatch(/Drag frame 2 \(1\.jpg\)/)
     expect(labels[2]).toMatch(/Drag frame 3 \(2\.jpg\)/)
+  })
+
+  it('does NOT fire PUT /order on initial load under StrictMode (double-effect guard)', async () => {
+    // Regression: useDebouncedSave's skipNextNonNull ref must survive
+    // StrictMode's intentional double-mount/double-effect, otherwise the
+    // first non-null seed of `order` would be saved back to the server.
+    server.use(
+      http.get('http://127.0.0.1:8000/projects/:pid/order', () =>
+        HttpResponse.json({ order: ['2.jpg', '3.jpg', '1.jpg'] })
+      )
+    )
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <StrictMode>
+        <QueryClientProvider client={qc}>
+          <MemoryRouter initialEntries={['/projects/pid-int/storyboard']}>
+            <Routes>
+              <Route path="/projects/:projectId/storyboard" element={<StoryboardScreen />} />
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>
+      </StrictMode>
+    )
+    const drag = await screen.findAllByRole('button', { name: /^drag frame /i })
+    expect(drag.length).toBe(3)
+    await new Promise((r) => setTimeout(r, 500))
+    expect(putOrderCalls.length).toBe(0)
   })
 })

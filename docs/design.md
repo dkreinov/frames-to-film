@@ -207,6 +207,41 @@ These cannot change without updating every later sub-plan:
   sub-plans SHOULD consume these with different props instead of
   forking. Move them to `components/layout/` if any of those screens
   actually need them — for now the name is fine.
+- **Frame ordering precedence** (introduced by Storyboard sub-plan).
+  All downstream stages that consume `<project>/kling_test/*.jpg` MUST
+  honour the user's saved Storyboard order if present:
+
+  1. If `<project>/order.json` exists and is `{order: string[]}`,
+     filter to filenames that still exist on disk and use that.
+  2. Otherwise fall back to numeric-prefix sort (`_sort_key`).
+
+  Implemented in `backend/services/generate.py::_ordered_frames` and in
+  `generate_all_videos.py` via the `PROJECT_ORDER` global swapped under
+  `_RUN_LOCK` (mirrors `PROJECT_PROMPTS`). Stitch / Review sub-plans
+  must reuse `_ordered_frames` rather than re-globbing.
+- **Drag-and-drop pattern** (introduced by Storyboard sub-plan).
+  `@dnd-kit/core + /sortable + /utilities` with
+  `PointerSensor({ activationConstraint: { distance: 4 } })` +
+  `KeyboardSensor`, `SortableContext` with `rectSortingStrategy`, and
+  `arrayMove` on `onDragEnd`. Per-item drag handles must carry an
+  `aria-label` matching `/^Drag frame \d+ \(.+\)\./` so Playwright +
+  Testing Library can target them by role+name. Any future sortable
+  surface (Review re-order, Settings) reuses these primitives instead
+  of re-picking a DnD library.
+- **`useDebouncedSave` hook** (introduced by Storyboard sub-plan,
+  `frontend/src/routes/useDebouncedSave.ts`). Signature
+  `useDebouncedSave<T>(value: T | null, delayMs, save)`. Skips entirely
+  while `value === null`; uses a `skipNextNonNull` ref to drop the
+  first non-null transition (the server-load echo) so the initial seed
+  never PUTs back. Verified safe under React `<StrictMode>` by
+  integration test. Generate / Review must use this exact hook for any
+  debounced PUT instead of rolling their own.
+- **`PUT/GET /projects/{id}/order`** (introduced by Storyboard
+  sub-plan). Body: `{order: string[]}` (non-empty, all strings).
+  Persists to `<project>/order.json`. `GET` returns 404 before first
+  PUT (front-end translates to `null`). Owner-scoped (404 if the
+  project belongs to another `user_id`). No legacy fallback —
+  consumers must accept the 404 → null mapping.
 
 ## Decisions log
 
