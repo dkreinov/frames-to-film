@@ -21,6 +21,15 @@ round-trips through a real Playwright E2E.
   `erasableSyntaxOnly` + `noUnusedLocals`.
 - Golden screenshots captured under `docs/design/golden/`.
 
+**Correction (2026-04-23, Prepare sub-plan):** the Upload sub-plan's
+"Step 9 commit" staged the golden PNGs but `git add` silently dropped
+them due to a repo-level `*.png` gitignore rule. The PNGs existed on
+disk and Playwright produced them, but they were never tracked.
+`.gitignore` was fixed in the Prepare sub-plan (exception for
+`!docs/design/golden/**`) and all goldens re-added to the index.
+Lesson for future sub-plans: after `git add`, run
+`git ls-files <paths>` to verify actual tracking.
+
 ## Decisions taken autonomously
 
 - **Stack:** see decisions log in `docs/design.md`. Locked for all 5 screens.

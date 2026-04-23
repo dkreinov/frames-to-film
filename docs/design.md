@@ -179,6 +179,34 @@ These cannot change without updating every later sub-plan:
   `frontend/src/api/types.ts`.
 - Shared layout components in `frontend/src/components/layout/`.
 - Wizard ordering (Upload → Prepare → Storyboard → Generate → Review).
+- **Stage-job polling pattern** (introduced by Prepare sub-plan):
+
+  ```ts
+  const jobQuery = useQuery({
+    queryKey: ['job', projectId, jobId],
+    queryFn: () => getJob(projectId, jobId!),
+    enabled: !!jobId,
+    refetchInterval: (q) => {
+      const s = q.state.data?.status
+      return s === 'done' || s === 'error' ? false : 2000
+    },
+  })
+
+  // Surface POST-side errors too — otherwise the spinner stalls forever:
+  const status: 'pending' | 'running' | 'done' | 'error' =
+    startMutation.isError ? 'error' : (jobQuery.data?.status ?? 'pending')
+  ```
+
+  Every wizard screen that drives a `POST /stage` + polls
+  `GET /jobs/{id}` MUST use this exact pattern. The
+  `startMutation.isError` branch is not optional — without it, a 5xx on
+  the initial POST strands the user on the spinner.
+- **Generic reusable components** (introduced by Prepare sub-plan):
+  `JobProgressCard` + `OutputsGrid` under
+  `frontend/src/components/prepare/`. Storyboard / Generate / Review
+  sub-plans SHOULD consume these with different props instead of
+  forking. Move them to `components/layout/` if any of those screens
+  actually need them — for now the name is fine.
 
 ## Decisions log
 

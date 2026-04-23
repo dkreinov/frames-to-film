@@ -90,4 +90,18 @@ describe('PrepareScreen integration', () => {
     expect(await screen.findByRole('alert', {}, { timeout: 5_000 })).toBeInTheDocument()
     expect(screen.getByText(/outpainted dir missing/i)).toBeInTheDocument()
   })
+
+  it('surfaces POST /prepare 5xx to the error card (advisor-flagged bug)', async () => {
+    // Regression: if POST /prepare fails, jobId stays null, the jobs poll is
+    // disabled, and the old code stalled at the spinner forever. Fixed by
+    // treating startMutation.isError as status='error'.
+    server.use(
+      http.post('http://127.0.0.1:8000/projects/:pid/prepare', () =>
+        HttpResponse.text('boom', { status: 500 })
+      )
+    )
+    renderAt()
+    expect(await screen.findByRole('alert', {}, { timeout: 5_000 })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument()
+  })
 })

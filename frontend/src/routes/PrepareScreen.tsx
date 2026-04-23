@@ -46,7 +46,8 @@ export default function PrepareScreen() {
     enabled: jobQuery.data?.status === 'done',
   })
 
-  const status = jobQuery.data?.status ?? 'pending'
+  const status: 'pending' | 'running' | 'done' | 'error' =
+    startMutation.isError ? 'error' : (jobQuery.data?.status ?? 'pending')
   const names = outputsQuery.data?.outputs ?? []
 
   const retry = () => {
