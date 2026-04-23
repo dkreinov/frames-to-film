@@ -1,0 +1,36 @@
+{
+  "status": "stitchmcp_generation_timed_out_after_4_attempts",
+  "service_reachable": true,
+  "service_reachable_evidence": "mcp__StitchMCP__list_projects returned 111k chars of project history; mcp__StitchMCP__create_project succeeded and returned resource name projects/10276889797068420736",
+  "stitch_project_resource": "projects/10276889797068420736",
+  "stitch_project_title": "olga_movie Phase 4 Frontend",
+  "attempts": [
+    {
+      "attempt": 1,
+      "model": "GEMINI_3_1_PRO",
+      "device": "DESKTOP",
+      "prompt_length_chars": 1547,
+      "result": "operation timed out; list_screens empty after"
+    },
+    {
+      "attempt": 2,
+      "model": "GEMINI_3_FLASH",
+      "device": "DESKTOP",
+      "prompt_length_chars": 510,
+      "result": "operation timed out; list_screens empty after"
+    },
+    {
+      "attempt": 3,
+      "model": "GEMINI_3_FLASH",
+      "device": "DESKTOP",
+      "prompt_length_chars": 210,
+      "result": "operation timed out; list_screens empty after"
+    },
+    {
+      "attempt": 4,
+      "note": "list_screens probed again with no further generate calls — still empty. Confirms that earlier timeouts did not asynchronously complete."
+    }
+  ],
+  "fallback_in_effect": "hand-designed implementation per the prose design prompt in docs/design/phase_4_upload_notes.md, which is the design-of-record for Step 4. docs/design.md is the authoritative frontend design system.",
+  "retry_policy_for_later_subplans": "re-attempt Stitch generation with the Prepare / Storyboard / Generate / Review / Settings screens. If Stitch produces a screen, capture its name under a screens[] array in this file and cross-reference from the sub-plan. If it fails again, proceed with hand-design. Do not block a sub-plan on Stitch availability."
+}
