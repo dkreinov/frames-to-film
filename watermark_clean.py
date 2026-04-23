@@ -28,6 +28,7 @@ DEFAULT_CLI = r"D:\Programming\claude\watermark-env\Scripts\gemini-watermark.exe
 _LOG_PREFIX = "[watermark_clean]"
 _RETRY_BACKOFF_S = 0.5
 _MAX_CALLS = 2  # 1 initial attempt + 1 retry
+_SUBPROCESS_TIMEOUT_S = 60  # real cleaner runs in ~1s; guards against hangs in batch runs
 
 
 def _log(msg: str) -> None:
@@ -60,16 +61,21 @@ def clean_if_enabled(path: Path | str) -> Path:
 
     last_err: str | None = None
     for attempt in range(1, _MAX_CALLS + 1):
-        result = subprocess.run(
-            [cli, "-i", str(p), "-o", str(p)],
-            capture_output=True,
-        )
-        if result.returncode == 0:
-            return p
-        last_err = (
-            (getattr(result, "stderr", b"") or b"").decode(errors="replace").strip()
-            or f"exit={result.returncode}"
-        )
+        try:
+            result = subprocess.run(
+                [cli, "-i", str(p), "-o", str(p)],
+                capture_output=True,
+                timeout=_SUBPROCESS_TIMEOUT_S,
+            )
+        except subprocess.TimeoutExpired:
+            last_err = f"timeout after {_SUBPROCESS_TIMEOUT_S}s"
+        else:
+            if result.returncode == 0:
+                return p
+            last_err = (
+                (getattr(result, "stderr", b"") or b"").decode(errors="replace").strip()
+                or f"exit={result.returncode}"
+            )
         if attempt < _MAX_CALLS:
             time.sleep(_RETRY_BACKOFF_S)
 

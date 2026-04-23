@@ -142,3 +142,47 @@ class TestCleanIfEnabled:
         assert mock_run.call_count == 0
         captured = capsys.readouterr()
         assert "[watermark_clean]" in captured.err
+
+    def test_case_7_timeout_then_success_retries(
+        self, image_file: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Case 7a: first call raises TimeoutExpired, second call returns 0 → 2 calls, returns path."""
+        from watermark_clean import clean_if_enabled
+
+        monkeypatch.setenv("WATERMARK_CLEAN", "auto")
+        timeout_exc = subprocess.TimeoutExpired(cmd=["cli"], timeout=60)
+        with patch("watermark_clean.shutil.which", return_value=r"C:\fake\cli.exe"):
+            with patch(
+                "watermark_clean.subprocess.run",
+                side_effect=[timeout_exc, _mock_run_rc(0)],
+            ) as mock_run:
+                result = clean_if_enabled(image_file)
+
+        assert result == image_file
+        assert mock_run.call_count == 2
+
+    def test_case_7b_timeout_both_is_fail_soft(
+        self,
+        image_file: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Case 7b: both calls raise TimeoutExpired → warning logged, exactly 2 calls, returns path."""
+        from watermark_clean import clean_if_enabled
+
+        monkeypatch.setenv("WATERMARK_CLEAN", "auto")
+        original_bytes = image_file.read_bytes()
+        timeout_exc = subprocess.TimeoutExpired(cmd=["cli"], timeout=60)
+        with patch("watermark_clean.shutil.which", return_value=r"C:\fake\cli.exe"):
+            with patch(
+                "watermark_clean.subprocess.run",
+                side_effect=[timeout_exc, timeout_exc],
+            ) as mock_run:
+                result = clean_if_enabled(image_file)
+
+        assert result == image_file
+        assert mock_run.call_count == 2
+        assert image_file.read_bytes() == original_bytes
+        captured = capsys.readouterr()
+        assert "[watermark_clean]" in captured.err
+        assert "timeout" in captured.err.lower()

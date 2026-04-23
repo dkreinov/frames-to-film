@@ -178,6 +178,13 @@ Legacy companion:
 - `legacy/image_prep/prepare_images.py` remains as a blur-pad fallback and quick preview path.
 - It is not the preferred path for the movie flow because blur-padded edges can create transition artifacts in Kling.
 
+Watermark cleaning:
+- Every Gemini-produced save in `outpaint_images.py` is routed through
+  `watermark_clean.clean_if_enabled(path)` before the file is handed off.
+- Cleaner is in-place, fail-soft, opt-out via `WATERMARK_CLEAN=off`.
+- Detection is dimension-gated to Gemini's standard `1376×768`; other
+  sizes (e.g. GPT outputs) pass through unmodified.
+
 ### Stage 3: 16:9 Story Frame Expansion
 
 Primary script: `outpaint_16_9.py`
@@ -196,6 +203,13 @@ Output:
 Important note:
 - This stage is prompt-driven and does not include a checked-in judge loop.
 - Retry behavior here is manual or ad hoc, based on rerunning a failed frame with a modified prompt.
+
+Watermark cleaning:
+- Every Gemini save in `outpaint_16_9.py`, `gemini_pro_extend.py`
+  (both PNG and JPEG branches), and the `review_app.py` extend step
+  is routed through `watermark_clean.clean_if_enabled(path)`.
+- Same contract as Stage 2: in-place, fail-soft, opt-out via
+  `WATERMARK_CLEAN=off`, 60 s subprocess timeout, one automatic retry.
 
 ### Stage 4: Kling Clip Generation
 
