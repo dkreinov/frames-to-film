@@ -278,6 +278,41 @@ These cannot change without updating every later sub-plan:
   `'idle' | 'running' | 'done' | 'error'` — NOT the auto-start
   pattern's `'pending'`. Review / Settings must pick the shape
   that matches whether the stage auto-starts; don't mix.
+- **`GET /projects/{id}/segments`** (introduced by Review sub-plan).
+  Returns `{segments: [{seg_id, verdict, notes, updated_at}]}`
+  sorted by `seg_id`. Empty list when no reviews exist (200, not
+  404). Owner-scoped.
+- **`seg_id` canonical form** (introduced by Review sub-plan):
+  `seg_<pair_key>`, e.g. `seg_1_to_2`. Matches the produced video
+  filename stem. Review's POST/GET, and anything future that
+  touches segments, MUST use this form.
+- **Verdict POST-then-update pattern** (introduced by Review
+  sub-plan). Local verdict state updates ONLY inside
+  `mutation.onSuccess`. Rejections leave the UI unchanged — no
+  optimistic-then-rollback. Prevents phantom verdicts on 5xx.
+  Required test: a mutation that rejects + asserts
+  `aria-pressed` stays false.
+- **`setState`-during-render seed-once pattern** (introduced by
+  Review sub-plan). For "seed local state once from a server query,
+  never again" workflows, use:
+  ```tsx
+  const [seeded, setSeeded] = useState(false)
+  if (!seeded && query.data) {
+    setLocal(derive(query.data))
+    setSeeded(true)
+  }
+  ```
+  REQUIRED: a regression test that calls
+  `qc.refetchQueries({ queryKey })`, awaits the mock to be called
+  a second time, and asserts local state survives the refetch.
+  Without that harness, a future refactor to `useEffect` with
+  wrong deps can silently regress.
+- **Download-via-`<a href download>`** (introduced by Review
+  sub-plan). For one-shot file downloads, use a plain anchor
+  styled with `buttonVariants({variant:'default', size:'lg'})`
+  pointing at a backend URL that sets `Content-Disposition`. Do
+  NOT wrap in `<Button>` + blob fetch unless a progress overlay
+  or filename override is required.
 
 ## Decisions log
 
