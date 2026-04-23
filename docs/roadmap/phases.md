@@ -19,7 +19,7 @@ Each phase gets its own saved plan at `docs/roadmap/phase_<N>_plan.md` (created 
 | 1 | Gemini watermark cleaner integration | done | — | Wire `gemini-watermark.exe` into every Gemini output (API + web paths). |
 | 2 | FastAPI engine + mock mode + project isolation | done | 1 | Wrap scripts in HTTP API. Add `GENERATION_MODE=api\|web\|mock`. Per-project state. |
 | 3 | De-Olga prompt library | done | 2 | Replace hardcoded `PAIR_PROMPTS` with per-project JSON auto-generated from image pairs. Style presets. |
-| 4 | Stitch-designed React commercial UI | pending | 2, 3 | 5 screens via `/stitch-design` → shadcn/ui React → FastAPI. |
+| 4 | Stitch-designed React commercial UI | in-progress | 2, 3 | 5 screens via `/stitch-design` → shadcn/ui React → FastAPI. Sub-plan 1 (Upload) done; 4 remaining. |
 | 5 | Free web-mode video generation | pending | 1, 2 | Playwright adapter for Veo (Gemini Pro web) or Minimax. |
 | 6 | Full E2E + polish + ship | pending | 4, 5 | Playwright E2E in mock mode, Claude-in-Chrome smoke, deploy. |
 

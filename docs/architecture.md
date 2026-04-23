@@ -14,6 +14,14 @@
 > stage consults `<project>/prompts.json` before `PAIR_PROMPTS` before
 > `FALLBACK_PROMPT`. Olga's `PAIR_PROMPTS` kept in place for the legacy
 > CLI flow; Phase 6 retires it. See `docs/roadmap/phase_3_execution.md`.
+>
+> **Phase 4 Upload sub-plan update (2026-04-23):** React frontend
+> scaffolded at `frontend/` (Vite + TS + Tailwind v4 + shadcn/ui +
+> TanStack Query). Upload screen complete end-to-end (vitest + MSW
+> integration + Playwright E2E + golden screenshots). 4 screens remain
+> (Prepare, Storyboard, Generate, Review+Export, Settings), each
+> shipping as its own sub-plan. See `docs/frontend-architecture.md` +
+> `docs/design.md` + `docs/roadmap/phase_4_upload_execution.md`.
 
 ## Goal
 

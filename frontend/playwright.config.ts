@@ -19,8 +19,9 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command:
-        '"C:/Users/nishtiak/AppData/Local/Programs/Python/Python312/python.exe" -m uvicorn backend.main:app --host 127.0.0.1 --port 8000',
+      // Override via OLGA_PYTHON env var if your Python isn't on PATH.
+      // e.g. OLGA_PYTHON=C:/path/to/python.exe npx playwright test
+      command: `${process.env.OLGA_PYTHON ?? 'python'} -m uvicorn backend.main:app --host 127.0.0.1 --port 8000`,
       cwd: '..',
       port: 8000,
       reuseExistingServer: !process.env.CI,

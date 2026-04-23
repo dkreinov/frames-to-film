@@ -189,4 +189,5 @@ These cannot change without updating every later sub-plan:
 | 2026-04-23 | React Router (not Next.js / Remix) | Single-page wizard; no SSR needed; smaller dep footprint. |
 | 2026-04-23 | TanStack Query only (no Zustand) | All state is server-owned; local state fits `useState`. |
 | 2026-04-23 | Shadcn "new-york" style, zinc base | Most neutral; suits the "calm and serious" principle. |
-| 2026-04-23 | pnpm preferred, npm fallback | pnpm faster; npm available on Windows PATH. |
+| 2026-04-23 | pnpm preferred, npm fallback | pnpm faster; npm available on Windows PATH. Phase 4 shipped on npm because pnpm was not on PATH — document over reinstall. |
+| 2026-04-23 | `OLGA_PYTHON` env var overrides Playwright's `python` command | Windows dev may have Python installed outside PATH; playwright.config.ts falls back to `process.env.OLGA_PYTHON ?? 'python'`. |

@@ -5,9 +5,11 @@ export const API_BASE =
   'http://127.0.0.1:8000'
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string) {
+  status: number
+  constructor(status: number, message: string) {
     super(message)
     this.name = 'ApiError'
+    this.status = status
   }
 }
 
