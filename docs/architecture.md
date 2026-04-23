@@ -7,6 +7,13 @@
 > zero-API-cost E2E. The Streamlit `review_app.py` runs untouched alongside.
 > See `docs/backend-api.md` and `docs/roadmap/phase_2_execution.md` for
 > endpoint details and Phase-3 caveats.
+>
+> **Phase 3 update (2026-04-23):** per-project prompt auto-generation.
+> Two new endpoints (`POST /prompts/generate`, `GET /prompts`) + 4 style
+> presets (`cinematic`, `nostalgic`, `vintage`, `playful`). Generate
+> stage consults `<project>/prompts.json` before `PAIR_PROMPTS` before
+> `FALLBACK_PROMPT`. Olga's `PAIR_PROMPTS` kept in place for the legacy
+> CLI flow; Phase 6 retires it. See `docs/roadmap/phase_3_execution.md`.
 
 ## Goal
 

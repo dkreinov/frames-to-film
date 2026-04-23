@@ -27,6 +27,8 @@ uvicorn backend.main:app --host 127.0.0.1 --port 8000
 | DELETE | `/projects/{id}/uploads/{filename}` | Remove an upload |
 | POST | `/projects/{id}/prepare` | Stage 1: 4:3 normalize (mode: mock\|api) |
 | POST | `/projects/{id}/extend` | Stage 2: 4:3 → 16:9 (mode: mock\|api) |
+| POST | `/projects/{id}/prompts/generate` | Stage 2.5: per-project prompt auto-gen (mode: mock\|api, style: cinematic\|nostalgic\|vintage\|playful) |
+| GET | `/projects/{id}/prompts` | Read `<project>/prompts.json` as `{pair_key: prompt}` |
 | POST | `/projects/{id}/generate` | Stage 3: video pair synthesis (mode: mock\|api) |
 | POST | `/projects/{id}/segments/{seg_id}/review` | Mark verdict winner\|redo\|bad |
 | POST | `/projects/{id}/stitch` | Stage 4: concat → full_movie.mp4 |
@@ -40,6 +42,17 @@ Stage endpoints accept `{"mode": "mock"|"api"}`.
 
 - **mock** — copies `tests/fixtures/fake_project/frame_*_gemini.png` → outpainted/*.jpg, then progressively builds downstream artifacts (ffmpeg stubs for videos). Zero API cost, deterministic, offline. Used by tests and the CI E2E smoke.
 - **api** — delegates to the existing pipeline scripts (`outpaint_images.run`, `outpaint_16_9.run`, `generate_all_videos.run`, `concat_videos.run`). Requires `gemini` key for image stages and `KLING_*_ACCESS_KEY` / `KLING_*_SECRET_KEY` for the generate stage. See caveats in `docs/roadmap/phase_2_execution.md`.
+
+## Prompt precedence (Phase 3)
+
+When the generate stage looks up a pair's prompt, it consults in order:
+
+1. `prompt_overrides` kwarg passed to `generate_pairs_for_sequence` (in-memory)
+2. `PROJECT_PROMPTS` — loaded from `<project>/prompts.json` inside `run()` under `_RUN_LOCK`
+3. `PAIR_PROMPTS` — Olga's canonical dict (backward compat for the Olga-movie CLI)
+4. `FALLBACK_PROMPT` — generic camera-first sentence
+
+Style presets live in `backend/services/prompts.py`: `cinematic`, `nostalgic`, `vintage`, `playful`. Mock mode expands the chosen preset across every pair; API mode calls `gemini-2.0-flash` per pair with both frames + style hint, falling back to the preset on any per-call error.
 
 ## Contracts
 
