@@ -1,0 +1,8 @@
+{
+  "status": "stitchmcp_generation_timed_out_after_1_attempt",
+  "attempts": [
+    { "attempt": 1, "model": "GEMINI_3_FLASH", "device": "DESKTOP", "result": "operation timed out; list_screens empty after" }
+  ],
+  "service_state": "list_screens reachable; generate_screen_from_text consistently times out across 3 sub-plans now (Upload, Prepare, Storyboard)",
+  "fallback": "hand-designed against the prose prompt in docs/design/phase_4_storyboard_notes.md."
+}
