@@ -69,6 +69,45 @@ export async function startPrepare(
   )
 }
 
+export async function startExtend(
+  projectId: string,
+  mode: 'mock' | 'api' = 'mock'
+): Promise<JobRef> {
+  return parse<JobRef>(
+    await fetch(`${API_BASE}/projects/${projectId}/extend`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode }),
+    })
+  )
+}
+
+export async function saveProjectOrder(
+  projectId: string,
+  order: string[]
+): Promise<{ order: string[] }> {
+  return parse<{ order: string[] }>(
+    await fetch(`${API_BASE}/projects/${projectId}/order`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order }),
+    })
+  )
+}
+
+export async function getProjectOrder(
+  projectId: string
+): Promise<string[] | null> {
+  const res = await fetch(`${API_BASE}/projects/${projectId}/order`)
+  if (res.status === 404) return null
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new ApiError(res.status, `${res.status}: ${text}`)
+  }
+  const body = (await res.json()) as { order: string[] }
+  return body.order
+}
+
 export async function listStageOutputs(
   projectId: string,
   stage: string

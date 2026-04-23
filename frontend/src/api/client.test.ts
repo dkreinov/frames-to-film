@@ -17,8 +17,11 @@ import {
   uploadFile,
   ApiError,
   startPrepare,
+  startExtend,
   listStageOutputs,
   artifactUrl,
+  saveProjectOrder,
+  getProjectOrder,
 } from './client'
 
 const server = setupServer(
@@ -111,5 +114,40 @@ describe('api client', () => {
     expect(artifactUrl('p', 'outpainted', 'a b.jpg')).toBe(
       'http://127.0.0.1:8000/projects/p/artifacts/outpainted/a%20b.jpg'
     )
+  })
+
+  it('startExtend posts {mode} and returns a job_id', async () => {
+    server.use(
+      http.post('http://127.0.0.1:8000/projects/:pid/extend', async ({ request }) => {
+        const body = (await request.json()) as { mode: string }
+        return HttpResponse.json({ job_id: `xid-${body.mode}` }, { status: 202 })
+      })
+    )
+    const r = await startExtend('abc', 'mock')
+    expect(r.job_id).toBe('xid-mock')
+  })
+
+  it('saveProjectOrder PUTs the order and returns the saved list', async () => {
+    server.use(
+      http.put('http://127.0.0.1:8000/projects/:pid/order', async ({ request }) => {
+        const body = (await request.json()) as { order: string[] }
+        return HttpResponse.json({ order: body.order })
+      })
+    )
+    const r = await saveProjectOrder('abc', ['1.jpg', '3.jpg', '2.jpg'])
+    expect(r.order).toEqual(['1.jpg', '3.jpg', '2.jpg'])
+  })
+
+  it('getProjectOrder returns the saved list or null on 404', async () => {
+    server.use(
+      http.get('http://127.0.0.1:8000/projects/abc/order', () =>
+        HttpResponse.json({ order: ['1.jpg', '2.jpg'] })
+      ),
+      http.get('http://127.0.0.1:8000/projects/none/order', () =>
+        HttpResponse.text('nope', { status: 404 })
+      )
+    )
+    expect(await getProjectOrder('abc')).toEqual(['1.jpg', '2.jpg'])
+    expect(await getProjectOrder('none')).toBeNull()
   })
 })
