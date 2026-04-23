@@ -1,0 +1,16 @@
+"""Step 2: health endpoint contract (TDD red).
+
+`GET /health` returns `{"status": "ok"}` with HTTP 200.
+"""
+from __future__ import annotations
+
+from fastapi.testclient import TestClient
+
+from backend.main import app
+
+
+def test_health_returns_ok() -> None:
+    client = TestClient(app)
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
