@@ -3,6 +3,7 @@
 import os
 import sys
 import re
+import threading
 import time
 import hmac
 import hashlib
@@ -14,6 +15,8 @@ from dotenv import load_dotenv
 from image_pair_prompts import PAIR_PROMPTS, FALLBACK_PROMPT
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+_RUN_LOCK = threading.Lock()
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # Load root .env first (optional), then olga_movie .env (overrides)
@@ -97,8 +100,8 @@ def get_kling_credentials():
 def get_jwt():
     ak, sk = get_kling_credentials()
     if not ak or not sk:
-        sys.exit(
-            "ERROR: Set KLING_ACTIVE=4 with KLING_4_ACCESS_KEY/KLING_4_SECRET_KEY, "
+        raise RuntimeError(
+            "Set KLING_ACTIVE=4 with KLING_4_ACCESS_KEY/KLING_4_SECRET_KEY, "
             "or set KLING_ACCESS_KEY/KLING_SECRET_KEY in .env."
         )
 
@@ -393,18 +396,22 @@ def run(img_dir=None, video_dir=None):
 
     Temporarily swaps module-level IMG_DIR/VID_DIR/STATUS_PATH for the
     call and restores them after. CLI behavior unchanged.
+
+    Serialised by _RUN_LOCK so concurrent FastAPI api-mode jobs can't
+    race on the module globals.
     """
     global IMG_DIR, VID_DIR, STATUS_PATH
-    prev = (IMG_DIR, VID_DIR, STATUS_PATH)
-    try:
-        if img_dir is not None:
-            IMG_DIR = str(img_dir)
-        if video_dir is not None:
-            VID_DIR = str(video_dir)
-            STATUS_PATH = os.path.join(VID_DIR, "status.json")
-        main()
-    finally:
-        IMG_DIR, VID_DIR, STATUS_PATH = prev
+    with _RUN_LOCK:
+        prev = (IMG_DIR, VID_DIR, STATUS_PATH)
+        try:
+            if img_dir is not None:
+                IMG_DIR = str(img_dir)
+            if video_dir is not None:
+                VID_DIR = str(video_dir)
+                STATUS_PATH = os.path.join(VID_DIR, "status.json")
+            main()
+        finally:
+            IMG_DIR, VID_DIR, STATUS_PATH = prev
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@
 """Outpaint all numbered 4:3 images to 16:9 using Gemini Pro for Kling AI video generation."""
 import os
 import re
+import threading
 import time
 from io import BytesIO
 from dotenv import load_dotenv
@@ -10,6 +11,8 @@ from google import genai
 from google.genai import types
 
 from watermark_clean import clean_if_enabled
+
+_RUN_LOCK = threading.Lock()
 
 load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env'))
 
@@ -281,17 +284,21 @@ def run(src_dir=None, out_dir=None):
     Temporarily swaps module-level SRC_DIR/OUT_DIR for the call so
     main() and its helpers keep working unchanged. Phase 1
     clean_if_enabled hook (line 270 inside main) still fires per save.
+
+    Serialised by _RUN_LOCK so concurrent FastAPI api-mode jobs can't
+    race on the module globals.
     """
     global SRC_DIR, OUT_DIR
-    prev = (SRC_DIR, OUT_DIR)
-    try:
-        if src_dir is not None:
-            SRC_DIR = str(src_dir)
-        if out_dir is not None:
-            OUT_DIR = str(out_dir)
-        main()
-    finally:
-        SRC_DIR, OUT_DIR = prev
+    with _RUN_LOCK:
+        prev = (SRC_DIR, OUT_DIR)
+        try:
+            if src_dir is not None:
+                SRC_DIR = str(src_dir)
+            if out_dir is not None:
+                OUT_DIR = str(out_dir)
+            main()
+        finally:
+            SRC_DIR, OUT_DIR = prev
 
 
 if __name__ == "__main__":

@@ -5,8 +5,11 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 import urllib.request
 import zipfile
+
+_RUN_LOCK = threading.Lock()
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 IMG_DIR = os.path.join(SCRIPT_DIR, "kling_test")
@@ -133,7 +136,7 @@ def main():
         print("ffmpeg not found and auto-download failed. Install ffmpeg and run again.", file=sys.stderr)
         print(f"  cd {VID_DIR}")
         print(f"  ffmpeg -y -f concat -safe 0 -i concat_list.txt -c copy full_movie.mp4")
-        sys.exit(1)
+        raise RuntimeError("ffmpeg not found and auto-download failed")
     cmd = [
         ffmpeg_exe, "-y", "-f", "concat", "-safe", "0",
         "-i", list_path,
@@ -199,20 +202,24 @@ def run(img_dir=None, video_dir=None, output_file=None):
 
     Swaps module-level IMG_DIR/VID_DIR/OUTPUT_FILE for the call and
     restores them after, so main() and CLI behavior remain unchanged.
+
+    Serialised by _RUN_LOCK so concurrent FastAPI api-mode jobs can't
+    race on the module globals.
     """
     global IMG_DIR, VID_DIR, OUTPUT_FILE
-    prev = (IMG_DIR, VID_DIR, OUTPUT_FILE)
-    try:
-        if img_dir is not None:
-            IMG_DIR = str(img_dir)
-        if video_dir is not None:
-            VID_DIR = str(video_dir)
-            OUTPUT_FILE = os.path.join(VID_DIR, "full_movie.mp4")
-        if output_file is not None:
-            OUTPUT_FILE = str(output_file)
-        main()
-    finally:
-        IMG_DIR, VID_DIR, OUTPUT_FILE = prev
+    with _RUN_LOCK:
+        prev = (IMG_DIR, VID_DIR, OUTPUT_FILE)
+        try:
+            if img_dir is not None:
+                IMG_DIR = str(img_dir)
+            if video_dir is not None:
+                VID_DIR = str(video_dir)
+                OUTPUT_FILE = os.path.join(VID_DIR, "full_movie.mp4")
+            if output_file is not None:
+                OUTPUT_FILE = str(output_file)
+            main()
+        finally:
+            IMG_DIR, VID_DIR, OUTPUT_FILE = prev
 
 
 if __name__ == "__main__":

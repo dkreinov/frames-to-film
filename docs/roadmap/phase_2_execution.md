@@ -38,34 +38,31 @@ runs untouched alongside — FastAPI is additive.
 
 ## Findings for Phase 3
 
-### Phase 3 must tackle (surfaced by advisor review)
+### Phase 2 blockers — resolved 2026-04-23 (post-phase hotfix)
 
-1. **`sys.exit(1)` in `get_client()` will crash the uvicorn worker.**
-   Both `outpaint_images.py:292-297` and `outpaint_16_9.py`'s equivalent
-   call `sys.exit(1)` on a missing `gemini` env var. `SystemExit` does
-   *not* inherit from `Exception`, so `run_job_sync`'s
-   `except Exception:` (in `backend/services/jobs.py`) does NOT catch
-   it. An api-mode `POST /prepare` on a server without `gemini` set will
-   terminate the FastAPI process.
-   - **Fix sketch (Phase 3):** replace `sys.exit(1)` with
-     `raise RuntimeError("missing 'gemini' key")`; optionally also
-     `except (Exception, SystemExit) as exc` in `run_job_sync`.
-   - **Why Phase 2 didn't hit it:** mock-mode paths lazy-import
-     `outpaint_images.run` only inside the `api` branch, so tests
-     never invoke `get_client()`.
+The two api-mode blockers called out below were fixed out-of-phase
+(separate hotfix commit) after Phase 2 close-out, because leaving them
+to rot until Phase 3 would have made api-mode untestable in any
+integration environment. See `tests/backend/test_script_errors.py` and
+`tests/backend/test_script_threadsafe.py` for the pins.
 
-2. **Module-global swap in `run()` is not thread-safe.**
-   Every script's `run()` helper does
-   `global SRC_DIR, OUT_DIR; prev = (...); try: SRC_DIR = ...; main(); finally: restore`.
-   FastAPI `BackgroundTasks` execute in a thread pool; two concurrent
-   api-mode jobs on two different projects would race on module globals
-   — one thread's `finally` restores mid-flight of the other's `main()`.
-   - **Fix sketch (Phase 3):** either thread the paths through as
-     explicit parameters down into the helpers (`process_single`,
-     `main` loops), OR gate `run()` with a module-level
-     `threading.Lock` (cheap, preserves refactor minimalism).
-   - **Why Phase 2 didn't hit it:** `TestClient` serializes requests,
-     and mock-mode doesn't enter the legacy `main()` body at all.
+1. **~~`sys.exit(1)` will crash the uvicorn worker~~ → raises RuntimeError.**
+   Three sites found (advisor flagged one; grep caught two more):
+   - `outpaint_images.get_client` — `sys.exit(1)` → `raise RuntimeError`
+   - `generate_all_videos.get_jwt` — `sys.exit(...)` → `raise RuntimeError`
+   - `concat_videos.main` — `sys.exit(1)` (on ffmpeg missing) → `raise RuntimeError`
+   - `outpaint_16_9.get_client` — already raised RuntimeError, no change needed.
+   Pinned by 4 tests asserting each raises `RuntimeError` (not SystemExit)
+   on the failure path.
+
+2. **~~Module-global swap in `run()` is not thread-safe~~ → serialised by `_RUN_LOCK`.**
+   Each of `outpaint_images.py`, `outpaint_16_9.py`,
+   `generate_all_videos.py`, `concat_videos.py` now defines a module-level
+   `_RUN_LOCK = threading.Lock()` and wraps its `run()` body in
+   `with _RUN_LOCK:`. A parametrized test patches each module's
+   `main()` to block on an `Event`, spawns two threads calling `run()`,
+   and asserts the second thread waits for the first to release before
+   entering — confirming serialisation under real concurrency.
 
 ### Non-blockers
 

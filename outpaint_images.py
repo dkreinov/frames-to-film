@@ -8,6 +8,7 @@ Usage:
 import os
 import sys
 import json
+import threading
 import time
 from io import BytesIO
 from dotenv import load_dotenv
@@ -16,6 +17,8 @@ from google import genai
 from google.genai import types
 
 from watermark_clean import clean_if_enabled
+
+_RUN_LOCK = threading.Lock()
 
 load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env'))
 
@@ -292,8 +295,7 @@ Respond ONLY with valid JSON, no other text:
 def get_client():
     gemini_key = os.getenv('gemini')
     if not gemini_key:
-        print("ERROR: No 'gemini' key found in .env", file=sys.stderr)
-        sys.exit(1)
+        raise RuntimeError("No 'gemini' key found in .env")
     return genai.Client(**{"api_key": gemini_key})
 
 
@@ -466,18 +468,22 @@ def run(src_dir=None, out_dir=None):
     restores them on exit so CLI behavior and process_single helpers
     continue to work unchanged. The Phase 1 watermark_clean hook inside
     process_single still fires after every save.
+
+    Serialised by _RUN_LOCK so concurrent FastAPI api-mode jobs can't
+    race on the module globals.
     """
     global SRC_DIR, OUT_DIR, SCORES_PATH
-    prev = (SRC_DIR, OUT_DIR, SCORES_PATH)
-    try:
-        if src_dir is not None:
-            SRC_DIR = str(src_dir)
-        if out_dir is not None:
-            OUT_DIR = str(out_dir)
-            SCORES_PATH = os.path.join(OUT_DIR, "scores.json")
-        main()
-    finally:
-        SRC_DIR, OUT_DIR, SCORES_PATH = prev
+    with _RUN_LOCK:
+        prev = (SRC_DIR, OUT_DIR, SCORES_PATH)
+        try:
+            if src_dir is not None:
+                SRC_DIR = str(src_dir)
+            if out_dir is not None:
+                OUT_DIR = str(out_dir)
+                SCORES_PATH = os.path.join(OUT_DIR, "scores.json")
+            main()
+        finally:
+            SRC_DIR, OUT_DIR, SCORES_PATH = prev
 
 
 if __name__ == "__main__":
