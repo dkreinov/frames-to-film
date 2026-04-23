@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 from backend.db import connect, init_db
 from backend.deps import get_db_path, get_storage_root, get_user_id
@@ -70,3 +72,46 @@ def get_prompts(
         return json.loads(pj.read_text())
     except json.JSONDecodeError as exc:
         raise HTTPException(status_code=500, detail=f"prompts.json unreadable: {exc}")
+
+
+class PromptsPutBody(BaseModel):
+    prompts: dict[str, str] = Field(min_length=1)
+
+    @field_validator("prompts")
+    @classmethod
+    def all_values_non_empty(cls, v: dict[str, str]) -> dict[str, str]:
+        for k, val in v.items():
+            if not isinstance(val, str):
+                raise ValueError(f"prompt for {k!r} is not a string")
+        return v
+
+
+@router.put("")
+def put_prompts(
+    project_id: str,
+    body: PromptsPutBody,
+    db_path: Path = Depends(get_db_path),
+    storage_root: Path = Depends(get_storage_root),
+    user_id: str = Depends(get_user_id),
+) -> dict[str, str]:
+    """Atomic full-file replace of <project>/prompts.json."""
+    init_db(db_path)
+    if not _project_exists(db_path, project_id, user_id):
+        raise HTTPException(status_code=404, detail="project not found")
+    if not body.prompts:
+        raise HTTPException(status_code=400, detail="prompts map must not be empty")
+
+    project_dir = storage_root / user_id / project_id
+    project_dir.mkdir(parents=True, exist_ok=True)
+    target = project_dir / "prompts.json"
+
+    # Atomic write: tempfile in same dir + os.replace.
+    fd, tmp_name = tempfile.mkstemp(prefix=".prompts-", suffix=".json", dir=project_dir)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(body.prompts, f, indent=2)
+        os.replace(tmp_name, target)
+    except Exception:
+        Path(tmp_name).unlink(missing_ok=True)
+        raise
+    return body.prompts

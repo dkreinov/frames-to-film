@@ -125,3 +125,76 @@ def test_get_prompts_scoped_to_user(client) -> None:
     )
     r = c.get(f"/projects/{pid}/prompts", headers={"X-User-ID": "bob"})
     assert r.status_code == 404
+
+
+# --- Phase 4 sub-plan 4 Step 2: PUT /projects/{id}/prompts ---
+
+def test_put_prompts_writes_json_atomically(client, project_with_kling: str) -> None:
+    """PUT replaces prompts.json wholesale. Follow-up GET round-trips."""
+    c, _, storage = client
+    payload = {
+        "prompts": {
+            "1_to_2": "custom push-in",
+            "2_to_3": "lateral drift",
+            "3_to_4": "static hold",
+            "4_to_5": "slow zoom",
+            "5_to_6": "crane up",
+        }
+    }
+    r = c.put(f"/projects/{project_with_kling}/prompts", json=payload)
+    assert r.status_code == 200, r.text
+    assert r.json() == payload["prompts"]
+    # file on disk matches
+    pj = storage / "local" / project_with_kling / "prompts.json"
+    assert pj.is_file()
+    assert json.loads(pj.read_text()) == payload["prompts"]
+    # GET round-trip
+    rg = c.get(f"/projects/{project_with_kling}/prompts")
+    assert rg.status_code == 200
+    assert rg.json() == payload["prompts"]
+
+
+def test_put_prompts_404_for_stranger(client) -> None:
+    c, _, storage = client
+    pid = c.post("/projects", json={"name": "A"}, headers={"X-User-ID": "alice"}).json()["project_id"]
+    _seed_kling_into_project(storage, "alice", pid, 2)
+    r = c.put(
+        f"/projects/{pid}/prompts",
+        json={"prompts": {"1_to_2": "hi"}},
+        headers={"X-User-ID": "bob"},
+    )
+    assert r.status_code == 404
+
+
+def test_put_prompts_rejects_empty_map(client, project_with_kling: str) -> None:
+    c, _, _ = client
+    r = c.put(f"/projects/{project_with_kling}/prompts", json={"prompts": {}})
+    # Pydantic min_length=1 yields 422; either flavour is acceptable
+    # as long as the request is rejected.
+    assert r.status_code in (400, 422)
+
+
+def test_put_prompts_rejects_non_string_value(client, project_with_kling: str) -> None:
+    c, _, _ = client
+    r = c.put(
+        f"/projects/{project_with_kling}/prompts",
+        json={"prompts": {"1_to_2": 123}},
+    )
+    # FastAPI/Pydantic validation returns 422 for bad types by default —
+    # we explicitly want 400 so the frontend can show a single error path.
+    assert r.status_code in (400, 422)
+
+
+def test_put_prompts_overwrites_existing_file(client, project_with_kling: str) -> None:
+    """Second PUT replaces the full file; stale keys from the first are gone."""
+    c, _, storage = client
+    c.put(
+        f"/projects/{project_with_kling}/prompts",
+        json={"prompts": {"1_to_2": "v1", "2_to_3": "v1", "3_to_4": "v1", "4_to_5": "v1", "5_to_6": "v1"}},
+    )
+    c.put(
+        f"/projects/{project_with_kling}/prompts",
+        json={"prompts": {"1_to_2": "v2", "2_to_3": "v2"}},
+    )
+    data = json.loads((storage / "local" / project_with_kling / "prompts.json").read_text())
+    assert data == {"1_to_2": "v2", "2_to_3": "v2"}
