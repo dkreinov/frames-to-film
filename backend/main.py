@@ -7,7 +7,10 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
+from backend.routers import projects
+
 app = FastAPI(title="olga_movie backend", version="0.2.0")
+app.include_router(projects.router)
 
 
 @app.get("/health")
