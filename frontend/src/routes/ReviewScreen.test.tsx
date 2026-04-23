@@ -26,7 +26,7 @@ import * as client from '@/api/client'
 
 function renderAt() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(
+  const utils = render(
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={['/projects/abc/review']}>
         <Routes>
@@ -35,6 +35,7 @@ function renderAt() {
       </MemoryRouter>
     </QueryClientProvider>
   )
+  return { ...utils, qc }
 }
 
 beforeEach(() => vi.clearAllMocks())
@@ -152,6 +153,46 @@ describe('ReviewScreen', () => {
     const btn = await screen.findByRole('button', { name: /stitch & export/i })
     fireEvent.click(btn)
     expect(await screen.findByText(/stitching your full movie/i)).toBeInTheDocument()
+  })
+
+  it('seeds local verdicts once — a later segmentsQuery refetch does not clobber user clicks', async () => {
+    // Regression pin for the setState-during-render seed-once pattern.
+    // First call: empty (no persisted verdicts).
+    // User clicks winner -> local state becomes winner.
+    // refetchQueries() forces React Query to re-invoke listSegments
+    // and pipe the new array back into the component. Still empty ->
+    // local state MUST remain winner, not re-seed from the server.
+    ;(client.listStageOutputs as any).mockResolvedValue({
+      stage: 'kling_test',
+      outputs: ['1.jpg', '2.jpg'],
+    })
+    ;(client.getProjectOrder as any).mockResolvedValue(null)
+    ;(client.listVideos as any).mockResolvedValue([
+      { name: 'seg_1_to_2.mp4', pair_key: '1_to_2' },
+    ])
+    const listSegmentsMock = vi.fn(async () => [])
+    ;(client.listSegments as any).mockImplementation(listSegmentsMock)
+    ;(client.reviewSegment as any).mockResolvedValue({
+      seg_id: 'seg_1_to_2',
+      verdict: 'winner',
+      notes: null,
+      updated_at: '',
+    })
+    const { qc } = renderAt()
+    const btn = await screen.findByRole('button', {
+      name: /mark 1_to_2 as winner/i,
+    })
+    // Wait for the initial listSegments call to complete.
+    await waitFor(() => expect(listSegmentsMock).toHaveBeenCalledTimes(1))
+    fireEvent.click(btn)
+    await waitFor(() => expect(btn).toHaveAttribute('aria-pressed', 'true'))
+    // Now force a real React Query refetch — this invokes the mock
+    // again and pipes the fresh [] back into the component.
+    await qc.refetchQueries({ queryKey: ['segments', 'abc'] })
+    await waitFor(() => expect(listSegmentsMock).toHaveBeenCalledTimes(2))
+    // aria-pressed must remain true — the fresh (empty) server data
+    // must NOT re-seed local state.
+    expect(btn).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('shows Download full movie link once stitch is done', async () => {
