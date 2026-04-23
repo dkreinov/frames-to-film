@@ -7,7 +7,17 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
-from backend.routers import extend, generate, jobs, prepare, projects, review, stitch, uploads
+from backend.routers import (
+    artifacts,
+    extend,
+    generate,
+    jobs,
+    prepare,
+    projects,
+    review,
+    stitch,
+    uploads,
+)
 
 app = FastAPI(title="olga_movie backend", version="0.2.0")
 app.include_router(projects.router)
@@ -18,6 +28,7 @@ app.include_router(extend.router)
 app.include_router(generate.router)
 app.include_router(review.router)
 app.include_router(stitch.router)
+app.include_router(artifacts.router)
 
 
 @app.get("/health")
