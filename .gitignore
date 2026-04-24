@@ -40,3 +40,8 @@ work_log.md
 # Exceptions — track golden screenshots under docs/design/golden/
 !docs/design/golden/
 !docs/design/golden/**
+
+# Exception — Vite entry point. Without this the *.html global rule
+# silently un-tracks index.html and CI fails with "Cannot resolve
+# entry module index.html".
+!frontend/index.html
