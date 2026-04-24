@@ -1,7 +1,8 @@
 """Generate stage service — video pair synthesis.
 
 Mock mode produces tiny ffmpeg 1s black-frame stubs (~50 KB each) so tests and
-local E2E runs stay free. API mode delegates to generate_all_videos.run.
+local E2E runs stay free. API mode calls fal.ai's Kling O3 first-last-frame
+endpoint via backend.services.kling_fal — 5-second clips, audio off.
 """
 from __future__ import annotations
 
@@ -11,6 +12,13 @@ import subprocess
 from pathlib import Path
 
 from backend.db import REPO_ROOT
+from backend.services import kling_fal
+
+# Default prompt used when a pair has no entry in prompts.json.
+_FALLBACK_PROMPT = "Smooth cinematic transition between the two frames."
+
+# Kling O3 5-second clips; matches the user-chosen duration in the plan.
+_API_DURATION_S = 5
 
 FFMPEG_BIN = REPO_ROOT / "tools" / "ffmpeg.exe"
 
@@ -63,7 +71,21 @@ def _ordered_frames(img_dir: Path, project_dir: Path) -> list[Path]:
     return sorted(img_dir.glob("*.jpg"), key=lambda p: _sort_key(p.name))
 
 
-def run_generate(project_dir: Path, mode: str) -> dict:
+def _load_prompts(project_dir: Path) -> dict[str, str]:
+    """Return the {pair_key: prompt} map from <project>/prompts.json, or {}."""
+    p = project_dir / "prompts.json"
+    if not p.is_file():
+        return {}
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+    if isinstance(data, dict):
+        return {k: v for k, v in data.items() if isinstance(k, str) and isinstance(v, str)}
+    return {}
+
+
+def run_generate(project_dir: Path, mode: str, fal_key: str | None = None) -> dict:
     project_dir = Path(project_dir)
     img_dir = project_dir / "kling_test"
     video_dir = img_dir / "videos"
@@ -86,10 +108,23 @@ def run_generate(project_dir: Path, mode: str) -> dict:
         return {"produced": produced}
 
     if mode == "api":
-        from generate_all_videos import run as generate_run
-        # pass project_dir so run() picks up <project>/prompts.json if present
-        generate_run(img_dir=img_dir, video_dir=video_dir, project_dir=project_dir)
-        return {"produced": [p.name for p in sorted(video_dir.glob("seg_*.mp4"))]}
+        if not fal_key:
+            raise RuntimeError("fal_key missing from runner payload in api mode")
+        frames = _ordered_frames(img_dir, project_dir)
+        if len(frames) < 2:
+            raise FileNotFoundError(f"need >=2 jpgs in {img_dir}, got {len(frames)}")
+        prompts = _load_prompts(project_dir)
+        produced = []
+        for a, b in zip(frames, frames[1:]):
+            pair_key = f"{a.stem}_to_{b.stem}"
+            prompt = prompts.get(pair_key, _FALLBACK_PROMPT)
+            mp4_bytes = kling_fal.generate_pair(
+                a, b, prompt, fal_key=fal_key, duration=_API_DURATION_S
+            )
+            out = video_dir / f"seg_{pair_key}.mp4"
+            out.write_bytes(mp4_bytes)
+            produced.append(out.name)
+        return {"produced": produced}
 
     raise ValueError(f"unknown mode: {mode}")
 
@@ -98,4 +133,5 @@ def generate_runner(**payload) -> dict:
     return run_generate(
         project_dir=Path(payload["project_dir"]),
         mode=payload["mode"],
+        fal_key=payload.get("fal_key"),
     )
