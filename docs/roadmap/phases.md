@@ -21,7 +21,7 @@ Each phase gets its own saved plan at `docs/roadmap/phase_<N>_plan.md` (created 
 | 3 | De-Olga prompt library | done | 2 | Replace hardcoded `PAIR_PROMPTS` with per-project JSON auto-generated from image pairs. Style presets. |
 | 4 | Stitch-designed React commercial UI | done | 2, 3 | 5 screens via `/stitch-design` → shadcn/ui React → FastAPI. All 6 sub-plans shipped: Upload, Prepare, Storyboard, Generate, Review+Export, Settings (Gemini key in localStorage + `X-Gemini-Key` header; per-stage mode toggles, only generatePrompts `api` enabled — rest gated to Phase 5). |
 | 5 | Paid fal.ai Kling O3 video generation | done | 1, 2 | Pivoted from free Playwright/Veo to paid fal.ai Kling O3 (latest Kling 3.0 first+last-frame, $0.084/s audio-off, 5s clips). Generate api mode calls kling_fal adapter with user-supplied fal.ai key from Settings (`X-Fal-Key` header). |
-| 6 | Full E2E + polish + ship | in-progress | 4, 5 | Sub-Plan 1 (E2E + CI) done: `review.spec.ts` covers the full happy path, GitHub Actions runs 3 jobs (pytest + vitest + Playwright) on every push, ffmpeg portability fixed, Claude-in-Chrome happy-path GIF captured. Remaining: legacy Streamlit → `legacy/`, README rewrite, Vercel deploy. |
+| 6 | Full E2E + polish + ship | in-progress | 4, 5 | Sub-Plans 1+2 done: CI is green on GitHub (3 jobs — 105 backend + 93 vitest + 14 Playwright), 11 legacy scripts + 7 legacy tests moved to `legacy/`, `Pillow` / Vite preview / `index.html` tracking all fixed. Remaining: README rewrite, `/app-design` + `/frontend-design` passes, Vercel deploy. |
 
 ## Exit criteria per phase
 
