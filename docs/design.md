@@ -378,45 +378,53 @@ These cannot change without updating every later sub-plan:
   admin/help page) render `<AppBar />` with no prop so
   `WizardStepper` highlights nothing. Do NOT pass a fake step
   id just to satisfy the type — it lies to the user.
-- **`Mode` type** (introduced by Phase 5 Sub-Plan 1). `Mode =
-  'mock' | 'api' | 'web'`. `web` applies ONLY to `generateVideos`
-  today; all other stages render a blank cell in the Settings
-  web column so the UI never tempts the user to flip a
-  nonsensical mode. api/client.ts stage-start signatures are
-  widened to accept `Mode` on all five stage starters to keep
-  TypeScript clean — the per-stage UI gates, plus backend
-  `Literal` validation at each router, prevent an invalid
-  combination from reaching a runner.
-- **`VeoWebAdapter` interface** (introduced by Phase 5 Sub-Plan
-  1, `backend/adapters/veo_web.py`). Methods: `authenticate()`,
-  `upload_frame(path)`, `request_generation(frame_a_url,
-  frame_b_url, prompt)`, `download_clip(job_ref)`, `cleanup()`.
-  All raise `WebModeNotImplemented` (a `NotImplementedError`
-  subclass) until Phase 5 Sub-Plan 2 wires them against a real
-  Playwright/Chrome-profile session. Method names + signatures
-  are frozen — Sub-Plan 2 MUST NOT rename. Class is also a
-  context manager so `cleanup()` runs on failure paths.
-- **`WebModeNotImplemented` sentinel** (introduced by Phase 5
-  Sub-Plan 1). `generate_runner`'s `mode == 'web'` branch
-  catches ONLY this sentinel and re-raises as a `RuntimeError`
-  with a user-facing message ("Phase 5 Sub-Plan 2 —
-  authenticated browser profile required. Flip 'Generate
-  videos' to api or mock mode in Settings."). `jobs.run_job_sync`
-  records that as `status='error'/error=<msg>`. Any future
-  adapter that follows the same "stub-first, implement-later"
-  pattern MUST reuse this sentinel shape — bare
-  `NotImplementedError` leaks the traceback.
-- **`STAGE_ROWS` shape for Settings** (introduced by Phase 5
-  Sub-Plan 1). Each row declares `apiEnabled: boolean` and
-  `supportsWeb: boolean`. `apiEnabled=false` disables the api
-  radio with an "api mode arrives in Phase 5" note;
-  `supportsWeb=true` renders a web radio (disabled until
-  Sub-Plan 2) with an inline "web mode arrives in Phase 5
-  Sub-Plan 2" note. `supportsWeb=false` renders a blank web
-  cell. Any future mode (e.g., a hypothetical `'kling'`) plugs
-  in by adding another per-row boolean + column header — do
-  NOT retrofit a general `supportedModes: Mode[]` array until a
-  third enabled-today vendor materialises.
+- **`Mode` type** (re-narrowed in Phase 5 Sub-Plan 2 after the
+  fal.ai pivot). `Mode = 'mock' | 'api'`. Sub-Plan 1's short-lived
+  `'web'` value was removed: the project committed to paid fal.ai
+  rather than a Playwright-driven free web path, so the `'web'`
+  scaffolding became orphan code. If a free-tier browser path is
+  ever revived, re-adding `'web'` is a 10-line change. api/client.ts
+  stage-start signatures all accept `Mode` to keep TypeScript clean;
+  per-stage UI gates + backend `Literal` validation prevent invalid
+  combinations at runtime.
+- **`resolve_fal_key` backend utility** (introduced by Phase 5
+  Sub-Plan 2, `backend/deps.py`). Mirrors `resolve_gemini_key`:
+  header `X-Fal-Key` → env `FAL_KEY` → `HTTPException(400,
+  "fal.ai API key required for api mode. Paste a key in Settings
+  or set the 'FAL_KEY' env var.")`. Called only on the generate
+  router's `mode == 'api'` branch so mock mode never requires a
+  key. Template for future per-vendor key resolvers.
+- **`kling_fal.generate_pair` adapter** (introduced by Phase 5
+  Sub-Plan 2, `backend/services/kling_fal.py`). Single function
+  signature: `generate_pair(image_a: Path, image_b: Path, prompt:
+  str, fal_key: str, duration: int = 5) -> bytes`. Posts to
+  `https://queue.fal.run/fal-ai/kling-video/o3/standard/image-to-video`
+  with `image_url` + `end_image_url` as base64 data URIs, polls
+  `/requests/{id}/status` until `COMPLETED` or `FAILED`/`CANCELLED`,
+  fetches `/requests/{id}` → `video.url`, downloads mp4 bytes.
+  Auth header is `Authorization: Key <fal_key>` (not Bearer) —
+  fal.ai's convention. Download step skips auth (CDN pre-signed
+  URL). Duration default `5` matches the user-chosen clip length
+  for this project (~$0.42/clip audio-off). Any new video-vendor
+  adapter MUST expose the same `generate_pair(a, b, prompt, key,
+  duration)` signature so the generate runner stays vendor-agnostic.
+- **`X-Fal-Key` request header pattern** (introduced by Phase 5
+  Sub-Plan 2). Frontend `apiFetch` reads both `olga.keys.gemini`
+  and `olga.keys.fal` from localStorage on every call and attaches
+  corresponding `X-Gemini-Key` + `X-Fal-Key` headers when each is
+  non-empty. Backend `generate` router resolves `X-Fal-Key` into
+  the job payload on api-mode POSTs. Any future per-vendor key
+  follows the same pattern: add `olga.keys.<vendor>` to Settings,
+  extend `headersWithKey` with an `X-<Vendor>-Key` attach, add
+  `resolve_<vendor>_key` in `deps.py`.
+- **5-second clip duration for api-mode video generation**
+  (Phase 5 Sub-Plan 2 decision). The generate runner hardcodes
+  `duration=5` on every `kling_fal.generate_pair` call via the
+  `_API_DURATION_S` constant. fal.ai Kling O3 accepts 3-15s;
+  5s is the enum's default and the project's sweet spot (low
+  cost per clip, enough duration for a discernible morph). If
+  a user wants a different duration later, it becomes a per-
+  project setting rather than a hardcode change.
 
 ## Decisions log
 
@@ -433,3 +441,6 @@ These cannot change without updating every later sub-plan:
 | 2026-04-24 | Only `generatePrompts` api-mode enabled in Settings; other stages gated until Phase 5 | Shipping `api` radios disabled-with-note is clearer than hiding them: user sees the roadmap, understands why, won't file "toggle does nothing" bugs. Phase 5 flips them on one by one as each vendor path lands. |
 | 2026-04-24 | Phase 5 split into Sub-Plan 1 (scaffolding, autonomous-safe) + Sub-Plan 2 (live Playwright, needs user) | Full Phase 5 adapter needs authenticated Chrome profile + CAPTCHA handling; cannot run unattended without risking account bans. Sub-Plan 1 lands the plumbing (Mode=web, adapter stub, UI column disabled) so Sub-Plan 2 is a drop-in replacement of the NotImplementedError raises. |
 | 2026-04-24 | `WebModeNotImplemented` sentinel + `RuntimeError` re-raise in `run_generate` web branch | Swallowing bare `NotImplementedError` would also hide real bugs in later Sub-Plan 2 code. Sentinel subclass + re-raise-as-RuntimeError-with-user-message is the only pattern the runner catches; anything else propagates normally. |
+| 2026-04-24 | Phase 5 pivot: abandon Playwright/Veo free path, use paid fal.ai Kling O3 directly | Veo doesn't support start+end frame (project requirement — that's why the code is named `kling_test/`). Grok API also lacks end-frame support. Kling is the only vendor with native dual-keyframe interpolation. fal.ai wraps Kling with pay-as-you-go pricing (no $10 minimum like official Kling dev). Sub-Plan 1 `'web'` scaffolding reverted in Sub-Plan 2 Step 2. |
+| 2026-04-24 | fal.ai over official Kling dev API | Simpler auth (single `Authorization: Key <FAL_KEY>` vs AK/SK + JWT HS256), zero minimum top-up vs official's credit-pack tiers, same Kling model under the hood, ~$0.084/s vs official's $0.075/s (negligible markup), plus fal.ai's model inventory (Luma, Veo, Runway) makes vendor swaps trivial if Kling prices hike. |
+| 2026-04-24 | 5-second clips hardcoded in `run_generate` api branch | User-chosen sweet spot: ~$0.42/clip, matches fal.ai Kling O3 enum default, enough duration for a discernible morph without burning budget. If per-project duration ever becomes a feature, promote to a project setting; don't scatter the number across call sites. |

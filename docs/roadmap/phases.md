@@ -20,7 +20,7 @@ Each phase gets its own saved plan at `docs/roadmap/phase_<N>_plan.md` (created 
 | 2 | FastAPI engine + mock mode + project isolation | done | 1 | Wrap scripts in HTTP API. Add `GENERATION_MODE=api\|web\|mock`. Per-project state. |
 | 3 | De-Olga prompt library | done | 2 | Replace hardcoded `PAIR_PROMPTS` with per-project JSON auto-generated from image pairs. Style presets. |
 | 4 | Stitch-designed React commercial UI | done | 2, 3 | 5 screens via `/stitch-design` → shadcn/ui React → FastAPI. All 6 sub-plans shipped: Upload, Prepare, Storyboard, Generate, Review+Export, Settings (Gemini key in localStorage + `X-Gemini-Key` header; per-stage mode toggles, only generatePrompts `api` enabled — rest gated to Phase 5). |
-| 5 | Free web-mode video generation | in-progress | 1, 2 | Playwright adapter for Veo (Gemini Pro web) or Minimax. Sub-Plan 1 (mode plumbing + adapter skeleton) done; Sub-Plan 2 (live Playwright against authenticated Chrome profile) requires user presence. |
+| 5 | Paid fal.ai Kling O3 video generation | done | 1, 2 | Pivoted from free Playwright/Veo to paid fal.ai Kling O3 (latest Kling 3.0 first+last-frame, $0.084/s audio-off, 5s clips). Generate api mode calls kling_fal adapter with user-supplied fal.ai key from Settings (`X-Fal-Key` header). |
 | 6 | Full E2E + polish + ship | pending | 4, 5 | Playwright E2E in mock mode, Claude-in-Chrome smoke, deploy. |
 
 ## Exit criteria per phase
@@ -58,13 +58,25 @@ Each phase gets its own saved plan at `docs/roadmap/phase_<N>_plan.md` (created 
 - Working: Claude-in-Chrome takes golden screenshots per step
 - General design: advisor pass
 
-### Phase 5 — Free web-mode video generation
-- Playwright adapter that drives Veo (via Gemini Pro web) or Minimax free tier
-- Reuses `.gemini_chrome_profile/` pattern
-- Watermark cleaner from Phase 1 is applied to any image frames produced
-- Logical: generate 3 clips via web path, compare file size/duration to API-mode baseline
-- Working: one full movie generated in web mode on a 5-photo test project
-- General design: advisor pass
+### Phase 5 — Paid fal.ai Kling O3 video generation
+- Direct fal.ai API (`Authorization: Key <FAL_KEY>`), Kling O3
+  first-last-frame endpoint, 5s audio-off clips (~$0.084/s)
+- Single `X-Fal-Key` header from browser-stored key (Settings)
+- `backend/services/kling_fal.py` adapter replaces the legacy
+  `generate_all_videos.py` JWT-based Kling path in the api branch
+- Logical: 8/8 backend integration tests green with mocked HTTP
+- Working: `tests/backend/test_kling_fal_real.py` smoke test passes
+  against real fal.ai when `FAL_KEY` env var is set (~$0.42/run)
+- General design: advisor pass (pre-close-out)
+
+**Pivot note**: originally scoped as free Playwright-driven Veo/Kling
+web automation. Sub-Plan 1 built the `'web'` Mode scaffolding, but
+Veo doesn't support first+last frame (project requirement) and Grok
+API lacks end-frame support entirely. Kling is the only vendor that
+does it natively, and fal.ai wraps it with pay-as-you-go pricing
+(no $10 minimum like official Kling). Sub-Plan 1 scaffolding reverted
+in Sub-Plan 2 Step 2 (Mode narrowed back to mock/api, adapter stub
+deleted).
 
 ### Phase 6 — Ship
 - Full Playwright E2E in mock mode runs under CI
