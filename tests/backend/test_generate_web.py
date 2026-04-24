@@ -63,3 +63,26 @@ def test_generate_rejects_unknown_mode(client, project_ready: str) -> None:
     c, _, _ = client
     r = c.post(f"/projects/{project_ready}/generate", json={"mode": "quantum"})
     assert r.status_code == 422
+
+
+def test_generate_web_mode_errors_gracefully_until_subplan_2(client, project_ready: str) -> None:
+    """Web mode dispatches to VeoWebAdapter.authenticate(), which raises
+    WebModeNotImplemented. The runner catches that sentinel and converts
+    it into a clean job error — NOT a 500, NOT a bare ValueError.
+
+    This test authentically exercises the runner pipeline: POST starts a
+    background task that actually runs run_generate with mode='web'.
+    If Step 4's branch regresses to `ValueError: unknown mode`, the
+    error-message assertion below fails.
+    """
+    c, db, _ = client
+    r = c.post(f"/projects/{project_ready}/generate", json={"mode": "web"})
+    assert r.status_code == 202
+    jid = r.json()["job_id"]
+    row = _job_row(db, jid)
+    assert row["status"] == "error", row
+    assert "Phase 5 Sub-Plan 2" in row["error"], row["error"]
+    # Guard against a regression where the branch is replaced with
+    # `raise ValueError("unknown mode: web")` — the sentinel message is
+    # specifically what tells the user what to do.
+    assert "unknown mode" not in row["error"], row["error"]
