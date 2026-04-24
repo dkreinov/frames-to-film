@@ -15,16 +15,18 @@ import {
   startExtend,
 } from '@/api/client'
 import { useDebouncedSave } from './useDebouncedSave'
+import { useSettings } from './useSettings'
 
 export default function StoryboardScreen() {
   const { projectId = '' } = useParams()
   const navigate = useNavigate()
   const [jobId, setJobId] = useState<string | null>(null)
   const [order, setOrder] = useState<string[] | null>(null)
+  const { modes } = useSettings()
 
   // Auto-start extend on mount.
   const startMutation = useMutation({
-    mutationFn: () => startExtend(projectId, 'mock'),
+    mutationFn: () => startExtend(projectId, modes.extend),
     onSuccess: (jobRef) => setJobId(jobRef.job_id),
   })
 

@@ -116,4 +116,35 @@ describe('PrepareScreen', () => {
     await screen.findByRole('status')
     expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
   })
+
+  it('passes modes.prepare from useSettings into startPrepare (api override)', async () => {
+    // Authentic test (plan-skill #9): seeding localStorage to api
+    // mode must reach the mutation fn. Would regress if mutationFn
+    // goes back to a hardcoded 'mock' literal.
+    localStorage.clear()
+    localStorage.setItem(
+      'olga.modes',
+      JSON.stringify({
+        prepare: 'api',
+        extend: 'mock',
+        generatePrompts: 'mock',
+        generateVideos: 'mock',
+        stitch: 'mock',
+      })
+    )
+    ;(client.getJob as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      job_id: 'jid-1',
+      status: 'running',
+      project_id: 'abc',
+      user_id: 'local',
+      kind: 'prepare',
+      payload: {},
+      error: null,
+      created_at: '',
+      updated_at: '',
+    })
+    renderAt()
+    await screen.findByText(/preparing photos/i)
+    expect(client.startPrepare).toHaveBeenCalledWith('abc', 'api')
+  })
 })

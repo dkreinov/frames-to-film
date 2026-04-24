@@ -19,9 +19,11 @@ import {
   startStitch,
   type Verdict,
 } from '@/api/client'
+import { useSettings } from './useSettings'
 
 export default function ReviewScreen() {
   const { projectId = '' } = useParams()
+  const { modes } = useSettings()
 
   const outputsQuery = useQuery({
     queryKey: ['outputs', projectId, 'kling_test'],
@@ -77,7 +79,7 @@ export default function ReviewScreen() {
 
   const [stitchJobId, setStitchJobId] = useState<string | null>(null)
   const stitchMutation = useMutation({
-    mutationFn: () => startStitch(projectId, 'mock'),
+    mutationFn: () => startStitch(projectId, modes.stitch),
     onSuccess: (ref) => setStitchJobId(ref.job_id),
   })
   const stitchJobQuery = useQuery({

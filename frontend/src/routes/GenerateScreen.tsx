@@ -23,6 +23,7 @@ import {
   type VideoItem,
 } from '@/api/client'
 import { useDebouncedSave } from './useDebouncedSave'
+import { useSettings } from './useSettings'
 
 function pairKeysFromOrder(ordered: string[]): string[] {
   const stems = ordered.map((n) => n.replace(/\.[^.]+$/, ''))
@@ -34,6 +35,7 @@ function pairKeysFromOrder(ordered: string[]): string[] {
 export default function GenerateScreen() {
   const { projectId = '' } = useParams()
   const navigate = useNavigate()
+  const { modes } = useSettings()
 
   // --- Expected pair sequence (from /outputs + /order) ---
   const outputsQuery = useQuery({
@@ -81,7 +83,7 @@ export default function GenerateScreen() {
     refetchIntervalInBackground: true,
   })
   const promptsGenMutation = useMutation({
-    mutationFn: () => startPromptsGeneration(projectId, 'mock', 'cinematic'),
+    mutationFn: () => startPromptsGeneration(projectId, modes.generatePrompts, 'cinematic'),
     onSuccess: (ref) => setPromptsJobId(ref.job_id),
   })
 
@@ -129,7 +131,7 @@ export default function GenerateScreen() {
   // --- Generate job ---
   const [generateJobId, setGenerateJobId] = useState<string | null>(null)
   const generateMutation = useMutation({
-    mutationFn: () => startGenerate(projectId, 'mock'),
+    mutationFn: () => startGenerate(projectId, modes.generateVideos),
     onSuccess: (ref) => setGenerateJobId(ref.job_id),
   })
   const generateJobQuery = useQuery({

@@ -154,4 +154,37 @@ describe('GenerateScreen', () => {
     const next = screen.getByRole('button', { name: /next: review/i })
     expect(next).not.toBeDisabled()
   })
+
+  it('passes modes.generatePrompts from useSettings into startPromptsGeneration', async () => {
+    // Authentic test (plan-skill #9): flip localStorage to api mode
+    // BEFORE mount; useSettings hydrates from it; the screen must
+    // pass 'api' not 'mock' into the mutation. Would regress if the
+    // mutationFn goes back to a hardcoded 'mock' literal.
+    localStorage.clear()
+    localStorage.setItem(
+      'olga.modes',
+      JSON.stringify({
+        prepare: 'mock',
+        extend: 'mock',
+        generatePrompts: 'api',
+        generateVideos: 'mock',
+        stitch: 'mock',
+      })
+    )
+    ;(client.listStageOutputs as any).mockResolvedValue({
+      stage: 'kling_test',
+      outputs: ['1.jpg', '2.jpg', '3.jpg'],
+    })
+    ;(client.getProjectOrder as any).mockResolvedValue(null)
+    ;(client.getPrompts as any).mockResolvedValue(null) // triggers re-gen
+    ;(client.getJob as any).mockResolvedValue({ ...jobDone, status: 'done' })
+    renderAt()
+    await waitFor(() =>
+      expect(client.startPromptsGeneration).toHaveBeenCalledWith(
+        'abc',
+        'api',
+        'cinematic'
+      )
+    )
+  })
 })

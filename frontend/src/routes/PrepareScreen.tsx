@@ -8,15 +8,17 @@ import { Button } from '@/components/ui/button'
 import { JobProgressCard } from '@/components/prepare/JobProgressCard'
 import { OutputsGrid } from '@/components/prepare/OutputsGrid'
 import { getJob, listStageOutputs, startPrepare } from '@/api/client'
+import { useSettings } from './useSettings'
 
 export default function PrepareScreen() {
   const { projectId = '' } = useParams()
   const navigate = useNavigate()
   const [jobId, setJobId] = useState<string | null>(null)
+  const { modes } = useSettings()
 
   // Kick off the prepare job on mount (or on retry).
   const startMutation = useMutation({
-    mutationFn: () => startPrepare(projectId, 'mock'),
+    mutationFn: () => startPrepare(projectId, modes.prepare),
     onSuccess: (jobRef) => setJobId(jobRef.job_id),
   })
 
