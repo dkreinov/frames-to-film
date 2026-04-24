@@ -90,3 +90,39 @@ describe('useSettings — generateVideos default', () => {
     expect(result.current.modes.generateVideos).toBe('mock')
   })
 })
+
+describe('useSettings — fal.ai key (Phase 5 Sub-Plan 2)', () => {
+  it('DEFAULT_KEYS.fal is empty string', () => {
+    const { result } = renderHook(() => useSettings())
+    expect(result.current.keys.fal).toBe('')
+  })
+
+  it('setKey("fal", ...) persists and reads back on a fresh hook', () => {
+    const { result } = renderHook(() => useSettings())
+    act(() => result.current.setKey('fal', 'fal-xyz'))
+    expect(result.current.keys.fal).toBe('fal-xyz')
+    expect(localStorage.getItem('olga.keys')).toContain('fal-xyz')
+
+    const { result: r2 } = renderHook(() => useSettings())
+    expect(r2.current.keys.fal).toBe('fal-xyz')
+  })
+
+  it('clearKey("fal") wipes without affecting other keys', () => {
+    const { result } = renderHook(() => useSettings())
+    act(() => result.current.setKey('gemini', 'gem-1'))
+    act(() => result.current.setKey('fal', 'fal-1'))
+    act(() => result.current.clearKey('fal'))
+    expect(result.current.keys.fal).toBe('')
+    expect(result.current.keys.gemini).toBe('gem-1')
+  })
+
+  it('pre-Sub-Plan-2 storage (no "fal" key) still parses; fal backfills to empty string', () => {
+    // Authenticity: someone upgrades from Phase-4 Settings where Keys
+    // only had `gemini`. read()'s spread merge must backfill `fal: ""`
+    // — otherwise keys.fal is `undefined` and headers break silently.
+    localStorage.setItem('olga.keys', JSON.stringify({ gemini: 'legacy' }))
+    const { result } = renderHook(() => useSettings())
+    expect(result.current.keys.gemini).toBe('legacy')
+    expect(result.current.keys.fal).toBe('')
+  })
+})

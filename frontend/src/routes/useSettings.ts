@@ -19,6 +19,7 @@ export interface Modes {
 
 export interface Keys {
   gemini: string
+  fal: string
 }
 
 export const DEFAULT_MODES: Modes = {
@@ -31,6 +32,7 @@ export const DEFAULT_MODES: Modes = {
 
 export const DEFAULT_KEYS: Keys = {
   gemini: '',
+  fal: '',
 }
 
 const KEYS_STORAGE = 'olga.keys'
