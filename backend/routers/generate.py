@@ -5,11 +5,11 @@ from pathlib import Path
 
 from typing import Literal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, status
 from pydantic import BaseModel
 
 from backend.db import connect, init_db
-from backend.deps import get_db_path, get_storage_root, get_user_id
+from backend.deps import get_db_path, get_storage_root, get_user_id, resolve_fal_key
 from backend.services import generate as generate_svc
 from backend.services import jobs as jobs_svc
 
@@ -33,6 +33,7 @@ def generate(
     project_id: str,
     body: GenerateRequest,
     bg: BackgroundTasks,
+    x_fal_key: str | None = Header(default=None, alias="X-Fal-Key"),
     db_path: Path = Depends(get_db_path),
     storage_root: Path = Depends(get_storage_root),
     user_id: str = Depends(get_user_id),
@@ -41,7 +42,11 @@ def generate(
     if not _project_exists(db_path, project_id, user_id):
         raise HTTPException(status_code=404, detail="project not found")
     project_dir = storage_root / user_id / project_id
-    payload = {"project_dir": str(project_dir), "mode": body.mode}
+    payload: dict = {"project_dir": str(project_dir), "mode": body.mode}
+    if body.mode == "api":
+        # resolve_fal_key raises HTTPException(400) if neither header nor env;
+        # that surfaces as a synchronous 400 at POST time, not a runner crash.
+        payload["fal_key"] = resolve_fal_key(x_fal_key)
     job_id = jobs_svc.create_job(
         db_path, project_id=project_id, user_id=user_id, kind="generate", payload=payload
     )
