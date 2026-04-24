@@ -88,6 +88,7 @@ export default function ReviewScreen() {
       const s = q.state.data?.status
       return s === 'done' || s === 'error' ? false : 500
     },
+    refetchIntervalInBackground: true,
   })
 
   const stitchStatus: 'idle' | 'running' | 'done' | 'error' = stitchMutation.isError

@@ -190,6 +190,7 @@ These cannot change without updating every later sub-plan:
       const s = q.state.data?.status
       return s === 'done' || s === 'error' ? false : 2000
     },
+    refetchIntervalInBackground: true,
   })
 
   // Surface POST-side errors too — otherwise the spinner stalls forever:
@@ -198,9 +199,18 @@ These cannot change without updating every later sub-plan:
   ```
 
   Every wizard screen that drives a `POST /stage` + polls
-  `GET /jobs/{id}` MUST use this exact pattern. The
-  `startMutation.isError` branch is not optional — without it, a 5xx on
-  the initial POST strands the user on the spinner.
+  `GET /jobs/{id}` MUST use this exact pattern. Two options are not
+  optional:
+  - `startMutation.isError` branch — without it, a 5xx on the initial
+    POST strands the user on the spinner.
+  - `refetchIntervalInBackground: true` — TanStack Query defaults to
+    `false`, which silently pauses polling whenever the browser tab
+    loses visibility (Chrome's own throttling, user switching tabs,
+    any extension or tool that opens the tab as `document.hidden`).
+    Setting this to `true` keeps `GET /jobs/{id}` firing so when the
+    user returns, the spinner isn't stalled on a stale payload. The
+    bandwidth cost is trivial (one `GET` every 500–2000ms only for
+    the duration a job is actually running).
 - **Generic reusable components** (introduced by Prepare sub-plan):
   `JobProgressCard` + `OutputsGrid` under
   `frontend/src/components/prepare/`. Storyboard / Generate / Review

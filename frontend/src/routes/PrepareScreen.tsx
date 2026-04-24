@@ -37,6 +37,7 @@ export default function PrepareScreen() {
       const s = q.state.data?.status
       return s === 'done' || s === 'error' ? false : 2000
     },
+    refetchIntervalInBackground: true,
   })
 
   // Once done, list the outputs.

@@ -78,6 +78,7 @@ export default function GenerateScreen() {
       const s = q.state.data?.status
       return s === 'done' || s === 'error' ? false : 500
     },
+    refetchIntervalInBackground: true,
   })
   const promptsGenMutation = useMutation({
     mutationFn: () => startPromptsGeneration(projectId, 'mock', 'cinematic'),
@@ -139,6 +140,7 @@ export default function GenerateScreen() {
       const s = q.state.data?.status
       return s === 'done' || s === 'error' ? false : 500
     },
+    refetchIntervalInBackground: true,
   })
 
   const generateStatus: 'idle' | 'running' | 'done' | 'error' = generateMutation.isError
