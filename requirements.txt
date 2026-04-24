@@ -4,3 +4,8 @@ pydantic>=2.0
 httpx>=0.28
 python-multipart>=0.0.26
 Pillow>=10.0
+# google-genai is used by the LEGACY Phase-1 watermark scripts
+# (outpaint_images.py, outpaint_16_9.py). Still imported by
+# tests/backend/test_script_*.py. Will be removed once those tests
+# move to legacy/ (Phase 6 Sub-Plan 2 Step 4).
+google-genai>=0.5
