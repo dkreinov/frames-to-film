@@ -47,4 +47,11 @@ export const router = createBrowserRouter([
       return { Component: mod.default }
     },
   },
+  {
+    path: '/settings',
+    lazy: async () => {
+      const mod = await import('./SettingsScreen')
+      return { Component: mod.default }
+    },
+  },
 ])
