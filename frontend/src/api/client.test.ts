@@ -151,3 +151,45 @@ describe('api client', () => {
     expect(await getProjectOrder('none')).toBeNull()
   })
 })
+
+// --- Phase 4 sub-plan 6 Step 3: X-Gemini-Key header attachment ---
+
+describe('api client: X-Gemini-Key header', () => {
+  let lastGeminiHeader: string | null = null
+
+  async function run(keyValue: string | null) {
+    // afterEach() calls server.resetHandlers() between tests — so each
+    // test re-registers its own handler rather than relying on beforeAll.
+    server.use(
+      http.post(
+        'http://127.0.0.1:8000/projects/:pid/prompts/generate',
+        ({ request }) => {
+          lastGeminiHeader = request.headers.get('x-gemini-key')
+          return HttpResponse.json({ job_id: 'jhk' }, { status: 202 })
+        }
+      )
+    )
+    localStorage.clear()
+    lastGeminiHeader = null
+    if (keyValue !== null) {
+      localStorage.setItem('olga.keys', JSON.stringify({ gemini: keyValue }))
+    }
+    const { startPromptsGeneration } = await import('./client')
+    await startPromptsGeneration('pid-x', 'mock', 'cinematic')
+  }
+
+  it('attaches X-Gemini-Key when olga.keys.gemini is set', async () => {
+    await run('sk-abc-123')
+    expect(lastGeminiHeader).toBe('sk-abc-123')
+  })
+
+  it('omits the header when no Gemini key is stored', async () => {
+    await run(null)
+    expect(lastGeminiHeader).toBeNull()
+  })
+
+  it('omits the header when the stored key is whitespace only', async () => {
+    await run('   ')
+    expect(lastGeminiHeader).toBeNull()
+  })
+})
