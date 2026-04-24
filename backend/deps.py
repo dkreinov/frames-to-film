@@ -44,3 +44,22 @@ def resolve_gemini_key(x_gemini_key: str | None) -> str:
             ),
         )
     return key
+
+
+def resolve_fal_key(x_fal_key: str | None) -> str:
+    """Resolve the fal.ai API key for api-mode video generation.
+
+    Same precedence shape as `resolve_gemini_key`:
+    1. `X-Fal-Key` header (pasted in Settings by the user).
+    2. `FAL_KEY` env var (local dev fallback).
+    """
+    key = (x_fal_key or "").strip() or os.getenv("FAL_KEY")
+    if not key:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "fal.ai API key required for api mode. "
+                "Paste a key in Settings or set the 'FAL_KEY' env var."
+            ),
+        )
+    return key
