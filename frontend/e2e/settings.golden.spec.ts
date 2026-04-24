@@ -15,10 +15,16 @@ test('golden: Settings screen with filled Gemini key + Generate prompts api', as
 }) => {
   await page.goto('/settings')
   await page.getByLabel(/gemini api key/i).fill('test-key-abc')
-  await page.getByRole('button', { name: /^save$/i }).click()
-  // Show the key so the screenshot captures a non-empty field visibly.
-  await page.getByRole('button', { name: /show key/i }).click()
+  await page.getByLabel(/fal\.ai api key/i).fill('fal-key-xyz')
+  // Two Save buttons now (Gemini + fal) — click each by index.
+  const saves = page.getByRole('button', { name: /^save$/i })
+  await saves.nth(0).click()
+  await saves.nth(1).click()
+  // Show both keys so the screenshot captures non-empty field values.
+  await page.getByRole('button', { name: /show gemini-key value/i }).click()
+  await page.getByRole('button', { name: /show fal-key value/i }).click()
   await page.getByRole('radio', { name: /generate prompts — api/i }).check()
+  await page.getByRole('radio', { name: /generate videos — api/i }).check()
   await page.waitForTimeout(300)
 
   await page.screenshot({

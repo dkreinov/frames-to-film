@@ -35,7 +35,9 @@ describe('SettingsScreen', () => {
     renderAt()
     const input = screen.getByLabelText(/gemini api key/i) as HTMLInputElement
     fireEvent.change(input, { target: { value: 'sk-test-123' } })
-    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+    // Two Save buttons on the page (Gemini + fal). Click the one adjacent
+    // to the Gemini input (first one in DOM order).
+    fireEvent.click(screen.getAllByRole('button', { name: /^save$/i })[0])
     const raw = localStorage.getItem('olga.keys')
     expect(raw).toContain('sk-test-123')
 
@@ -49,8 +51,8 @@ describe('SettingsScreen', () => {
     renderAt()
     const input = screen.getByLabelText(/gemini api key/i) as HTMLInputElement
     fireEvent.change(input, { target: { value: 'sk-test-123' } })
-    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
-    fireEvent.click(screen.getByRole('button', { name: /^clear$/i }))
+    fireEvent.click(screen.getAllByRole('button', { name: /^save$/i })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: /^clear$/i })[0])
     expect(input.value).toBe('')
   })
 
@@ -64,8 +66,9 @@ describe('SettingsScreen', () => {
     const rawModes = localStorage.getItem('olga.modes')
     expect(rawModes).toContain('"generatePrompts":"api"')
 
-    // Prepare / extend / generateVideos / stitch api radios disabled.
-    for (const stage of ['prepare', 'storyboard extend', 'generate videos', 'stitch']) {
+    // Prepare / extend / stitch api radios still disabled (Phase 5 only
+    // lit up generate-videos + generate-prompts).
+    for (const stage of ['prepare', 'storyboard extend', 'stitch']) {
       const disabled = screen.getByRole('radio', {
         name: new RegExp(`${stage} — api`, 'i'),
       }) as HTMLInputElement
@@ -108,5 +111,44 @@ describe('SettingsScreen — columns', () => {
       }) as HTMLInputElement
       expect(mockRadio.disabled).toBe(false)
     }
+  })
+})
+
+describe('SettingsScreen — fal.ai key + enabled Generate videos api (Phase 5 Sub-Plan 2)', () => {
+  it('renders both Gemini and fal.ai key inputs', () => {
+    renderAt()
+    expect(screen.getByLabelText(/gemini api key/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/fal\.ai api key/i)).toBeInTheDocument()
+  })
+
+  it('saving the fal.ai key persists to localStorage as olga.keys.fal', () => {
+    renderAt()
+    const input = screen.getByLabelText(/fal\.ai api key/i) as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'fal-test-999' } })
+    // Two Save buttons on the page now (one per field). Click the one
+    // next to the fal input — it's the second Save button in DOM order.
+    const saves = screen.getAllByRole('button', { name: /^save$/i })
+    expect(saves).toHaveLength(2)
+    fireEvent.click(saves[1])
+    const raw = localStorage.getItem('olga.keys')
+    expect(raw).toContain('"fal":"fal-test-999"')
+  })
+
+  it('Generate videos — api radio is enabled (not disabled like the mock-only rows)', () => {
+    // Authenticity: the whole point of Step 9 is to flip apiEnabled:true
+    // on the generateVideos row. If this regresses, the user can't even
+    // select api mode.
+    renderAt()
+    const apiRadio = screen.getByRole('radio', {
+      name: /^Generate videos — api$/,
+    }) as HTMLInputElement
+    expect(apiRadio.disabled).toBe(false)
+  })
+
+  it('Generate videos row no longer shows the "api mode arrives in Phase 5" note', () => {
+    renderAt()
+    const row = screen.getByText(/^Generate videos$/i).closest('tr')
+    expect(row).toBeTruthy()
+    expect(row!.textContent).not.toMatch(/api mode arrives in Phase 5/i)
   })
 })
