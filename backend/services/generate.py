@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -20,7 +21,21 @@ _FALLBACK_PROMPT = "Smooth cinematic transition between the two frames."
 # Kling O3 5-second clips; matches the user-chosen duration in the plan.
 _API_DURATION_S = 5
 
-FFMPEG_BIN = REPO_ROOT / "tools" / "ffmpeg.exe"
+
+def _resolve_ffmpeg() -> str:
+    """Pick the ffmpeg binary: system PATH first, then bundled Windows exe.
+
+    Linux CI `apt-get install -y ffmpeg` puts it on PATH; Windows dev
+    machines ship `tools/ffmpeg.exe` alongside the repo. Same precedence
+    pattern as `concat_videos._get_ffmpeg_exe`.
+    """
+    on_path = shutil.which("ffmpeg")
+    if on_path:
+        return on_path
+    bundled = REPO_ROOT / "tools" / "ffmpeg.exe"
+    return str(bundled)
+
+FFMPEG_BIN = Path(_resolve_ffmpeg())
 
 
 def _sort_key(filename: str) -> tuple[int, str]:
