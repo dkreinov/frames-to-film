@@ -323,6 +323,61 @@ These cannot change without updating every later sub-plan:
   pointing at a backend URL that sets `Content-Disposition`. Do
   NOT wrap in `<Button>` + blob fetch unless a progress overlay
   or filename override is required.
+- **`useSettings` hook + localStorage schema** (introduced by
+  Settings sub-plan, `frontend/src/routes/useSettings.ts`).
+  Two storage keys, both JSON-encoded:
+  - `olga.keys` — `{gemini: string}` (more keys in Phase 5).
+    Empty string means "not set"; components MUST treat "" as
+    absent, not as a valid key.
+  - `olga.modes` — `{prepare, extend, generatePrompts,
+    generateVideos, stitch: 'mock' | 'api'}`. Default all `mock`.
+  The hook exposes `{keys, modes, setKey, clearKey, setMode}`
+  and listens for cross-tab `storage` events so a key saved in
+  one tab propagates to others without reload. Any future
+  per-user preference that needs to survive reload but not
+  leave the browser belongs here — do NOT roll a second
+  localStorage wrapper.
+- **`X-Gemini-Key` header attach pattern** (introduced by
+  Settings sub-plan). `frontend/src/api/client.ts` exports an
+  internal `apiFetch(url, init)` wrapper that reads
+  `localStorage['olga.keys'].gemini` at call time and attaches
+  it as the `X-Gemini-Key` request header when non-empty. Every
+  client function MUST go through `apiFetch` — never call
+  `fetch` directly — so new endpoints inherit the header for
+  free. The key is read on each call (not cached) so a Save in
+  Settings takes effect on the very next request without a
+  React re-render.
+- **`resolve_gemini_key` backend utility** (introduced by
+  Settings sub-plan, `backend/deps.py`). Not a FastAPI
+  `Depends` — handlers call it only on `mode == "api"`
+  branches so mock-mode requests never require a key.
+  Precedence: request header `X-Gemini-Key` → env var
+  `gemini` → `HTTPException(400, "Gemini API key required for
+  api mode. Paste a key in Settings or set the 'gemini' env
+  var.")`. Any future per-user-provided secret (Kling,
+  OpenAI, etc.) follows the same shape: a `resolve_<vendor>_key`
+  in `deps.py` + a matching `X-<Vendor>-Key` header attached
+  by `apiFetch`. Do NOT add a blanket `Depends(resolve_*)` —
+  mock mode would then 400 without a key, defeating the
+  "runs offline for free" principle.
+- **Mode propagation via `useSettings`** (introduced by
+  Settings sub-plan). Every wizard screen that starts a stage
+  job MUST read `modes.<stageKey>` from `useSettings()` and
+  pass it to the `startStage` mutationFn. The mutationFn MUST
+  accept the mode as an explicit argument — do NOT hardcode
+  `'mock'` in the mutationFn or the Settings toggle becomes
+  decorative. Required test (proven in `PrepareScreen.test.tsx`
+  and `GenerateScreen.test.tsx`): seed `localStorage['olga.modes']`
+  with the stage set to `'api'` before mount, then assert the
+  client mock was called with `'api'`. A passing test that
+  calls the mock directly is a placebo and MUST be rewritten
+  to drive the real mount path.
+- **Non-wizard `AppBar`** (introduced by Settings sub-plan).
+  `AppBar`'s `currentStep` prop is optional. Wizard routes pass
+  their step id; non-wizard routes (Settings, any future
+  admin/help page) render `<AppBar />` with no prop so
+  `WizardStepper` highlights nothing. Do NOT pass a fake step
+  id just to satisfy the type — it lies to the user.
 
 ## Decisions log
 
@@ -335,3 +390,5 @@ These cannot change without updating every later sub-plan:
 | 2026-04-23 | Shadcn "new-york" style, zinc base | Most neutral; suits the "calm and serious" principle. |
 | 2026-04-23 | pnpm preferred, npm fallback | pnpm faster; npm available on Windows PATH. Phase 4 shipped on npm because pnpm was not on PATH — document over reinstall. |
 | 2026-04-23 | `OLGA_PYTHON` env var overrides Playwright's `python` command | Windows dev may have Python installed outside PATH; playwright.config.ts falls back to `process.env.OLGA_PYTHON ?? 'python'`. |
+| 2026-04-24 | Settings: localStorage + `X-Gemini-Key` header, per-stage mode toggles | User-supplied secrets belong on the client — never in the backend `.env` of a tool others will run. Per-stage toggle is the minimum knob that scales to Phase 5 (Kling web mode) without redesigning Settings. |
+| 2026-04-24 | Only `generatePrompts` api-mode enabled in Settings; other stages gated until Phase 5 | Shipping `api` radios disabled-with-note is clearer than hiding them: user sees the roadmap, understands why, won't file "toggle does nothing" bugs. Phase 5 flips them on one by one as each vendor path lands. |

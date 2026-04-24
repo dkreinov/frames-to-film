@@ -29,7 +29,7 @@ export default function SettingsScreen() {
 
   return (
     <>
-      <AppBar currentStep="upload" />
+      <AppBar />
       <PageContainer
         title="Settings"
         subtitle="API keys are stored in this browser only. Run modes control whether each stage uses real APIs or mock data."

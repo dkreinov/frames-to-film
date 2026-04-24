@@ -11,8 +11,10 @@ export const WIZARD_STEPS = [
 
 export type WizardStep = (typeof WIZARD_STEPS)[number]['id']
 
-export function WizardStepper({ currentStep }: { currentStep: WizardStep }) {
-  const currentIdx = WIZARD_STEPS.findIndex((s) => s.id === currentStep)
+export function WizardStepper({ currentStep }: { currentStep?: WizardStep }) {
+  const currentIdx = currentStep
+    ? WIZARD_STEPS.findIndex((s) => s.id === currentStep)
+    : -1
   return (
     <ol className="flex items-center gap-2 text-xs">
       {WIZARD_STEPS.map((step, idx) => {

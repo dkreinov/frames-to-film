@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { Settings } from 'lucide-react'
 import { WizardStepper, type WizardStep } from './WizardStepper'
 
-export function AppBar({ currentStep }: { currentStep: WizardStep }) {
+export function AppBar({ currentStep }: { currentStep?: WizardStep }) {
   return (
     <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-border bg-background/80 px-6 backdrop-blur">
       <Link to="/" className="flex items-center gap-2 font-semibold tracking-tight">
