@@ -91,23 +91,6 @@ def run_generate(project_dir: Path, mode: str) -> dict:
         generate_run(img_dir=img_dir, video_dir=video_dir, project_dir=project_dir)
         return {"produced": [p.name for p in sorted(video_dir.glob("seg_*.mp4"))]}
 
-    if mode == "web":
-        # Phase 5 Sub-Plan 1: adapter exists but every real-browser method
-        # raises WebModeNotImplemented. We authenticate() eagerly so the
-        # error surfaces as a clean job error (status='error') with a
-        # user-facing message. Sub-Plan 2 replaces the raises with real
-        # Playwright; the runner branch stays.
-        from backend.adapters.veo_web import VeoWebAdapter, WebModeNotImplemented
-        try:
-            with VeoWebAdapter() as adapter:
-                adapter.authenticate()
-                # Sub-Plan 2 will loop frames + upload + generate + download here.
-                return {"produced": []}
-        except WebModeNotImplemented as exc:
-            # Surface as a job error, not a 500. The sentinel is intentional —
-            # any other exception type propagates normally.
-            raise RuntimeError(str(exc)) from exc
-
     raise ValueError(f"unknown mode: {mode}")
 
 

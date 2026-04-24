@@ -17,7 +17,7 @@ router = APIRouter(prefix="/projects/{project_id}/generate", tags=["generate"])
 
 
 class GenerateRequest(BaseModel):
-    mode: Literal["mock", "api", "web"] = "mock"
+    mode: Literal["mock", "api"] = "mock"
 
 
 def _project_exists(db_path: Path, project_id: str, user_id: str) -> bool:
