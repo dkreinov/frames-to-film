@@ -27,21 +27,25 @@ export class ApiError extends Error {
 }
 
 /**
- * Read the Gemini API key from localStorage and merge it into request
- * headers as X-Gemini-Key. Attached on every request (mode-independent)
- * so the backend's resolve_gemini_key can prefer it over .env even for
+ * Read stored API keys from localStorage and merge them into request
+ * headers. Attached on every request (mode-independent) so the backend's
+ * resolve_<vendor>_key helpers can prefer them over .env even for
  * mock-mode flows that happen to inspect the header for logging.
  *
- * Missing/empty key -> no header attached (backend falls back to env).
+ * Missing/empty key -> no corresponding header attached (backend falls
+ * back to env var).
  */
 function headersWithKey(base: HeadersInit = {}): HeadersInit {
   try {
     const raw = localStorage.getItem('olga.keys')
     if (!raw) return base
-    const parsed = JSON.parse(raw) as { gemini?: string }
+    const parsed = JSON.parse(raw) as { gemini?: string; fal?: string }
+    const out: Record<string, string> = { ...(base as Record<string, string>) }
     const gemini = (parsed.gemini || '').trim()
-    if (!gemini) return base
-    return { ...base, 'X-Gemini-Key': gemini }
+    if (gemini) out['X-Gemini-Key'] = gemini
+    const fal = (parsed.fal || '').trim()
+    if (fal) out['X-Fal-Key'] = fal
+    return out
   } catch {
     return base
   }

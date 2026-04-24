@@ -193,3 +193,56 @@ describe('api client: X-Gemini-Key header', () => {
     expect(lastGeminiHeader).toBeNull()
   })
 })
+
+// --- Phase 5 sub-plan 2 Step 10: X-Fal-Key header attachment ---
+
+describe('api client: X-Fal-Key header', () => {
+  let lastFalHeader: string | null = null
+  let lastGeminiHeader: string | null = null
+
+  async function run(keys: { gemini?: string; fal?: string }) {
+    server.use(
+      http.post(
+        'http://127.0.0.1:8000/projects/:pid/generate',
+        ({ request }) => {
+          lastFalHeader = request.headers.get('x-fal-key')
+          lastGeminiHeader = request.headers.get('x-gemini-key')
+          return HttpResponse.json({ job_id: 'jid-gen' }, { status: 202 })
+        }
+      )
+    )
+    localStorage.clear()
+    lastFalHeader = null
+    lastGeminiHeader = null
+    localStorage.setItem('olga.keys', JSON.stringify(keys))
+    const { startGenerate } = await import('./client')
+    await startGenerate('pid-gen', 'api')
+  }
+
+  it('attaches X-Fal-Key when olga.keys.fal is set', async () => {
+    await run({ fal: 'fal-xyz-777' })
+    expect(lastFalHeader).toBe('fal-xyz-777')
+  })
+
+  it('attaches both X-Fal-Key and X-Gemini-Key when both are set', async () => {
+    await run({ gemini: 'gem-1', fal: 'fal-2' })
+    expect(lastGeminiHeader).toBe('gem-1')
+    expect(lastFalHeader).toBe('fal-2')
+  })
+
+  it('omits X-Fal-Key when only gemini is set', async () => {
+    await run({ gemini: 'gem-only' })
+    expect(lastGeminiHeader).toBe('gem-only')
+    expect(lastFalHeader).toBeNull()
+  })
+
+  it('omits X-Fal-Key when the stored value is empty', async () => {
+    await run({ fal: '' })
+    expect(lastFalHeader).toBeNull()
+  })
+
+  it('omits X-Fal-Key when the stored value is whitespace only', async () => {
+    await run({ fal: '   ' })
+    expect(lastFalHeader).toBeNull()
+  })
+})
