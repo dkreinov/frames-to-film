@@ -1,9 +1,10 @@
-"""Shared FastAPI dependencies — DB path, storage root, user id."""
+"""Shared FastAPI dependencies — DB path, storage root, user id, API keys."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
-from fastapi import Header
+from fastapi import Header, HTTPException
 
 from backend.db import DEFAULT_DB_PATH, REPO_ROOT
 
@@ -20,3 +21,26 @@ def get_storage_root() -> Path:
 
 def get_user_id(x_user_id: str | None = Header(default=None)) -> str:
     return (x_user_id or "local").strip() or "local"
+
+
+def resolve_gemini_key(x_gemini_key: str | None) -> str:
+    """Resolve the Gemini API key for api-mode calls.
+
+    Precedence:
+    1. `X-Gemini-Key` header value (passed in from the handler).
+    2. `gemini` env var (legacy `.env` path for local dev).
+
+    Raises `HTTPException(400)` if neither is set. Handlers should call
+    this only when the request actually needs a key (mode == "api");
+    mock-mode flows should not reach this resolver.
+    """
+    key = (x_gemini_key or "").strip() or os.getenv("gemini")
+    if not key:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Gemini API key required for api mode. "
+                "Paste a key in Settings or set the 'gemini' env var."
+            ),
+        )
+    return key

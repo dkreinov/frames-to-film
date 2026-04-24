@@ -74,9 +74,9 @@ def test_api_generator_calls_gemini_once_per_pair(tmp_path: Path, monkeypatch: p
         def __init__(self) -> None:
             self.models = FakeModels()
 
-    monkeypatch.setattr(prompts_mod, "_get_genai_client", lambda: FakeClient())
+    monkeypatch.setattr(prompts_mod, "_get_genai_client", lambda key: FakeClient())
 
-    out = prompts_mod.generate_prompts_api(tmp_path, style="cinematic")
+    out = prompts_mod.generate_prompts_api(tmp_path, style="cinematic", key="test-key")
     assert set(out.keys()) == {"1_to_2", "2_to_3", "3_to_4", "4_to_5", "5_to_6"}
     # 5 API calls, each using the flash model
     assert len(calls) == 5
@@ -144,9 +144,164 @@ def test_api_generator_falls_back_to_preset_on_api_error(tmp_path: Path, monkeyp
         def __init__(self) -> None:
             self.models = FakeModels()
 
-    monkeypatch.setattr(prompts_mod, "_get_genai_client", lambda: FakeClient())
+    monkeypatch.setattr(prompts_mod, "_get_genai_client", lambda key: FakeClient())
 
-    out = prompts_mod.generate_prompts_api(tmp_path, style="playful")
+    out = prompts_mod.generate_prompts_api(tmp_path, style="playful", key="test-key")
     assert set(out.keys()) == {"1_to_2", "2_to_3"}
     for v in out.values():
         assert v == STYLE_PRESETS["playful"]
+
+
+# --- Phase 4 sub-plan 6 Step 1: X-Gemini-Key resolver ---
+
+def test_resolve_gemini_key_prefers_header_over_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    from backend.deps import resolve_gemini_key
+
+    monkeypatch.setenv("gemini", "env-key")
+    assert resolve_gemini_key("header-key") == "header-key"
+
+
+def test_resolve_gemini_key_falls_back_to_env_when_header_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from backend.deps import resolve_gemini_key
+
+    monkeypatch.setenv("gemini", "env-key")
+    assert resolve_gemini_key(None) == "env-key"
+    assert resolve_gemini_key("") == "env-key"
+    assert resolve_gemini_key("   ") == "env-key"
+
+
+def test_resolve_gemini_key_raises_400_when_neither_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from fastapi import HTTPException
+    from backend.deps import resolve_gemini_key
+
+    monkeypatch.delenv("gemini", raising=False)
+    with pytest.raises(HTTPException) as exc:
+        resolve_gemini_key(None)
+    assert exc.value.status_code == 400
+    assert "Gemini API key required" in exc.value.detail
+
+
+def test_prompts_api_endpoint_surfaces_header_key_to_runner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Full HTTP round-trip: POST /prompts/generate with X-Gemini-Key ->
+    the background runner receives the key via the job payload and
+    passes it to _get_genai_client."""
+    from fastapi.testclient import TestClient
+    from backend.deps import get_db_path, get_storage_root
+    from backend.main import app
+    from backend.services import prompts as prompts_mod
+
+    db = tmp_path / "index.db"
+    storage = tmp_path / "pipeline_runs"
+    storage.mkdir()
+    app.dependency_overrides[get_db_path] = lambda: db
+    app.dependency_overrides[get_storage_root] = lambda: storage
+
+    # Record which key _get_genai_client was called with.
+    received_keys: list[str] = []
+
+    class FakeResponse:
+        def __init__(self, text: str) -> None:
+            self.text = text
+
+    class FakeModels:
+        def generate_content(self, **_ignored):
+            return FakeResponse("generated")
+
+    class FakeClient:
+        def __init__(self) -> None:
+            self.models = FakeModels()
+
+    def fake_get_client(key: str):
+        received_keys.append(key)
+        return FakeClient()
+
+    monkeypatch.setattr(prompts_mod, "_get_genai_client", fake_get_client)
+    monkeypatch.delenv("gemini", raising=False)  # force header path
+
+    try:
+        with TestClient(app) as c:
+            pid = c.post("/projects", json={"name": "X"}).json()["project_id"]
+            # Seed kling_test frames.
+            d = storage / "local" / pid / "kling_test"
+            d.mkdir(parents=True, exist_ok=True)
+            from PIL import Image
+            for i in range(1, 4):
+                Image.new("RGB", (16, 16), (i * 30, 0, 0)).save(d / f"{i}.jpg", "JPEG")
+
+            r = c.post(
+                f"/projects/{pid}/prompts/generate",
+                json={"mode": "api", "style": "cinematic"},
+                headers={"X-Gemini-Key": "header-key-xyz"},
+            )
+            assert r.status_code == 202, r.text
+    finally:
+        app.dependency_overrides.clear()
+
+    assert received_keys == ["header-key-xyz"]
+
+
+def test_prompts_api_endpoint_400_when_api_mode_and_no_key(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """POST /prompts/generate with mode=api and no header + no env -> 400."""
+    from fastapi.testclient import TestClient
+    from backend.deps import get_db_path, get_storage_root
+    from backend.main import app
+
+    db = tmp_path / "index.db"
+    storage = tmp_path / "pipeline_runs"
+    storage.mkdir()
+    app.dependency_overrides[get_db_path] = lambda: db
+    app.dependency_overrides[get_storage_root] = lambda: storage
+    monkeypatch.delenv("gemini", raising=False)
+
+    try:
+        with TestClient(app) as c:
+            pid = c.post("/projects", json={"name": "X"}).json()["project_id"]
+            r = c.post(
+                f"/projects/{pid}/prompts/generate",
+                json={"mode": "api", "style": "cinematic"},
+            )
+            assert r.status_code == 400
+            assert "Gemini API key required" in r.json()["detail"]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_prompts_mock_mode_does_not_require_gemini_key(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """mock mode must work without a Gemini key — no 400 surfacing."""
+    from fastapi.testclient import TestClient
+    from backend.deps import get_db_path, get_storage_root
+    from backend.main import app
+
+    db = tmp_path / "index.db"
+    storage = tmp_path / "pipeline_runs"
+    storage.mkdir()
+    app.dependency_overrides[get_db_path] = lambda: db
+    app.dependency_overrides[get_storage_root] = lambda: storage
+    monkeypatch.delenv("gemini", raising=False)
+
+    try:
+        with TestClient(app) as c:
+            pid = c.post("/projects", json={"name": "X"}).json()["project_id"]
+            d = storage / "local" / pid / "kling_test"
+            d.mkdir(parents=True, exist_ok=True)
+            from PIL import Image
+            for i in range(1, 4):
+                Image.new("RGB", (16, 16), (i * 30, 0, 0)).save(d / f"{i}.jpg", "JPEG")
+
+            r = c.post(
+                f"/projects/{pid}/prompts/generate",
+                json={"mode": "mock", "style": "cinematic"},
+            )
+            assert r.status_code == 202, r.text
+    finally:
+        app.dependency_overrides.clear()

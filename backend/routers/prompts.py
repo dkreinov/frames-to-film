@@ -6,11 +6,11 @@ import os
 import tempfile
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 
 from backend.db import connect, init_db
-from backend.deps import get_db_path, get_storage_root, get_user_id
+from backend.deps import get_db_path, get_storage_root, get_user_id, resolve_gemini_key
 from backend.services import jobs as jobs_svc
 from backend.services import prompts as prompts_svc
 
@@ -38,16 +38,21 @@ def generate_prompts(
     db_path: Path = Depends(get_db_path),
     storage_root: Path = Depends(get_storage_root),
     user_id: str = Depends(get_user_id),
+    x_gemini_key: str | None = Header(default=None, alias="X-Gemini-Key"),
 ) -> dict:
     init_db(db_path)
     if not _project_exists(db_path, project_id, user_id):
         raise HTTPException(status_code=404, detail="project not found")
     project_dir = storage_root / user_id / project_id
-    payload = {
+    payload: dict = {
         "project_dir": str(project_dir),
         "mode": body.mode,
         "style": body.style,
     }
+    # Resolve + validate the Gemini key ONLY when api mode is requested.
+    # Mock mode doesn't touch Gemini, so a missing key must not 400.
+    if body.mode == "api":
+        payload["gemini_key"] = resolve_gemini_key(x_gemini_key)
     job_id = jobs_svc.create_job(
         db_path, project_id=project_id, user_id=user_id, kind="prompts", payload=payload
     )

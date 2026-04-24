@@ -145,34 +145,41 @@ _API_PROMPT_TEMPLATE = (
 )
 
 
-def _get_genai_client() -> Any:
+def _get_genai_client(key: str) -> Any:
     """Thin wrapper — replaced by tests. Import lazily so offline tests
-    never need the google-genai SDK loaded."""
-    import os
+    never need the google-genai SDK loaded.
+
+    Accepts the key explicitly so the resolver (header -> env) lives in
+    backend/deps.py::get_gemini_key, not scattered across services.
+    """
     from google import genai
-    gemini_key = os.getenv("gemini")
-    if not gemini_key:
-        raise RuntimeError("No 'gemini' key found in .env")
-    return genai.Client(**{"api_key": gemini_key})
+    return genai.Client(**{"api_key": key})
 
 
-def generate_prompts_api(project_dir: Path | str, style: str = "cinematic") -> dict[str, str]:
+def generate_prompts_api(
+    project_dir: Path | str,
+    style: str = "cinematic",
+    key: str = "",
+) -> dict[str, str]:
     """API generator — calls gemini-2.0-flash per pair with both frame images
     + a style hint. On any per-pair API error, falls back to the style preset
     for that pair so the output dict is always complete.
+
+    `key` is the resolved Gemini API key from backend.deps.get_gemini_key.
+    Callers must pass it; the service no longer reads env directly.
     """
     project_dir = Path(project_dir)
     pairs = _pair_keys_for_project(project_dir)
     img_dir = project_dir / "kling_test"
     preset = STYLE_PRESETS.get(style, FALLBACK_PROMPT)
 
-    client = _get_genai_client()
+    client = _get_genai_client(key)
     instruction = _API_PROMPT_TEMPLATE.format(style=style)
     out: dict[str, str] = {}
 
     from PIL import Image
-    for key in pairs:
-        a_stem, b_stem = key.split("_to_")
+    for pair_key in pairs:
+        a_stem, b_stem = pair_key.split("_to_")
         img_a = Image.open(img_dir / f"{a_stem}.jpg")
         img_b = Image.open(img_dir / f"{b_stem}.jpg")
         try:
@@ -181,23 +188,29 @@ def generate_prompts_api(project_dir: Path | str, style: str = "cinematic") -> d
                 contents=[instruction, img_a, img_b],
             )
             text = (resp.text or "").strip()
-            out[key] = text or preset
+            out[pair_key] = text or preset
         except Exception:  # fall back per-pair; don't lose the whole run
-            out[key] = preset
+            out[pair_key] = preset
 
     (project_dir / "prompts.json").write_text(json.dumps(out, indent=2))
     return out
 
 
 def prompts_runner(**payload) -> dict:
-    """Adapter for backend.services.jobs.run_job_sync."""
+    """Adapter for backend.services.jobs.run_job_sync.
+
+    Expects `gemini_key` in payload when mode == "api" (resolved by the
+    HTTP handler's get_gemini_key dependency and written into the job
+    payload so the background runner doesn't need request context).
+    """
     project_dir = Path(payload["project_dir"])
     mode = payload.get("mode", "mock")
     style = payload.get("style", "cinematic")
     if mode == "mock":
         produced = generate_prompts_mock(project_dir, style=style)
     elif mode == "api":
-        produced = generate_prompts_api(project_dir, style=style)
+        key = payload.get("gemini_key") or ""
+        produced = generate_prompts_api(project_dir, style=style, key=key)
     else:
         raise ValueError(f"unknown mode: {mode}")
     return {"produced": list(produced.keys())}
