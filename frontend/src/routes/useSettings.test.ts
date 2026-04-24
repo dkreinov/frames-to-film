@@ -72,32 +72,14 @@ describe('useSettings', () => {
   })
 })
 
-describe('useSettings — web mode (Phase 5 Sub-Plan 1)', () => {
+describe('useSettings — generateVideos default', () => {
   it('DEFAULT_MODES.generateVideos stays mock (no accidental upgrade)', () => {
-    // Authenticity (plan-skill #9): pins the default so a future edit
-    // that flips generateVideos to api/web by accident fails loudly.
+    // Pins the default so a future edit that flips generateVideos to
+    // api accidentally fails loudly. Authentic regression guard.
     expect(DEFAULT_MODES.generateVideos).toBe('mock')
   })
 
-  it('round-trips stored {generateVideos: "web"} through the hook', () => {
-    localStorage.setItem(
-      'olga.modes',
-      JSON.stringify({ ...DEFAULT_MODES, generateVideos: 'web' })
-    )
-    const { result } = renderHook(() => useSettings())
-    expect(result.current.modes.generateVideos).toBe('web')
-  })
-
-  it('setMode("generateVideos", "web") persists to localStorage', () => {
-    const { result } = renderHook(() => useSettings())
-    act(() => result.current.setMode('generateVideos', 'web'))
-    expect(result.current.modes.generateVideos).toBe('web')
-    const raw = localStorage.getItem('olga.modes')
-    expect(raw).not.toBeNull()
-    expect(JSON.parse(raw!).generateVideos).toBe('web')
-  })
-
-  it('storage missing generateVideos key still backfills to mock default', () => {
+  it('storage missing generateVideos key backfills to mock default', () => {
     // Pre-Phase-5 upgrade shape: someone had partial modes written. The
     // read() merge with DEFAULT_MODES fills in the missing keys.
     localStorage.setItem(

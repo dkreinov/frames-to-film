@@ -10,17 +10,15 @@ const STAGE_ROWS: Array<{
   id: StageKey
   label: string
   apiEnabled: boolean
-  supportsWeb: boolean
 }> = [
-  { id: 'prepare', label: 'Prepare', apiEnabled: false, supportsWeb: false },
-  { id: 'extend', label: 'Storyboard extend', apiEnabled: false, supportsWeb: false },
-  { id: 'generatePrompts', label: 'Generate prompts', apiEnabled: true, supportsWeb: false },
-  { id: 'generateVideos', label: 'Generate videos', apiEnabled: false, supportsWeb: true },
-  { id: 'stitch', label: 'Stitch', apiEnabled: false, supportsWeb: false },
+  { id: 'prepare', label: 'Prepare', apiEnabled: false },
+  { id: 'extend', label: 'Storyboard extend', apiEnabled: false },
+  { id: 'generatePrompts', label: 'Generate prompts', apiEnabled: true },
+  { id: 'generateVideos', label: 'Generate videos', apiEnabled: false },
+  { id: 'stitch', label: 'Stitch', apiEnabled: false },
 ]
 
 const API_NOTE = 'api mode arrives in Phase 5'
-const WEB_NOTE = 'web mode arrives in Phase 5 Sub-Plan 2'
 
 export default function SettingsScreen() {
   const { keys, modes, setKey, clearKey, setMode } = useSettings()
@@ -97,11 +95,9 @@ export default function SettingsScreen() {
         <section>
           <h2 className="mb-3 text-lg font-semibold">Run modes</h2>
           <p className="mb-4 text-sm text-muted-foreground">
-            Each stage can run in mock (free, fast, preset output), api
-            (real external calls, requires keys above), or web
-            (authenticated browser profile — Generate videos only,
-            arriving in Phase 5 Sub-Plan 2). Only stages with
-            implemented paths can be toggled today.
+            Each stage can run in mock (free, fast, preset output) or
+            api (real external calls, requires keys above). Only stages
+            with implemented api paths can be toggled today.
           </p>
           <table className="text-sm">
             <thead>
@@ -115,50 +111,33 @@ export default function SettingsScreen() {
                 <th className="px-4 pb-2 font-medium text-muted-foreground">
                   api
                 </th>
-                <th className="px-4 pb-2 font-medium text-muted-foreground">
-                  web
-                </th>
               </tr>
             </thead>
             <tbody>
-              {STAGE_ROWS.map(({ id, label, apiEnabled, supportsWeb }) => {
-                const notes: string[] = []
-                if (!apiEnabled) notes.push(API_NOTE)
-                if (supportsWeb) notes.push(WEB_NOTE)
-                return (
-                  <tr key={id}>
-                    <td className="pr-6 py-2">
-                      <span className="font-medium">{label}</span>
-                      {notes.length > 0 && (
-                        <span className="ml-2 text-xs text-muted-foreground">
-                          ({notes.join(', ')})
-                        </span>
-                      )}
+              {STAGE_ROWS.map(({ id, label, apiEnabled }) => (
+                <tr key={id}>
+                  <td className="pr-6 py-2">
+                    <span className="font-medium">{label}</span>
+                    {!apiEnabled && (
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        ({API_NOTE})
+                      </span>
+                    )}
+                  </td>
+                  {(['mock', 'api'] as Mode[]).map((m) => (
+                    <td key={m} className="px-4 py-2 text-center">
+                      <input
+                        type="radio"
+                        name={`mode-${id}`}
+                        aria-label={`${label} — ${m}`}
+                        checked={modes[id] === m}
+                        disabled={!apiEnabled && m === 'api'}
+                        onChange={() => setMode(id, m)}
+                      />
                     </td>
-                    {(['mock', 'api', 'web'] as Mode[]).map((m) => {
-                      // Non-video rows: web cell is blank (no radio).
-                      if (m === 'web' && !supportsWeb) {
-                        return <td key={m} className="px-4 py-2" />
-                      }
-                      const disabled =
-                        (m === 'api' && !apiEnabled) ||
-                        (m === 'web' && supportsWeb) // Sub-Plan 2 not implemented
-                      return (
-                        <td key={m} className="px-4 py-2 text-center">
-                          <input
-                            type="radio"
-                            name={`mode-${id}`}
-                            aria-label={`${label} — ${m}`}
-                            checked={modes[id] === m}
-                            disabled={disabled}
-                            onChange={() => setMode(id, m)}
-                          />
-                        </td>
-                      )
-                    })}
-                  </tr>
-                )
-              })}
+                  ))}
+                </tr>
+              ))}
             </tbody>
           </table>
         </section>

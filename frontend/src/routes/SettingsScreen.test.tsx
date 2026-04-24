@@ -74,8 +74,8 @@ describe('SettingsScreen', () => {
   })
 })
 
-describe('SettingsScreen — web column (Phase 5 Sub-Plan 1)', () => {
-  it('renders four column headers: Stage, mock, api, web', () => {
+describe('SettingsScreen — columns', () => {
+  it('renders three column headers: Stage, mock, api', () => {
     renderAt()
     const table = screen.getByRole('table')
     const headers = table.querySelectorAll('thead th')
@@ -83,38 +83,10 @@ describe('SettingsScreen — web column (Phase 5 Sub-Plan 1)', () => {
       'Stage',
       'mock',
       'api',
-      'web',
     ])
   })
 
-  it('Generate videos row has a disabled web radio', () => {
-    renderAt()
-    const radio = screen.getByRole('radio', {
-      name: /^Generate videos — web$/,
-    }) as HTMLInputElement
-    expect(radio).toBeInTheDocument()
-    expect(radio.disabled).toBe(true)
-  })
-
-  it('Generate videos row label shows "web mode arrives in Phase 5 Sub-Plan 2" note', () => {
-    renderAt()
-    expect(
-      screen.getByText(/web mode arrives in Phase 5 Sub-Plan 2/i)
-    ).toBeInTheDocument()
-  })
-
-  it('non-video stage rows have no web radio at all', () => {
-    renderAt()
-    for (const label of ['Prepare', 'Storyboard extend', 'Generate prompts', 'Stitch']) {
-      expect(
-        screen.queryByRole('radio', { name: new RegExp(`^${label} — web$`) })
-      ).not.toBeInTheDocument()
-    }
-  })
-
-  it('Generate prompts — api radio stays enabled (Phase 4 contract unchanged)', () => {
-    // Regression guard: Step 6's column expansion must not accidentally
-    // re-disable the existing api radio on Generate prompts.
+  it('Generate prompts — api radio stays enabled (Phase 4 contract)', () => {
     renderAt()
     const apiRadio = screen.getByRole('radio', {
       name: /^Generate prompts — api$/,

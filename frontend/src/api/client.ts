@@ -96,7 +96,7 @@ export async function getJob(projectId: string, jobId: string): Promise<Job> {
 
 export async function startPrepare(
   projectId: string,
-  mode: 'mock' | 'api' | 'web' = 'mock'
+  mode: 'mock' | 'api' = 'mock'
 ): Promise<JobRef> {
   return parse<JobRef>(
     await apiFetch(`${API_BASE}/projects/${projectId}/prepare`, {
@@ -109,7 +109,7 @@ export async function startPrepare(
 
 export async function startExtend(
   projectId: string,
-  mode: 'mock' | 'api' | 'web' = 'mock'
+  mode: 'mock' | 'api' = 'mock'
 ): Promise<JobRef> {
   return parse<JobRef>(
     await apiFetch(`${API_BASE}/projects/${projectId}/extend`, {
@@ -161,7 +161,7 @@ export function artifactUrl(projectId: string, stage: string, name: string): str
 
 export async function startPromptsGeneration(
   projectId: string,
-  mode: 'mock' | 'api' | 'web' = 'mock',
+  mode: 'mock' | 'api' = 'mock',
   style: StylePreset = 'cinematic'
 ): Promise<JobRef> {
   return parse<JobRef>(
@@ -200,7 +200,7 @@ export async function savePrompts(
 
 export async function startGenerate(
   projectId: string,
-  mode: 'mock' | 'api' | 'web' = 'mock'
+  mode: 'mock' | 'api' = 'mock'
 ): Promise<JobRef> {
   return parse<JobRef>(
     await apiFetch(`${API_BASE}/projects/${projectId}/generate`, {
@@ -246,7 +246,7 @@ export async function reviewSegment(
 
 export async function startStitch(
   projectId: string,
-  mode: 'mock' | 'api' | 'web' = 'mock'
+  mode: 'mock' | 'api' = 'mock'
 ): Promise<JobRef> {
   return parse<JobRef>(
     await apiFetch(`${API_BASE}/projects/${projectId}/stitch`, {

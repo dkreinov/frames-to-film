@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
-export type Mode = 'mock' | 'api' | 'web'
+export type Mode = 'mock' | 'api'
 
 export type StageKey =
   | 'prepare'
