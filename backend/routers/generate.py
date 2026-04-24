@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from typing import Literal
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import BaseModel
 
@@ -15,7 +17,7 @@ router = APIRouter(prefix="/projects/{project_id}/generate", tags=["generate"])
 
 
 class GenerateRequest(BaseModel):
-    mode: str = "mock"
+    mode: Literal["mock", "api", "web"] = "mock"
 
 
 def _project_exists(db_path: Path, project_id: str, user_id: str) -> bool:
