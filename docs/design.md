@@ -378,6 +378,45 @@ These cannot change without updating every later sub-plan:
   admin/help page) render `<AppBar />` with no prop so
   `WizardStepper` highlights nothing. Do NOT pass a fake step
   id just to satisfy the type — it lies to the user.
+- **`Mode` type** (introduced by Phase 5 Sub-Plan 1). `Mode =
+  'mock' | 'api' | 'web'`. `web` applies ONLY to `generateVideos`
+  today; all other stages render a blank cell in the Settings
+  web column so the UI never tempts the user to flip a
+  nonsensical mode. api/client.ts stage-start signatures are
+  widened to accept `Mode` on all five stage starters to keep
+  TypeScript clean — the per-stage UI gates, plus backend
+  `Literal` validation at each router, prevent an invalid
+  combination from reaching a runner.
+- **`VeoWebAdapter` interface** (introduced by Phase 5 Sub-Plan
+  1, `backend/adapters/veo_web.py`). Methods: `authenticate()`,
+  `upload_frame(path)`, `request_generation(frame_a_url,
+  frame_b_url, prompt)`, `download_clip(job_ref)`, `cleanup()`.
+  All raise `WebModeNotImplemented` (a `NotImplementedError`
+  subclass) until Phase 5 Sub-Plan 2 wires them against a real
+  Playwright/Chrome-profile session. Method names + signatures
+  are frozen — Sub-Plan 2 MUST NOT rename. Class is also a
+  context manager so `cleanup()` runs on failure paths.
+- **`WebModeNotImplemented` sentinel** (introduced by Phase 5
+  Sub-Plan 1). `generate_runner`'s `mode == 'web'` branch
+  catches ONLY this sentinel and re-raises as a `RuntimeError`
+  with a user-facing message ("Phase 5 Sub-Plan 2 —
+  authenticated browser profile required. Flip 'Generate
+  videos' to api or mock mode in Settings."). `jobs.run_job_sync`
+  records that as `status='error'/error=<msg>`. Any future
+  adapter that follows the same "stub-first, implement-later"
+  pattern MUST reuse this sentinel shape — bare
+  `NotImplementedError` leaks the traceback.
+- **`STAGE_ROWS` shape for Settings** (introduced by Phase 5
+  Sub-Plan 1). Each row declares `apiEnabled: boolean` and
+  `supportsWeb: boolean`. `apiEnabled=false` disables the api
+  radio with an "api mode arrives in Phase 5" note;
+  `supportsWeb=true` renders a web radio (disabled until
+  Sub-Plan 2) with an inline "web mode arrives in Phase 5
+  Sub-Plan 2" note. `supportsWeb=false` renders a blank web
+  cell. Any future mode (e.g., a hypothetical `'kling'`) plugs
+  in by adding another per-row boolean + column header — do
+  NOT retrofit a general `supportedModes: Mode[]` array until a
+  third enabled-today vendor materialises.
 
 ## Decisions log
 
@@ -392,3 +431,5 @@ These cannot change without updating every later sub-plan:
 | 2026-04-23 | `OLGA_PYTHON` env var overrides Playwright's `python` command | Windows dev may have Python installed outside PATH; playwright.config.ts falls back to `process.env.OLGA_PYTHON ?? 'python'`. |
 | 2026-04-24 | Settings: localStorage + `X-Gemini-Key` header, per-stage mode toggles | User-supplied secrets belong on the client — never in the backend `.env` of a tool others will run. Per-stage toggle is the minimum knob that scales to Phase 5 (Kling web mode) without redesigning Settings. |
 | 2026-04-24 | Only `generatePrompts` api-mode enabled in Settings; other stages gated until Phase 5 | Shipping `api` radios disabled-with-note is clearer than hiding them: user sees the roadmap, understands why, won't file "toggle does nothing" bugs. Phase 5 flips them on one by one as each vendor path lands. |
+| 2026-04-24 | Phase 5 split into Sub-Plan 1 (scaffolding, autonomous-safe) + Sub-Plan 2 (live Playwright, needs user) | Full Phase 5 adapter needs authenticated Chrome profile + CAPTCHA handling; cannot run unattended without risking account bans. Sub-Plan 1 lands the plumbing (Mode=web, adapter stub, UI column disabled) so Sub-Plan 2 is a drop-in replacement of the NotImplementedError raises. |
+| 2026-04-24 | `WebModeNotImplemented` sentinel + `RuntimeError` re-raise in `run_generate` web branch | Swallowing bare `NotImplementedError` would also hide real bugs in later Sub-Plan 2 code. Sentinel subclass + re-raise-as-RuntimeError-with-user-message is the only pattern the runner catches; anything else propagates normally. |
