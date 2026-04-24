@@ -10,9 +10,9 @@ Replaces the Olga-specific `PAIR_PROMPTS` + `FALLBACK_PROMPT` pattern with:
 3. Two **generators** (mock + api) that populate `<project>/prompts.json` from
    the pairs discovered in `<project>/kling_test/*.jpg`.
 
-For the Olga backward-compat path, `generate_all_videos.py` keeps importing
-`PAIR_PROMPTS` from `image_pair_prompts.py` — nothing in this module overrides
-that. Phase 6 retires it.
+The Phase-6 legacy move retired the Olga-era `image_pair_prompts.py` +
+`generate_all_videos.py` path — both now live under `legacy/scripts/`.
+This module is the sole prompt source for the active backend pipeline.
 """
 from __future__ import annotations
 

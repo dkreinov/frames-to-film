@@ -1,7 +1,10 @@
 """Extend stage service — 4:3 outpainted → 16:9 kling_test frames.
 
 Mock mode copies outpainted/*.jpg → kling_test/*.jpg.
-API mode delegates to `outpaint_16_9.run(src_dir, out_dir)`.
+API mode is not wired to a productized path as of Phase 6 — the
+original legacy outpaint-16-9 script lives at
+`legacy/scripts/outpaint_16_9.py` but is not imported here (Settings
+UI keeps extend→api disabled).
 """
 from __future__ import annotations
 
@@ -26,9 +29,13 @@ def run_extend(project_dir: Path, mode: str) -> dict:
         return {"produced": [p.name for p in sorted(out_dir.glob("*.jpg"))]}
 
     if mode == "api":
-        from outpaint_16_9 import run as extend_run
-        extend_run(src_dir=src_dir, out_dir=out_dir)
-        return {"produced": [p.name for p in sorted(out_dir.glob("*.jpg"))]}
+        # Phase-1 outpaint_16_9.py moved to legacy/scripts/. See prepare.py
+        # for the same pattern — Settings UI gates extend→api disabled.
+        raise NotImplementedError(
+            "extend api mode is not productized in Phase 6 — "
+            "flip Settings→Storyboard extend to mock, or run "
+            "legacy/scripts/outpaint_16_9.py directly."
+        )
 
     raise ValueError(f"unknown mode: {mode}")
 

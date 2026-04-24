@@ -1,7 +1,9 @@
 """Prepare stage service — 4:3 normalize.
 
 Mock mode copies `tests/fixtures/fake_project/frame_*.png` → `<project>/outpainted/*.jpg`.
-API mode delegates to `outpaint_images.run(src_dir, out_dir)`.
+API mode is not wired to a productized path as of Phase 6 — the
+original legacy outpaint script lives at `legacy/scripts/outpaint_images.py`
+but is not imported here (Settings UI keeps prepare→api disabled).
 """
 from __future__ import annotations
 
@@ -36,10 +38,15 @@ def run_prepare(project_dir: Path, mode: str, fixture_dir: Path | None = None) -
         return {"produced": [p.name for p in sorted(out_dir.glob("*.jpg"))]}
 
     if mode == "api":
-        from outpaint_images import run as outpaint_run  # imported lazily so tests don't need gemini key
-        sources = project_dir / "sources"
-        outpaint_run(src_dir=sources, out_dir=out_dir)
-        return {"produced": [p.name for p in sorted(out_dir.glob("*.jpg"))]}
+        # Phase-1 outpaint_images.py moved to legacy/scripts/. The
+        # Settings UI keeps prepare→api disabled until a productized
+        # path replaces it; raising NotImplementedError here matches
+        # that UI state if someone bypasses it via direct POST.
+        raise NotImplementedError(
+            "prepare api mode is not productized in Phase 6 — "
+            "flip Settings→Prepare to mock, or run "
+            "legacy/scripts/outpaint_images.py directly."
+        )
 
     raise ValueError(f"unknown mode: {mode}")
 
