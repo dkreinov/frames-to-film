@@ -91,5 +91,55 @@ Existing Playwright-captured goldens in `docs/design/golden/` are the authoritat
 - `phase_4_storyboard_grid.png`
 - `phase_4_generate_ready.png`
 - `phase_4_review_ready.png`
+- `phase_4_settings.png` (two-key layout: Gemini + fal.ai; generate-videos api enabled)
+- `phase_6_journey.gif` (5-frame wizard tour via Claude-in-Chrome)
 
 No fresh PNGs added from this pass — Playwright's existing set covers the visual states at higher fidelity than the MCP tool's screenshots.
+
+---
+
+# Phase 6 Sub-Plan 1 — Full E2E + CI
+
+**Date:** 2026-04-24
+**Scope:** Full happy-path E2E journey (already covered by `review.spec.ts`) + GitHub Actions CI running backend pytest + frontend vitest + Playwright E2E on every push. All in mock mode.
+
+## E2E journey coverage
+
+`frontend/e2e/review.spec.ts` drives the entire happy path in a single test:
+
+1. `/projects/new/upload` → drop 3 fixture photos → click Next
+2. `/projects/:id/prepare` → wait for "Prepared N photos" → Next
+3. `/projects/:id/storyboard` → wait for drag handles → Next: Generate
+4. `/projects/:id/generate` → wait for prompt textareas → click Generate Videos → wait for play buttons
+5. `/projects/:id/review` → click Winner on first segment → Stitch & Export → assert "Download full movie" link
+
+Cleanup: `DELETE /projects/:id` to keep tests idempotent.
+
+No separate `journey.spec.ts` was added — would duplicate this coverage.
+
+## Pre-CI portability fix
+
+`backend/services/generate.py` previously hardcoded `tools/ffmpeg.exe`. Fixed to use `shutil.which('ffmpeg')` first, fall back to the Windows exe. Linux CI runners (`apt-get install -y ffmpeg`) now work; Windows dev unchanged.
+
+## CI workflow
+
+`.github/workflows/test.yml` runs on every push/PR to master:
+
+- **backend-tests** (`ubuntu-latest`, Python 3.12): apt-install ffmpeg, pip install from `requirements.txt` + `requirements-test.txt` (new), pytest 116 tests.
+- **frontend-unit** (`ubuntu-latest`, Node 20): npm ci, tsc -b, vitest run (93 tests).
+- **e2e** (`ubuntu-latest`, Python 3.12 + Node 20): ffmpeg + npm ci + `npx playwright install --with-deps chromium` + `OLGA_PYTHON=python npx playwright test`. Uploads `playwright-report` artifact on failure.
+
+Real fal.ai smoke test (`test_kling_fal_real.py`) auto-skips under CI (`pytest.mark.skipif(not FAL_KEY)`) — zero cost.
+
+## Known Claude-in-Chrome limitation
+
+Native file picker cannot be driven by the MCP tool for file uploads. The `phase_6_journey.gif` tour therefore walks an already-seeded project rather than starting from `/projects/new/upload` with a real file drop. Playwright's `setInputFiles` on the hidden `<input type=file>` is the canonical path for automated upload testing — see `review.spec.ts`.
+
+## Deferred to later Phase 6 sub-plans
+
+- Deploy to Vercel (frontend) + self-host backend
+- Legacy Streamlit move → `legacy/`
+- README rewrite for commercial positioning
+- `/app-design` + `/frontend-design` final passes
+- Settings → generate-videos full real-fal.ai E2E (requires user's paid key)
+
