@@ -39,7 +39,8 @@ Turn a working pipeline (Phase 6) into a **good** pipeline that produces movies 
 
 | # | Sub-plan | Days | Quality lift | Service-stage priority |
 |---|---|---|---|---|
-| **7.1** | Three-tier judge prototypes — `prompt_judge`, `clip_judge`, `movie_judge` services with minimal rubric prompts. Wired into pipeline behind a `JUDGES_ENABLED` flag (off in CI mock). | 2 | indirect (enables 7.2) | **must-have** |
+| **7.1** | Three-tier judge prototypes — `prompt_judge`, `clip_judge`, `movie_judge` services with minimal rubric prompts. Wired into pipeline behind a `JUDGES_ENABLED` flag (off in CI mock). ✓ **done** | 2 | indirect (enables 7.2) | **must-have** |
+| **7.1.1** | Olga real-asset validation — Tests A/B/C audit auto-pipeline against operator's manually-finished 15-min reference movie. Gates investment in 7.2+. See `phase_7_subplan_1_1_plan.md`. | 0.5–1 | **decisive** (data drives every later sub-plan's priority) | **must-have BEFORE 7.2** |
 | **7.2** | Eval harness — `fixtures/eval_set/` with 5 reference projects (diverse subjects, bring real photos), `eval_runner.py` that walks each through the pipeline and writes `eval_runs.csv`. Baseline run on current pipeline + Phase 7 judges only (no story changes yet). | 1-2 | indirect | **must-have** |
 | **7.3** | AI ↔ human judge calibration — operator scores 5 reference movies on 4-dim rubric (story / continuity / visual / arc), AI judge scores same, compute agreement, iterate AI rubric prompt until agreement ≥70%. | 1-2 (incl. user time) | indirect | **must-have** |
 | **7.4** | Story arc + brief input + story writer service + 5 arc templates. UI: arc-type radio + brief textarea on Upload; new Story Review screen. Backend: `services/story.py` with one call per movie + per-pair motion-intent output. | 2-3 | **HIGH** — biggest perceived lift | **must-have** |
