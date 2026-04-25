@@ -33,13 +33,13 @@ This doc lives between `phase_7_plan.md` (the master) and the per-sub-plan `phas
         │             eval delta vs baseline (↑)    │
         └────────────────────┬──────────────────────┘
                              │
-              ┌──────────────┼──────────────┐
-              ▼              ▼              ▼
-        ┌──────────┐  ┌──────────────┐  ┌──────────────┐
-        │  7.5     │  │  7.6 (opt)   │  │  7.7 Stitch  │
-        │  Devices │  │  Web-sub     │  │  polish      │
-        │  catalog │  │  story path  │  │  (xfade)     │
-        └──────────┘  └──────────────┘  └──────────────┘
+              ┌──────────────┬──────────────┬──────────────┐
+              ▼              ▼              ▼              ▼
+        ┌──────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+        │  7.5     │  │  7.5b        │  │  7.6 (opt)   │  │  7.7 Stitch  │
+        │  Devices │  │  Generator   │  │  Web-sub     │  │  polish      │
+        │  catalog │  │  A/B (Wan)   │  │  story path  │  │  (xfade)     │
+        └──────────┘  └──────────────┘  └──────────────┘  └──────────────┘
 ```
 
 ## Frozen contracts (cross-sub-plan)
@@ -159,6 +159,7 @@ Both are polish, neither blocks the other. 7.6 is optional/v1.1 for the service 
 | 7.3 | none (pure prompt iteration on existing judges) | `services/judges/*.py` rubric prompts | none | calibration log committed |
 | 7.4 | `backend/services/story.py`, `data/story_arcs/*.yaml` (5 templates) | UploadScreen, GenerateScreen, new StoryReviewScreen | Upload mods, **Story Review (new)** | vitest, Playwright, backend |
 | 7.5 | `data/cinematic_devices.yaml` (~15), `backend/services/prompt_writer.py` (transition-aware) | StoryReviewScreen (show device picks), prompts pipeline | minor (transition pills) | unit, eval gate |
+| 7.5b | `backend/services/wan_25.py`, `resolve_dashscope_key` in deps | `generate.py` (dispatch on `VIDEO_GENERATOR` env) | none (operator-facing decision in eval results) | unit (mocked HTTP) + slow_real smoke |
 | 7.6 | `backend/services/grid_compose.py`, story-source toggle UI | UploadScreen | Source toggle, paste UI | unit, manual smoke |
 | 7.7 | ffmpeg xfade integration in `stitch.py` | stitch.py | none (output mp4 only) | golden frame compare |
 
@@ -171,6 +172,7 @@ Both are polish, neither blocks the other. 7.6 is optional/v1.1 for the service 
 | 7.3 | 1-2 (incl. user time) | $0 (pure prompt iteration) | n/a |
 | 7.4 | 2-3 | +$0.01 (story call) | 1 eval run after merge |
 | 7.5 | 2-3 | $0 (pipeline already paid) | 1 eval run after merge |
+| 7.5b | 2-3 | +$0.20-$0.55/movie (Wan 2.7 720p adds ~$3 for 5 clips vs Kling's $2; only if Wan wins eval and becomes default) | 1 A/B eval after merge |
 | 7.6 | 2 | -$0.01 for sub users | n/a |
 | 7.7 | 2 | $0 for cross-fade; +$0.05 if music bed (deferred) | 1 eval run after merge |
 | **Total** | **12-16** | **~$0.50 typical / $0.92 ceiling per movie** | — |
@@ -182,6 +184,7 @@ Both are polish, neither blocks the other. 7.6 is optional/v1.1 for the service 
 - **7.3**: Cohen's kappa or simple agreement % ≥ 70% on rubric agreement vs operator scoring.
 - **7.4**: `story_coherence` median across 5 fixtures rises by **≥ 0.5** vs 7.2 baseline. No other rubric dim regresses by >0.3.
 - **7.5**: `visual_quality` rises ≥ 0.3 AND `story_coherence` holds or rises. Re-roll rate ≤ 20%.
+- **7.5b**: Adapter ships with mocked tests + 1 real-API smoke; A/B eval doc compares Wan 2.7 vs Kling on at least 5 fixture pairs across all rubric dims; decision (default flip OR per-arc override OR no change) recorded in execution log.
 - **7.6** (optional): functional path; user can complete a movie via web-sub story step in ≤ 15 min.
 - **7.7**: Visual continuity of stitched output passes operator review (no jarring cuts on age-match transitions).
 

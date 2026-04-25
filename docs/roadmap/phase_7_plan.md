@@ -44,11 +44,14 @@ Turn a working pipeline (Phase 6) into a **good** pipeline that produces movies 
 | **7.3** | AI ↔ human judge calibration — operator scores 5 reference movies on 4-dim rubric (story / continuity / visual / arc), AI judge scores same, compute agreement, iterate AI rubric prompt until agreement ≥70%. | 1-2 (incl. user time) | indirect | **must-have** |
 | **7.4** | Story arc + brief input + story writer service + 5 arc templates. UI: arc-type radio + brief textarea on Upload; new Story Review screen. Backend: `services/story.py` with one call per movie + per-pair motion-intent output. | 2-3 | **HIGH** — biggest perceived lift | **must-have** |
 | **7.5** | Cinematic devices catalog (≥15 entries, hand-curated from film grammar) + transition-aware prompt writer. Story writer picks transition per pair from catalog; prompt writer applies template. | 2-3 | **HIGH** — second lever | **must-have** |
+| **7.5b** | Video generator A/B — Kling O3 vs Wan 2.7 i2v adapter, fixture re-renders, judge eval, decide default. See `phase_7_subplan_5b_plan.md`. | 2-3 | **HIGH for life-montage** (character continuity) | **must-have** before life-montage demos |
 | **7.6** | Web-sub story path — composite-grid generator (2×3 PNG with corner labels, `services/grid_compose.py`) + Story Source toggle + paste-back UI. | 2 | low for service stage (operator already has API) | **optional / defer to v1.1** |
 | **7.7** | Stitch polish — ffmpeg `xfade` cross-fade transitions per chosen device; optional music bed via Suno or ElevenLabs API; optional TTS narration. | 2 | medium (perceived polish) | **must-have for the cross-fades; music bed optional** |
 
-**Total committed work (must-haves):** ~10-13 days
-**With optional 7.6 + 7.7-music:** ~12-16 days
+**Total committed work (must-haves):** ~12-16 days
+**With optional 7.6 + 7.7-music:** ~14-19 days
+
+(7.5b adds 2-3 days; ships in parallel with 7.5/7.6/7.7 since it's a separate code path.)
 
 ## Five open decisions to lock before starting 7.4
 
