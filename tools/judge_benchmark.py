@@ -291,6 +291,14 @@ def main() -> int:
     parser.add_argument("--out-md", default="docs/roadmap/judge_model_benchmark_2026-04.md")
     args = parser.parse_args()
 
+    # Hard cost cap — abort if the benchmark exceeds this. Set via
+    # MAX_USD env var; default $20 per user policy (2026-04-25). The
+    # SDK self-report under-counts "thinking" tokens, so the *real*
+    # spend can be higher than what we accumulate here. Treat this
+    # as a soft estimate; verify against billing dashboard after run.
+    max_usd = float(os.getenv("MAX_USD") or "20.0")
+    print(f"[{_ts()}] cost cap: ${max_usd:.2f}")
+
     gemini_key = os.getenv("gemini") or ""
     deepseek_key = os.getenv("DEEPSEEK_KEY") or ""
     if not gemini_key:
@@ -305,21 +313,35 @@ def main() -> int:
 
     results_by_judge: dict[str, list[dict]] = {}
 
-    if "prompt" not in args.skip:
+    def _running_total() -> float:
+        return sum(
+            r.get("cost_total_usd", 0)
+            for results in results_by_judge.values()
+            for r in results
+        )
+
+    def _cap_check() -> bool:
+        total = _running_total()
+        if total >= max_usd:
+            print(f"[{_ts()}] !! cost cap hit: ${total:.4f} >= ${max_usd:.2f} — aborting remaining stages")
+            return True
+        return False
+
+    if "prompt" not in args.skip and not _cap_check():
         print(f"[{_ts()}] benchmarking prompt_judge: {prompt_models}")
         results_by_judge["prompt_judge"] = _bench_prompt_judge(
             gemini_key=gemini_key, models=prompt_models)
     else:
         results_by_judge["prompt_judge"] = []
 
-    if "clip" not in args.skip:
+    if "clip" not in args.skip and not _cap_check():
         print(f"[{_ts()}] benchmarking clip_judge: {clip_models}")
         results_by_judge["clip_judge"] = _bench_clip_judge(
             gemini_key=gemini_key, models=clip_models)
     else:
         results_by_judge["clip_judge"] = []
 
-    if "movie" not in args.skip:
+    if "movie" not in args.skip and not _cap_check():
         print(f"[{_ts()}] benchmarking movie_judge: {movie_models}")
         results_by_judge["movie_judge"] = _bench_movie_judge(
             deepseek_key=deepseek_key, models=movie_models)

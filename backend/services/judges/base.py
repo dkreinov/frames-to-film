@@ -56,22 +56,40 @@ class JudgeScore(BaseModel):
 
 # --- Token-cost tables (per 1M tokens; refresh when prices move) -----
 #
-# Source: docs/roadmap/reference_model_prices_2026_04 (memory) snapshot
-# 2026-04-25. Update here when memory updates.
+# Verified against actual Google Cloud Console billing 2026-04-25
+# (My Billing Account_Reports, 2026-04-18 — 2026-04-25.csv). Earlier
+# estimates were 10-12x low because:
+#   1. Gemini 2.5/3 emit "thinking" tokens NOT exposed in the SDK's
+#      candidates_token_count. Real billable output ≈ visible × 5-10.
+#   2. gemini-3-flash-preview is BILLED at $0.50/$3 per M (was labeled
+#      "free during preview" — wrong).
+# Going forward: trust billing dashboard, not SDK self-report.
 
 _PRICE_PER_M_TOKENS: dict[str, tuple[float, float]] = {
-    # in_per_M, out_per_M
-    "gemini-2.5-flash-lite": (0.10, 0.40),
-    "gemini-2.5-flash": (0.15, 0.60),
-    "gemini-3-flash-preview": (0.0, 0.0),   # free during preview; pricing TBA
-    "gemini-3-flash": (0.50, 3.00),         # post-GA placeholder
-    "gemini-2.5-pro": (1.25, 10.00),
-    "gemini-3-pro-preview": (0.0, 0.0),     # free during preview
+    # in_per_M, out_per_M  --  effective rates (incl. thinking tokens
+    # where applicable, derived from actual ₪/token billing)
+    "gemini-2.5-flash-lite": (0.10, 0.40),         # confirmed via bill
+    "gemini-2.5-flash": (0.30, 2.50),              # +thinking surcharge
+    "gemini-3-flash-preview": (0.50, 3.00),        # NOT free; was wrong
+    "gemini-3-flash": (0.50, 3.00),
+    "gemini-2.5-pro": (1.25, 10.00),               # confirmed via bill
+    "gemini-3-pro-preview": (2.00, 12.00),         # treat as priced; verify
     "gemini-3-pro": (2.00, 12.00),
-    "deepseek-chat": (0.14, 0.28),          # V4 Flash via deepseek-chat alias
+    "gemini-2.5-flash-image": (0.30, 30.00),       # image OUTPUT is the killer; ~$0.30 per generated image
+    "deepseek-chat": (0.14, 0.28),                 # V4 Flash
     "deepseek-v4-flash": (0.14, 0.28),
     "deepseek-v4-pro": (1.74, 3.48),
-    "deepseek-reasoner": (0.55, 2.19),      # legacy R1; retires 2026-07
+    "deepseek-reasoner": (0.55, 2.19),             # legacy R1; retires 2026-07
+    # Qwen via DashScope international (qwen.ai/apiplatform)
+    "qwen-vl-plus": (0.21, 0.63),
+    "qwen-vl-max": (0.52, 2.08),
+    "qwen3-vl-plus": (0.50, 1.50),
+    "qwen3-vl-235b-a22b-thinking": (0.26, 0.90),
+    # Kimi via Moonshot (api.moonshot.ai)
+    "moonshot-v1-8k-vision-preview": (0.30, 0.90),
+    "moonshot-v1-128k-vision-preview": (0.60, 1.80),
+    "kimi-k2.5": (0.60, 2.50),
+    "kimi-k2.6": (0.74, 4.66),
 }
 
 

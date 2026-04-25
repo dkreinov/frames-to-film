@@ -155,6 +155,21 @@ GROUP_PROMPT_OVERRIDES = {
 }
 
 
+# Tolerance for "already at 16:9" — within ±2% of target ratio. At this
+# threshold the visible difference is undetectable and a Gemini call
+# would just round-trip the image at $0.30+ for nothing. Wet-test cat
+# fixtures (ratio 1.79 vs target 1.778, multiplier 0.992) all fell here
+# but were still sent to Gemini, costing $3.62 of avoidable spend.
+ALREADY_AT_TARGET_TOLERANCE = 0.02
+
+
+def is_already_at_target(img) -> bool:
+    """True if the image is already within ±2% of 16:9 (no outpaint
+    needed; just resize to TARGET_W×TARGET_H and save)."""
+    ratio = img.width / img.height
+    return abs(ratio - TARGET_ASPECT_RATIO) / TARGET_ASPECT_RATIO <= ALREADY_AT_TARGET_TOLERANCE
+
+
 def choose_extension_prompt(img, filename=None):
     if filename:
         override = GROUP_PROMPT_OVERRIDES.get(filename)
@@ -244,6 +259,7 @@ def main():
     print(f"To process: {len(todo)}")
     print("-" * 60)
 
+    skipped_at_target = 0
     for i, filename in enumerate(todo):
         src = os.path.join(SRC_DIR, filename)
         out = os.path.join(OUT_DIR, filename)
@@ -252,6 +268,19 @@ def main():
         img = ImageOps.exif_transpose(img)
         if img.mode != 'RGB':
             img = img.convert('RGB')
+
+        # Skip Gemini call if image is already at 16:9. Just resize +
+        # save. Saves $0.30+ per image vs an unnecessary outpaint call.
+        if is_already_at_target(img):
+            ratio = img.width / img.height
+            print(f"[{i+1}/{len(todo)}] {filename}: {img.size} ratio={ratio:.3f} "
+                  f"[ALREADY 16:9 — skip Gemini]", end="", flush=True)
+            result = upscale_to_target(img)
+            result.save(out, "JPEG", quality=95)
+            clean_if_enabled(out)
+            print(f" -> {result.size} OK")
+            skipped_at_target += 1
+            continue
 
         prompt, prompt_profile = choose_extension_prompt(img, filename)
         print(f"[{i+1}/{len(todo)}] {filename}: {img.size} [{prompt_profile}]", end="", flush=True)
@@ -273,6 +302,10 @@ def main():
         clean_if_enabled(out)
         print(f" -> {result.size} OK")
         time.sleep(API_DELAY)
+
+    if skipped_at_target:
+        print(f"\n[saved] {skipped_at_target} image(s) skipped Gemini (already 16:9), "
+              f"~${skipped_at_target * 0.30:.2f} saved")
 
     done = len([f for f in os.listdir(OUT_DIR) if f.lower().endswith('.jpg')])
     print(f"\nDone. {done} images in {OUT_DIR}")

@@ -32,22 +32,54 @@ This means:
 | G | **Web-sub story path** | Composite-grid trick (2×3 PNG with corner labels) → user uploads to gemini.google.com or chatgpt.com via existing subscription → pastes story output back. Solves image-order problem; saves API spend for sub users. |
 | H | **Stitch polish** | Cross-fade transitions (ffmpeg `xfade`), optional music bed (Suno/ElevenLabs), optional TTS narration. |
 
-## Cost ceiling per movie (target)
+## Cost ceiling per movie (target — REVISED 2026-04-25 after billing audit)
 
-| Stage | Model / cost |
+The original numbers below were based on SDK token self-reporting which
+**under-counted by 10-12×** for Gemini models because their "thinking"
+output tokens are NOT exposed in `usage_metadata.candidates_token_count`
+but ARE billed. Verified actual rates from the 2026-04-18→25 billing
+period.
+
+| Stage | Model / cost (real) |
 |---|---|
+| **Outpaint/extend** | **~$1.80** (6 photos × $0.30 each via Gemini Native Image Generation) — **skipped entirely if input is already 16:9** (most modern uploads are; cat fixtures all were) |
 | Story | Gemini 2.5 Pro web (sub) = $0, or API ~$0.01 |
-| 5× prompt write | Gemini 2.5 Flash ~$0.005 |
-| 5× prompt judge | Gemini 2.5 Flash-Lite ~$0.003 |
+| 5× prompt write | Gemini 2.5 Flash ~$0.05 (with thinking) |
+| 5× prompt judge | Gemini 2.5 Flash-Lite ~$0.003 (low-thinking model) |
 | 5× Kling render | $0.42 |
-| 5× clip judge | Qwen3-VL or Flash on 3 frames ~$0.01 |
+| 5× clip judge | Qwen3-VL or Gemini Flash on 3 frames ~$0.01-$0.05 |
 | 1× movie judge | DeepSeek V4 Flash ~$0.005 |
 | Music bed (optional) | ~$0.05 |
-| **Base** | **~$0.50** |
-| 1× re-roll worst case | +$0.42 |
-| **Ceiling** | **~$0.92** |
 
-vs current $0.42 with no quality guarantees.
+**Without outpaint (input already 16:9):**
+- Base: **~$0.50-$0.60**
+- Ceiling (1 re-roll): **~$1.00**
+
+**With outpaint (input needs widening):**
+- Base: **~$2.30**
+- Ceiling: **~$2.70**
+
+vs current $0.42 wet-test movie (which paid $3.62 for unnecessary
+outpaint of already-16:9 cat photos = the bug we just fixed).
+
+### Skip logic added 2026-04-25
+
+`legacy/scripts/outpaint_16_9.py` now checks input aspect ratio before
+calling Gemini. If within ±2% of 16:9, image is resized + saved
+directly. **Saves ~$0.30 per skipped photo.** All cat fixtures hit the
+skip path retrospectively — would have saved $1.80 of the $3.62 spent.
+
+### Cost-tracking lessons
+
+1. **SDK self-report ≠ truth.** `usage_metadata` in google-genai
+   under-reports thinking tokens. Trust the billing dashboard.
+2. **`gemini-3-flash-preview` is NOT free** despite the "preview" label
+   — billed at $0.50/$3 per M tokens.
+3. **Image generation is the killer.** Native Image Generation output
+   bills at ~$26/M tokens (~$0.30 per generated image at default tile
+   size). That single line was 94% of last week's bill.
+4. **MAX_USD env cap** added to `tools/judge_benchmark.py` (default
+   $20.00 per user policy 2026-04-25). Aborts before runaway spend.
 
 ## Sub-plan breakdown + ordering
 
