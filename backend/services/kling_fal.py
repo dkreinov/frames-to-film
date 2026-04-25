@@ -19,6 +19,9 @@ import requests
 
 MODEL_ID = "fal-ai/kling-video/o3/standard/image-to-video"
 QUEUE_BASE = "https://queue.fal.run"
+# Base path for status/result URLs — fal.ai omits the variant suffix
+# (/o3/standard/…) from those paths even when the submit URL includes it.
+_STATUS_BASE = f"{QUEUE_BASE}/fal-ai/kling-video/requests"
 SUBMIT_URL = f"{QUEUE_BASE}/{MODEL_ID}"
 
 # Polling schedule: fal.ai Kling O3 typically takes 1-3 minutes per clip.
@@ -52,8 +55,12 @@ def _submit(
     prompt: str,
     fal_key: str,
     duration: int,
-) -> str:
-    """POST to the queue; return the request_id."""
+) -> tuple[str, str]:
+    """POST to the queue; return (status_url, response_url) from the response body.
+
+    fal.ai returns canonical status/result URLs that omit the model variant
+    path segment (e.g. /o3/standard/…) — using those directly avoids 405s.
+    """
     payload = {
         "image_url": _image_to_data_uri(image_a),
         "end_image_url": _image_to_data_uri(image_b),
@@ -68,31 +75,37 @@ def _submit(
         timeout=120,
     )
     resp.raise_for_status()
-    data = resp.json()
-    return data["request_id"]
+    request_id = resp.json()["request_id"]
+    # Construct canonical URLs — the status_url/response_url in the response
+    # body use the full model variant path which returns 405 on GET.
+    return f"{_STATUS_BASE}/{request_id}/status", f"{_STATUS_BASE}/{request_id}"
 
 
-def _poll_until_done(request_id: str, fal_key: str) -> None:
-    """Block until the queue reports COMPLETED or raises on error/timeout."""
-    status_url = f"{QUEUE_BASE}/{MODEL_ID}/requests/{request_id}/status"
+def _poll_until_done(status_url: str, fal_key: str) -> None:
+    """Block until the queue reports COMPLETED or raises on error/timeout.
+
+    fal.ai returns 405 with a valid JSON body for terminal states (COMPLETED,
+    FAILED, CANCELLED, ALREADY_COMPLETED) — do not raise_for_status() here.
+    """
     headers = {"Authorization": f"Key {fal_key}"}
     for wait in _POLL_INTERVALS_S:
         time.sleep(wait)
         resp = requests.get(status_url, headers=headers, timeout=30)
-        resp.raise_for_status()
-        status = resp.json().get("status")
-        if status == "COMPLETED":
+        data = resp.json()
+        status = data.get("status", "")
+        if status in ("COMPLETED", "ALREADY_COMPLETED"):
             return
         if status in ("FAILED", "CANCELLED"):
-            raise RuntimeError(f"fal.ai generation {status}: request_id={request_id}")
+            raise RuntimeError(f"fal.ai generation {status}: status_url={status_url}")
+        if resp.status_code >= 400 and not status:
+            resp.raise_for_status()
     raise TimeoutError(f"fal.ai generation timed out after {sum(_POLL_INTERVALS_S)}s")
 
 
-def _fetch_result_url(request_id: str, fal_key: str) -> str:
-    """After COMPLETED, the result endpoint returns the mp4 URL."""
-    result_url = f"{QUEUE_BASE}/{MODEL_ID}/requests/{request_id}"
+def _fetch_result_url(response_url: str, fal_key: str) -> str:
+    """After COMPLETED, fetch the mp4 URL from the result endpoint."""
     headers = {"Authorization": f"Key {fal_key}"}
-    resp = requests.get(result_url, headers=headers, timeout=30)
+    resp = requests.get(response_url, headers=headers, timeout=30)
     resp.raise_for_status()
     return resp.json()["video"]["url"]
 
@@ -127,7 +140,7 @@ def generate_pair(
         RuntimeError if fal.ai reports FAILED/CANCELLED
         TimeoutError if polling exhausts without completion
     """
-    request_id = _submit(image_a, image_b, prompt, fal_key, duration)
-    _poll_until_done(request_id, fal_key)
-    mp4_url = _fetch_result_url(request_id, fal_key)
+    status_url, response_url = _submit(image_a, image_b, prompt, fal_key, duration)
+    _poll_until_done(status_url, fal_key)
+    mp4_url = _fetch_result_url(response_url, fal_key)
     return _download(mp4_url)
