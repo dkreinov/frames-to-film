@@ -21,7 +21,9 @@ Each phase gets its own saved plan at `docs/roadmap/phase_<N>_plan.md` (created 
 | 3 | De-Olga prompt library | done | 2 | Replace hardcoded `PAIR_PROMPTS` with per-project JSON auto-generated from image pairs. Style presets. |
 | 4 | Stitch-designed React commercial UI | done | 2, 3 | 5 screens via `/stitch-design` → shadcn/ui React → FastAPI. All 6 sub-plans shipped: Upload, Prepare, Storyboard, Generate, Review+Export, Settings (Gemini key in localStorage + `X-Gemini-Key` header; per-stage mode toggles, only generatePrompts `api` enabled — rest gated to Phase 5). |
 | 5 | Paid fal.ai Kling O3 video generation | done | 1, 2 | Pivoted from free Playwright/Veo to paid fal.ai Kling O3 (latest Kling 3.0 first+last-frame, $0.084/s audio-off, 5s clips). Generate api mode calls kling_fal adapter with user-supplied fal.ai key from Settings (`X-Fal-Key` header). |
-| 6 | Full E2E + polish + ship | in-progress | 4, 5 | Sub-Plans 1+2 done: CI is green on GitHub (3 jobs — 105 backend + 93 vitest + 14 Playwright), 11 legacy scripts + 7 legacy tests moved to `legacy/`, `Pillow` / Vite preview / `index.html` tracking all fixed. Remaining: README rewrite, `/app-design` + `/frontend-design` passes, Vercel deploy. |
+| 6 | Full E2E + polish + ship | review | 4, 5 | Sub-Plans 1+2 done; CI green; legacy moved; README rewritten. Remaining `/app-design` + `/frontend-design` passes folded into Phase 7 sub-plans (since 7.4/7.5 add new UI). Vercel deploy explicitly deferred until Phase 7 quality lands — public deploy of current quality = first-impression risk. |
+| 7 | Quality: story-aware pipeline + judge-driven eval | pending | 6 | Story arc parameter + brief input + story writer + cinematic devices catalog + three-tier judge stack + eval harness with AI/human calibration + stitch polish. Built for paid-service stage (operator-driven, single tenant). 7 sub-plans (7.1–7.7), ~12-16 focused days. See `phase_7_overview.md` and `phase_7_plan.md`. |
+| 8 | SaaS readiness | pending | 7 | Auth, billing (Stripe), multi-tenant isolation, public landing, Vercel deploy. Out of scope until paid-service stage validates demand. |
 
 ## Exit criteria per phase
 
