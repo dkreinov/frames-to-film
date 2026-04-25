@@ -1,0 +1,306 @@
+{
+  "prompt_judge": {
+    "qwen": [
+      {
+        "pair": "1_to_2",
+        "score": 4.0,
+        "tokens_in": 1736,
+        "tokens_out": 61,
+        "cost": 0.000403,
+        "latency_s": 2.72,
+        "reasoning": "The prompt's description of a slow, steady camera dolly in aligns well with the visual transition between the two frames, which show a gradual change in the cat's pose and interaction with the environ",
+        "error": null
+      },
+      {
+        "pair": "2_to_3",
+        "score": 4.0,
+        "tokens_in": 2192,
+        "tokens_out": 40,
+        "cost": 0.000486,
+        "latency_s": 2.57,
+        "reasoning": "The prompt's elements of glowing mushrooms and a package are accurately represented with consistent lighting and lunar landscape.",
+        "error": null
+      },
+      {
+        "pair": "3_to_4",
+        "score": 4.0,
+        "tokens_in": 2214,
+        "tokens_out": 52,
+        "cost": 0.000498,
+        "latency_s": 2.63,
+        "reasoning": "The prompt's description of subtle light refraction and cosmic dust is well-captured in the transition, maintaining the otherworldly atmosphere while adding dynamic visual effects.",
+        "error": null
+      },
+      {
+        "pair": "4_to_5",
+        "score": 4.0,
+        "tokens_in": 2201,
+        "tokens_out": 47,
+        "cost": 0.000492,
+        "latency_s": 2.53,
+        "reasoning": "The prompt's description of a cinematic camera dollying forward and morphing transition is well-aligned with the visual changes between the two frames.",
+        "error": null
+      },
+      {
+        "pair": "5_to_6",
+        "score": 4.0,
+        "tokens_in": 2218,
+        "tokens_out": 46,
+        "cost": 0.000495,
+        "latency_s": 2.76,
+        "reasoning": "The prompt's description of a shimmering distortion effect and consistent color grading is well-aligned with the visual transition between the two frames.",
+        "error": null
+      }
+    ],
+    "moonshot": [
+      {
+        "pair": "1_to_2",
+        "score": 3.0,
+        "tokens_in": 2184,
+        "tokens_out": 56,
+        "cost": 0.001411,
+        "latency_s": 3.4,
+        "reasoning": "The prompt suggests a camera movement and effect that is not directly observable in the static images, but the general idea of a transition could be inferred from the change in the cat's posture and a",
+        "error": null
+      },
+      {
+        "pair": "2_to_3",
+        "score": 4.0,
+        "tokens_in": 2184,
+        "tokens_out": 47,
+        "cost": 0.001395,
+        "latency_s": 3.23,
+        "reasoning": "The prompt is well-aligned with the images, as it describes a transition from the glowing mushrooms to the package, which is consistent with the visual content.",
+        "error": null
+      },
+      {
+        "pair": "3_to_4",
+        "score": 4.0,
+        "tokens_in": 2206,
+        "tokens_out": 52,
+        "cost": 0.001417,
+        "latency_s": 3.19,
+        "reasoning": "The prompt aligns well with the images, suggesting a camera move and maintaining the otherworldly atmosphere, but does not explicitly describe the light refraction and cosmic dust effects.",
+        "error": null
+      },
+      {
+        "pair": "4_to_5",
+        "score": 4.0,
+        "tokens_in": 2193,
+        "tokens_out": 52,
+        "cost": 0.001409,
+        "latency_s": 3.24,
+        "reasoning": "The prompt aligns well with the images, as it describes a cinematic transition with morphing elements and space scene lighting, which is consistent with the visual content of the images.",
+        "error": null
+      },
+      {
+        "pair": "5_to_6",
+        "score": 4.0,
+        "tokens_in": 2210,
+        "tokens_out": 69,
+        "cost": 0.00145,
+        "latency_s": 3.38,
+        "reasoning": "The prompt is well-aligned with the images, as it describes a zoom in on the subject (the cat) and a shimmering distortion effect, which could be interpreted from the change in the cat's position and ",
+        "error": null
+      }
+    ]
+  },
+  "clip_judge": {
+    "qwen": [
+      {
+        "pair": "1_to_2",
+        "visual_quality": 4.5,
+        "style_consistency": 4.0,
+        "prompt_match": 4.5,
+        "anatomy_ok": true,
+        "tokens_in": 2799,
+        "tokens_out": 66,
+        "cost": 0.000629,
+        "latency_s": 2.89,
+        "reasoning": "Minor inconsistencies in lighting and object rendering detract slightly from visual quality.",
+        "error": null
+      },
+      {
+        "pair": "2_to_3",
+        "visual_quality": 4.5,
+        "style_consistency": 4.0,
+        "prompt_match": 4.5,
+        "anatomy_ok": true,
+        "tokens_in": 2799,
+        "tokens_out": 73,
+        "cost": 0.000634,
+        "latency_s": 2.91,
+        "reasoning": "The lighting and lunar landscape remain consistent, but the morphing elements could be smoother for better visual flow.",
+        "error": null
+      },
+      {
+        "pair": "3_to_4",
+        "visual_quality": 4.5,
+        "style_consistency": 4.0,
+        "prompt_match": 4.5,
+        "anatomy_ok": true,
+        "tokens_in": 2821,
+        "tokens_out": 79,
+        "cost": 0.000642,
+        "latency_s": 2.87,
+        "reasoning": "The subtle cosmic dust and light refraction effects are well-executed, but the animation lacks dynamic camera movement as suggested by the prompt.",
+        "error": null
+      },
+      {
+        "pair": "4_to_5",
+        "visual_quality": 4.5,
+        "style_consistency": 4.0,
+        "prompt_match": 4.5,
+        "anatomy_ok": true,
+        "tokens_in": 2808,
+        "tokens_out": 52,
+        "cost": 0.000622,
+        "latency_s": 2.7,
+        "reasoning": "",
+        "error": null
+      },
+      {
+        "pair": "5_to_6",
+        "visual_quality": 4.5,
+        "style_consistency": 4.0,
+        "prompt_match": 4.5,
+        "anatomy_ok": true,
+        "tokens_in": 2825,
+        "tokens_out": 77,
+        "cost": 0.000642,
+        "latency_s": 2.67,
+        "reasoning": "The shimmering distortion effect is inconsistently applied across frames, with the middle frame showing a more pronounced and less natural transition.",
+        "error": null
+      }
+    ],
+    "moonshot": [
+      {
+        "pair": "1_to_2",
+        "visual_quality": 4.5,
+        "style_consistency": 4.5,
+        "prompt_match": 4.0,
+        "anatomy_ok": true,
+        "tokens_in": 3248,
+        "tokens_out": 75,
+        "cost": 0.002084,
+        "latency_s": 3.96,
+        "reasoning": "The prompt mentions a 'shimmering displacement effect' which is not clearly visible in the transition between frames.",
+        "error": null
+      },
+      {
+        "pair": "2_to_3",
+        "visual_quality": 4.5,
+        "style_consistency": 4.0,
+        "prompt_match": 3.5,
+        "anatomy_ok": true,
+        "tokens_in": 3248,
+        "tokens_out": 86,
+        "cost": 0.002104,
+        "latency_s": 4.65,
+        "reasoning": "The morph from glowing mushrooms to a package is not clearly depicted, and the style consistency is slightly off due to the change in the object the cat is interacting with.",
+        "error": null
+      },
+      {
+        "pair": "3_to_4",
+        "visual_quality": 4.5,
+        "style_consistency": 4.5,
+        "prompt_match": 4.0,
+        "anatomy_ok": true,
+        "tokens_in": 3270,
+        "tokens_out": 80,
+        "cost": 0.002106,
+        "latency_s": 4.48,
+        "reasoning": "The prompt's requirement for a subtle shift in reality and light refraction is met, but the cosmic dust effect is not prominently visible.",
+        "error": null
+      },
+      {
+        "pair": "4_to_5",
+        "visual_quality": 4.5,
+        "style_consistency": 4.5,
+        "prompt_match": 4.0,
+        "anatomy_ok": true,
+        "tokens_in": 3257,
+        "tokens_out": 72,
+        "cost": 0.002084,
+        "latency_s": 4.28,
+        "reasoning": "The prompt match is slightly lower due to the lack of a clear morphing transition between frames.",
+        "error": null
+      },
+      {
+        "pair": "5_to_6",
+        "visual_quality": 4.5,
+        "style_consistency": 4.0,
+        "prompt_match": 3.5,
+        "anatomy_ok": true,
+        "tokens_in": 3274,
+        "tokens_out": 76,
+        "cost": 0.002101,
+        "latency_s": 4.38,
+        "reasoning": "The shimmering distortion effect is not clearly propagating from the subject's immediate environment outward as described in the prompt.",
+        "error": null
+      }
+    ]
+  },
+  "movie_judge": {
+    "deepseek": [
+      {
+        "run": 0,
+        "story_coherence": 3.8,
+        "character_continuity": 3.5,
+        "visual_quality": 3.8,
+        "emotional_arc": 3.6,
+        "weakest_seam": 2,
+        "tokens_in": 753,
+        "tokens_out": 155,
+        "cost": 0.000149,
+        "latency_s": 3.73,
+        "reasoning": "The story arc is mostly coherent, with a clear progression from approach to discovery to transformation, but the weakest seam is pair 2 (clip 2 to 3) where the cat's hand merges with the package edge, breaking anatomy and visual continuity, which undermines character continuity and slightly disrupts",
+        "error": null
+      },
+      {
+        "run": 1,
+        "story_coherence": 3.8,
+        "character_continuity": 3.5,
+        "visual_quality": 3.8,
+        "emotional_arc": 3.6,
+        "weakest_seam": 2,
+        "tokens_in": 753,
+        "tokens_out": 153,
+        "cost": 0.000148,
+        "latency_s": 3.55,
+        "reasoning": "The story arc is mostly coherent, with a clear progression from approach to discovery to transformation, but the weakest seam is pair 2 (clip 2 to 3) where the cat's hand merges with the package edge, breaking anatomy and visual continuity, which undermines character continuity and emotional immersi",
+        "error": null
+      }
+    ],
+    "kimi": [
+      {
+        "run": 0,
+        "story_coherence": 4.0,
+        "character_continuity": 3.2,
+        "visual_quality": 3.6,
+        "emotional_arc": 3.7,
+        "weakest_seam": 2,
+        "tokens_in": 711,
+        "tokens_out": 2604,
+        "cost": 0.012661,
+        "latency_s": 42.76,
+        "reasoning": "The narrative arc is logically sound and emotionally satisfying, moving cleanly through approach, discovery, and cosmic transformation, but the second seam (pair 2_to_3) represents a critical failure point: an anatomy break and markedly lower visual quality, style consistency, and prompt-match score",
+        "error": null
+      },
+      {
+        "run": 1,
+        "story_coherence": 3.5,
+        "character_continuity": 3.8,
+        "visual_quality": 3.5,
+        "emotional_arc": 3.5,
+        "weakest_seam": 2,
+        "tokens_in": 711,
+        "tokens_out": 2249,
+        "cost": 0.011006,
+        "latency_s": 47.84,
+        "reasoning": "The narrative maintains a clear heroic trajectory across the alien moonscape, but the second seam (pair 2) is a critical failure point: an anatomy break where the cat astronaut's hand merges with the package edge shatters immersion during the pivotal discovery beat, directly undermining story cohere",
+        "error": null
+      }
+    ]
+  }
+}
