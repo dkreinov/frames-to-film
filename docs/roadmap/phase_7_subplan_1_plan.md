@@ -1,9 +1,10 @@
 # Phase 7 — Sub-Plan 1: Three-tier judge prototypes
 
 **Status:** pending
-**Size:** 2 days
+**Size:** 2.5 days (includes model-benchmark study)
 **Depends on:** none (this is the foundation)
 **Unblocks:** 7.2, 7.3, and the eval gate of every later sub-plan
+**Keys required:** `gemini` (have), `FAL_KEY` (have), `DEEPSEEK_KEY` (have, $2.12 balance loaded 2026-04-25)
 
 ## Goal
 
@@ -12,8 +13,9 @@ Ship three callable judge services — `prompt_judge`, `clip_judge`, `movie_judg
 ## Inputs / outputs
 
 **Inputs**
-- API keys (Gemini already plumbed; check if Qwen/V4 needed)
+- API keys: Gemini (plumbed), DeepSeek (plumbed in this sub-plan via `DEEPSEEK_KEY` env var + `X-DeepSeek-Key` header)
 - Image data + prompt text + optional video frames
+- Existing wet-test fixtures at `pipeline_runs/local/3fadfa16c6454ac28f336f612ca58e2b/` for real-API smoke tests
 
 **Outputs**
 - `backend/services/judges/prompt_judge.py` — sees `(image_a, image_b, prompt) → judge_score`
@@ -51,6 +53,38 @@ Ship three callable judge services — `prompt_judge`, `clip_judge`, `movie_judg
 - Test: 3 mock cases (coherent story, broken middle, character drift)
 - Real-API smoke: 1 call against the wet-test movie's pretend-judge results
 
+### 4.5. Model comparison study (NEW — adds ~4 hours, ~$0.10 in API calls)
+
+Goal: replace assumption-based model picks with eval-driven picks. Run each judge against the same fixture inputs across multiple model tiers, log scores + cost + latency, decide winners with data.
+
+**Comparison matrix:**
+
+| Judge | Models to compare | Test inputs | Decision criterion |
+|---|---|---|---|
+| `prompt_judge` | Gemini 2.5 Flash-Lite vs Gemini 2.5 Flash vs Gemini 3 Flash | 5 prompts from wet test, mix of good + bad | Stability of scores across re-runs (variance), cost-per-call |
+| `clip_judge` | Gemini 2.5 Flash vs Gemini 3 Flash vs Gemini 2.5 Pro | 5 clips from wet test (incl. one with known anatomy issue) | Does the model catch the anatomy issue? Score consistency |
+| `movie_judge` | DeepSeek V4 Flash vs Gemini 2.5 Flash vs DeepSeek V4 Pro vs Gemini 3 Pro | 1 fake "judge JSON + arc + brief" payload, run all 4 | Reasoning quality on weakest-seam ID; cost; latency |
+
+**Output artefact:** `docs/roadmap/judge_model_benchmark_2026-04.md` — table with per-model:
+- mean score on each test
+- score variance across 2 re-runs
+- $/call
+- latency (ms)
+- 1-line subjective note ("flagged anatomy issue clearly", "reasoning was vague", etc.)
+
+**Locked picks** (commit message references this doc):
+- prompt_judge: ___ (filled in after benchmark)
+- clip_judge: ___ (filled in after benchmark)
+- movie_judge: ___ (filled in after benchmark)
+
+**Cost cap:** if benchmark exceeds $0.50, stop and pick the cheapest passing tier. Don't keep paying to verify obvious losers.
+
+**Implementation:**
+- New script: `tools/judge_benchmark.py`
+- Reads `MODELS_TO_TEST` constant (3-4 per judge)
+- Calls each, logs to `benchmark_results.json`
+- Generates the markdown table from the JSON
+
 ### 5. Pipeline wiring (behind flag)
 - Add `JUDGES_ENABLED=auto|on|off` env var (`auto` = on if API keys present, off otherwise)
 - In `pipeline_runs/.../run.json`, add `judges` section per `phase_7_flow.md` shape
@@ -79,10 +113,11 @@ Ship three callable judge services — `prompt_judge`, `clip_judge`, `movie_judg
 
 | Q | Default proposal | Decide when |
 |---|---|---|
-| `clip_judge` model — Flash vs Qwen3-VL? | Try both; pick by cost-per-call after step 3 benchmark | Step 3 |
-| Frame sampling rate for `clip_judge` | 3 frames at 0.2s, 2.5s, 4.5s | Step 3 |
+| Final model picks for each judge | Run benchmark study (Step 4.5), commit results, pick winners | Step 4.5 |
+| Frame sampling rate for `clip_judge` | 3 frames at 0.2s, 2.5s, 4.5s | Step 3 — locked |
 | Failure mode if judge errors | Log + skip, don't block run | Locked here |
-| Where to plumb FAL_KEY-like env var for new vendors (Qwen, V4) | Add `X-Qwen-Key`, `X-DeepSeek-Key` headers in Settings during 7.4 UI work; for 7.1 use env vars only | Step 1 |
+| `X-DeepSeek-Key` header in Settings UI | Defer to 7.4 (UI sub-plan); for 7.1 use env var `DEEPSEEK_KEY` only | Locked |
+| Settings-UI-managed Qwen/Kimi keys | Skip entirely — DeepSeek + Gemini cover all judges | Locked |
 
 ## Rollback / failure mode
 
@@ -98,3 +133,15 @@ Don't ship a judge that gives random scores; downstream decisions (re-rolls, eva
 - `~/.claude/projects/.../memory/reference_model_prices_2026_04.md` — for model picks
 - `~/.claude/projects/.../memory/feedback_model_selection.md` — old+cheap-first rule
 - `phase_7_flow.md` — `JudgeScore` envelope contract (immutable after this sub-plan)
+
+## Total cost to ship 7.1
+
+| Phase | Cost | Notes |
+|---|---|---|
+| Unit tests (mocked) | $0 | Iterate freely |
+| Benchmark study (Step 4.5) | ~$0.10 | 3-4 models × 3 judges, capped at $0.50 |
+| Real-API smoke tests | ~$0.05 | 1 call per judge on locked picks |
+| One full pipeline with judges on | ~$0.50 | Includes Kling render |
+| **Total to merge** | **~$0.65** | Roughly 1.5 cat-movie's worth of spend |
+
+DeepSeek balance ($2.12) covers ~10,000 movie_judge calls — effectively unlimited for development.
