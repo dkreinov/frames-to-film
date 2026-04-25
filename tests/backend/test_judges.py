@@ -1,0 +1,236 @@
+"""Unit tests for the three judges + JudgeScore envelope.
+
+LLM calls are monkeypatched at module level so tests run offline without
+keys. One real-API path lives in `test_judges_real.py` (slow_real mark).
+"""
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from backend.services.judges import JudgeScore, score_clip, score_movie, score_prompt
+from backend.services.judges import clip_judge, movie_judge, prompt_judge
+from backend.services.judges.base import estimate_cost
+
+
+# --- JudgeScore envelope ---------------------------------------------
+
+def test_judge_score_basic_construction():
+    js = JudgeScore(
+        judge="prompt_judge",
+        scores={"prompt_image_alignment": 4.2},
+        model_used="gemini-2.5-flash-lite",
+    )
+    assert js.judge == "prompt_judge"
+    assert js.version == "v1"
+    assert js.scores["prompt_image_alignment"] == 4.2
+    assert js.cost_usd == 0.0
+
+
+def test_judge_score_is_failing_below_threshold():
+    js = JudgeScore(
+        judge="clip_judge",
+        scores={"visual_quality": 1.5, "anatomy_ok": True},
+        model_used="x",
+    )
+    assert js.is_failing(2.0) is True
+
+
+def test_judge_score_is_failing_above_threshold():
+    js = JudgeScore(
+        judge="clip_judge",
+        scores={"visual_quality": 4.0, "anatomy_ok": True},
+        model_used="x",
+    )
+    assert js.is_failing(2.0) is False
+
+
+def test_estimate_cost_known_model():
+    # 1k input tokens at $0.10/M = $0.0001; 100 output at $0.40/M = $0.00004
+    cost = estimate_cost("gemini-2.5-flash-lite", 1000, 100)
+    assert abs(cost - (0.0001 + 0.00004)) < 1e-9
+
+
+def test_estimate_cost_unknown_model_returns_zero():
+    assert estimate_cost("not-a-model", 5000, 500) == 0.0
+
+
+# --- prompt_judge -----------------------------------------------------
+
+def test_prompt_judge_happy_path(monkeypatch, tmp_path):
+    img_a = tmp_path / "a.jpg"
+    img_b = tmp_path / "b.jpg"
+    img_a.write_bytes(b"\xff\xd8\xff\xe0")
+    img_b.write_bytes(b"\xff\xd8\xff\xe0")
+
+    fake_response = (
+        '```json\n{"score": 4.5, "reasoning": "well grounded"}\n```',
+        850,  # input tokens
+        25,   # output tokens
+    )
+    monkeypatch.setattr(prompt_judge, "_call_gemini_vision",
+                        lambda **kwargs: fake_response)
+
+    js = score_prompt(image_a=img_a, image_b=img_b,
+                      prompt_text="Slow dolly", key="fake-key")
+    assert js.judge == "prompt_judge"
+    assert js.scores["prompt_image_alignment"] == 4.5
+    assert js.reasoning == "well grounded"
+    assert js.input_tokens == 850
+    assert js.output_tokens == 25
+    assert js.cost_usd > 0
+    assert js.model_used == prompt_judge.DEFAULT_MODEL
+
+
+def test_prompt_judge_handles_unfenced_json(monkeypatch, tmp_path):
+    img_a = tmp_path / "a.jpg"
+    img_b = tmp_path / "b.jpg"
+    img_a.write_bytes(b"\xff\xd8\xff\xe0")
+    img_b.write_bytes(b"\xff\xd8\xff\xe0")
+
+    monkeypatch.setattr(
+        prompt_judge, "_call_gemini_vision",
+        lambda **kwargs: ('{"score": 2.0, "reasoning": "vague"}', 500, 10),
+    )
+    js = score_prompt(image_a=img_a, image_b=img_b,
+                      prompt_text="x", key="k")
+    assert js.scores["prompt_image_alignment"] == 2.0
+
+
+def test_prompt_judge_falls_back_on_call_error(monkeypatch, tmp_path):
+    img_a = tmp_path / "a.jpg"
+    img_b = tmp_path / "b.jpg"
+    img_a.write_bytes(b"\xff\xd8\xff\xe0")
+    img_b.write_bytes(b"\xff\xd8\xff\xe0")
+
+    def boom(**kwargs):
+        raise RuntimeError("network down")
+    monkeypatch.setattr(prompt_judge, "_call_gemini_vision", boom)
+
+    js = score_prompt(image_a=img_a, image_b=img_b,
+                      prompt_text="x", key="k")
+    # Neutral fallback is the contract: pipeline shouldn't crash.
+    assert js.scores["prompt_image_alignment"] == 3.0
+    assert "judge error" in js.reasoning
+
+
+# --- clip_judge -------------------------------------------------------
+
+def test_clip_judge_happy_path(monkeypatch, tmp_path):
+    video = tmp_path / "clip.mp4"
+    video.write_bytes(b"fake mp4")
+
+    # Bypass ffmpeg by monkeypatching frame extraction.
+    fake_frames = [tmp_path / f"f{i}.jpg" for i in range(3)]
+    for f in fake_frames:
+        f.write_bytes(b"\xff\xd8\xff\xe0")
+    monkeypatch.setattr(clip_judge, "extract_frames_at_timestamps",
+                        lambda *a, **kw: fake_frames)
+
+    monkeypatch.setattr(
+        clip_judge, "_call_gemini_vision",
+        lambda **kwargs: (
+            '{"visual_quality": 4.5, "style_consistency": 4.0, '
+            '"prompt_match": 3.5, "anatomy_ok": true, "reasoning": "minor blur"}',
+            1200, 35,
+        ),
+    )
+
+    js = score_clip(video_path=video, prompt_text="dolly in", key="k")
+    assert js.judge == "clip_judge"
+    assert js.scores["visual_quality"] == 4.5
+    assert js.scores["anatomy_ok"] is True
+    assert js.reasoning == "minor blur"
+    assert js.input_tokens == 1200
+
+
+def test_clip_judge_flags_anatomy_break(monkeypatch, tmp_path):
+    video = tmp_path / "clip.mp4"
+    video.write_bytes(b"fake")
+    fake_frames = [tmp_path / f"f{i}.jpg" for i in range(3)]
+    for f in fake_frames:
+        f.write_bytes(b"\xff\xd8\xff\xe0")
+    monkeypatch.setattr(clip_judge, "extract_frames_at_timestamps",
+                        lambda *a, **kw: fake_frames)
+    monkeypatch.setattr(
+        clip_judge, "_call_gemini_vision",
+        lambda **kwargs: (
+            '{"visual_quality": 3.0, "style_consistency": 3.0, '
+            '"prompt_match": 3.0, "anatomy_ok": false, "reasoning": "extra fingers"}',
+            500, 20,
+        ),
+    )
+    js = score_clip(video_path=video, prompt_text="x", key="k")
+    assert js.scores["anatomy_ok"] is False
+    assert "fingers" in js.reasoning
+
+
+def test_clip_judge_falls_back_on_ffmpeg_error(monkeypatch, tmp_path):
+    video = tmp_path / "clip.mp4"
+    video.write_bytes(b"fake")
+
+    def boom(*a, **kw):
+        raise RuntimeError("ffmpeg failed")
+    monkeypatch.setattr(clip_judge, "extract_frames_at_timestamps", boom)
+
+    js = score_clip(video_path=video, prompt_text="x", key="k")
+    assert js.scores["visual_quality"] == 3.0
+    assert "judge error" in js.reasoning
+
+
+# --- movie_judge ------------------------------------------------------
+
+def test_movie_judge_happy_path(monkeypatch):
+    monkeypatch.setattr(
+        movie_judge, "_call_deepseek",
+        lambda **kwargs: (
+            '{"story_coherence": 4.0, "character_continuity": 3.5, '
+            '"visual_quality": 4.2, "emotional_arc": 3.8, '
+            '"weakest_seam": 3, "reasoning": "middle pair has anatomy issue"}',
+            900, 60,
+        ),
+    )
+
+    clip_judges = [
+        {"pair": "1_to_2", "visual_quality": 4.0, "anatomy_ok": True},
+        {"pair": "2_to_3", "visual_quality": 4.5, "anatomy_ok": True},
+        {"pair": "3_to_4", "visual_quality": 2.0, "anatomy_ok": False},
+    ]
+    js = score_movie(clip_judges=clip_judges, key="k")
+    assert js.judge == "movie_judge"
+    assert js.scores["story_coherence"] == 4.0
+    assert js.weakest_seam == 3
+    assert js.input_tokens == 900
+
+
+def test_movie_judge_no_key_returns_neutral():
+    # Pass api_key="" explicitly to bypass env fallback
+    js = score_movie(clip_judges=[{"x": 1}], key="")
+    assert js.scores["story_coherence"] == 3.0
+    assert "DEEPSEEK_KEY" in js.reasoning
+
+
+def test_movie_judge_falls_back_on_call_error(monkeypatch):
+    def boom(**kwargs):
+        raise RuntimeError("deepseek 500")
+    monkeypatch.setattr(movie_judge, "_call_deepseek", boom)
+
+    js = score_movie(clip_judges=[{"x": 1}], key="k")
+    assert js.scores["story_coherence"] == 3.0
+    assert "judge error" in js.reasoning
+
+
+def test_movie_judge_invalid_weakest_seam(monkeypatch):
+    """If the model returns a non-numeric weakest_seam, swallow it."""
+    monkeypatch.setattr(
+        movie_judge, "_call_deepseek",
+        lambda **kwargs: (
+            '{"story_coherence": 3.5, "character_continuity": 3.5, '
+            '"visual_quality": 3.5, "emotional_arc": 3.5, '
+            '"weakest_seam": "not-a-number", "reasoning": ""}',
+            100, 10,
+        ),
+    )
+    js = score_movie(clip_judges=[{"x": 1}], key="k")
+    assert js.weakest_seam is None

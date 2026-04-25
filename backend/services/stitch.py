@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from backend.services.judges import orchestrator as judges_orch
+
 
 def run_stitch(project_dir: Path, mode: str | None = None) -> dict:
     project_dir = Path(project_dir)
@@ -22,6 +24,15 @@ def run_stitch(project_dir: Path, mode: str | None = None) -> dict:
 
     from concat_videos import run as concat_run
     concat_run(img_dir=img_dir, video_dir=video_dir, output_file=output_file)
+
+    # Phase 7.1 — score the stitched movie post-stitch (advisory).
+    # Mock mode produces black frames; judges still run if enabled but
+    # the operator should treat scores as not meaningful in that mode.
+    if mode != "mock" and judges_orch.is_enabled():
+        try:
+            judges_orch.run_post_stitch_judge(project_dir)
+        except Exception as exc:
+            print(f"[judges] post-stitch skipped: {exc!r}")
 
     return {"output_file": str(output_file), "segments": [s.name for s in segments]}
 

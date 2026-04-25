@@ -41,8 +41,14 @@ class JudgeScore(BaseModel):
 
     def is_failing(self, threshold: float = 2.0) -> bool:
         """True if any numeric score is below `threshold`. Used by the
-        re-roll decision in clip_judge wiring (7.5)."""
+        re-roll decision in clip_judge wiring (7.5).
+
+        Excludes bool (which subclasses int in Python) so that
+        ``anatomy_ok: True`` doesn't get counted as ``1 < threshold``.
+        """
         for v in self.scores.values():
+            if isinstance(v, bool):
+                continue
             if isinstance(v, (int, float)) and v < threshold:
                 return True
         return False

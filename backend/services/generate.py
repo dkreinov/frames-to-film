@@ -14,6 +14,7 @@ from pathlib import Path
 
 from backend.db import REPO_ROOT
 from backend.services import kling_fal
+from backend.services.judges import orchestrator as judges_orch
 
 # Default prompt used when a pair has no entry in prompts.json.
 _FALLBACK_PROMPT = "Smooth cinematic transition between the two frames."
@@ -120,6 +121,8 @@ def run_generate(project_dir: Path, mode: str, fal_key: str | None = None) -> di
             out = video_dir / f"seg_{a_name}_to_{b_name}.mp4"
             _make_stub(out)
             produced.append(out.name)
+        # Mock mode skips judges — clips are placeholder black frames,
+        # judging them wastes API spend and gives meaningless scores.
         return {"produced": produced}
 
     if mode == "api":
@@ -139,6 +142,13 @@ def run_generate(project_dir: Path, mode: str, fal_key: str | None = None) -> di
             out = video_dir / f"seg_{pair_key}.mp4"
             out.write_bytes(mp4_bytes)
             produced.append(out.name)
+        # Phase 7.1 — score every prompt + clip post-render (advisory).
+        # Failure isolated: a judge error never fails the generate run.
+        if judges_orch.is_enabled():
+            try:
+                judges_orch.run_post_generate_judges(project_dir)
+            except Exception as exc:
+                print(f"[judges] post-generate skipped: {exc!r}")
         return {"produced": produced}
 
     raise ValueError(f"unknown mode: {mode}")

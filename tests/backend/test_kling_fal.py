@@ -87,7 +87,11 @@ def test_generate_pair_happy_path(monkeypatch, tmp_path):
     # Submit + 2 status polls + 1 result + 1 download.
     assert [c[0] for c in calls] == ["POST", "GET", "GET", "GET", "GET"]
     assert "/requests/req-123/status" in calls[1][1]
-    assert calls[3][1] == f"{kling_fal.QUEUE_BASE}/{kling_fal.MODEL_ID}/requests/req-123"
+    # _STATUS_BASE strips the model variant path — fal.ai's canonical
+    # status/result URL is `/fal-ai/kling-video/requests/{id}`, not
+    # `/fal-ai/kling-video/o3/standard/image-to-video/requests/{id}`
+    # (the latter returns 405). See wet_test_findings.md finding #3.
+    assert calls[3][1] == f"{kling_fal._STATUS_BASE}/req-123"
 
 
 def test_generate_pair_raises_on_fal_failure(monkeypatch, tmp_path):
