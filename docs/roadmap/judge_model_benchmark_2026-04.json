@@ -1,0 +1,643 @@
+{
+  "prompt_judge": [
+    {
+      "judge": "prompt_judge",
+      "model": "gemini-2.5-flash-lite",
+      "n_calls": 10,
+      "score_mean": 3.8,
+      "score_stdev": 0.75,
+      "cost_total_usd": 0.00092,
+      "cost_per_call_usd": 9.2e-05,
+      "latency_mean_s": 2.68,
+      "calls": [
+        {
+          "pair": "1_to_2",
+          "run": 0,
+          "score": 3.0,
+          "cost": 8.98e-05,
+          "latency_s": 4.61,
+          "tokens_in": 710,
+          "tokens_out": 47,
+          "reasoning_excerpt": "The prompt describes effects not visually evident in the static images, but it doesn't contradict the plausible motion b"
+        },
+        {
+          "pair": "1_to_2",
+          "run": 1,
+          "score": 4.0,
+          "cost": 8.7e-05,
+          "latency_s": 2.22,
+          "tokens_in": 710,
+          "tokens_out": 40,
+          "reasoning_excerpt": "The prompt accurately describes a plausible motion between A and B with a slight stretch as the camera movement is impli"
+        },
+        {
+          "pair": "2_to_3",
+          "run": 0,
+          "score": 4.0,
+          "cost": 9.2e-05,
+          "latency_s": 2.47,
+          "tokens_in": 712,
+          "tokens_out": 52,
+          "reasoning_excerpt": "The prompt accurately describes a plausible morph from glowing mushrooms to a package of cheese, with a cinematic slow p"
+        },
+        {
+          "pair": "2_to_3",
+          "run": 1,
+          "score": 5.0,
+          "cost": 8.76e-05,
+          "latency_s": 2.2,
+          "tokens_in": 712,
+          "tokens_out": 41,
+          "reasoning_excerpt": "The prompt accurately describes the transition from glowing mushrooms to a package of cheese, maintaining the consistent"
+        },
+        {
+          "pair": "3_to_4",
+          "run": 0,
+          "score": 3.0,
+          "cost": 9.39e-05,
+          "latency_s": 2.56,
+          "tokens_in": 731,
+          "tokens_out": 52,
+          "reasoning_excerpt": "The prompt describes visual elements like light refraction and cosmic dust that are not explicitly present in the source"
+        },
+        {
+          "pair": "3_to_4",
+          "run": 1,
+          "score": 3.0,
+          "cost": 9.510000000000001e-05,
+          "latency_s": 2.15,
+          "tokens_in": 731,
+          "tokens_out": 55,
+          "reasoning_excerpt": "The prompt describes a plausible camera move and atmospheric effects that are generally consistent with the images, but "
+        },
+        {
+          "pair": "4_to_5",
+          "run": 0,
+          "score": 4.0,
+          "cost": 9.36e-05,
+          "latency_s": 2.56,
+          "tokens_in": 720,
+          "tokens_out": 54,
+          "reasoning_excerpt": "The prompt accurately describes a plausible motion between the two frames, with the 'glowing elements' morphing as indic"
+        },
+        {
+          "pair": "4_to_5",
+          "run": 1,
+          "score": 4.0,
+          "cost": 9.120000000000001e-05,
+          "latency_s": 2.36,
+          "tokens_in": 720,
+          "tokens_out": 48,
+          "reasoning_excerpt": "The prompt accurately describes a plausible morphing transition between the glowing elements and maintains the overall s"
+        },
+        {
+          "pair": "5_to_6",
+          "run": 0,
+          "score": 5.0,
+          "cost": 9.410000000000001e-05,
+          "latency_s": 3.25,
+          "tokens_in": 737,
+          "tokens_out": 51,
+          "reasoning_excerpt": "The prompt accurately describes a plausible motion from frame A to frame B, with the kitten seemingly entering a spacesh"
+        },
+        {
+          "pair": "5_to_6",
+          "run": 1,
+          "score": 3.0,
+          "cost": 9.25e-05,
+          "latency_s": 2.38,
+          "tokens_in": 737,
+          "tokens_out": 47,
+          "reasoning_excerpt": "The prompt describes a slow camera zoom and the cat's environment, but the transition involves the cat entering a spaces"
+        }
+      ]
+    },
+    {
+      "judge": "prompt_judge",
+      "model": "gemini-2.5-flash",
+      "n_calls": 10,
+      "score_mean": 2.5,
+      "score_stdev": 1.02,
+      "cost_total_usd": 0.00148,
+      "cost_per_call_usd": 0.000148,
+      "latency_mean_s": 11.72,
+      "calls": [
+        {
+          "pair": "1_to_2",
+          "run": 0,
+          "score": 5.0,
+          "cost": 0.0001449,
+          "latency_s": 8.41,
+          "tokens_in": 710,
+          "tokens_out": 64,
+          "reasoning_excerpt": "The prompt accurately describes a plausible 'camera dolly in' motion as the cat becomes larger and the scene tighter bet"
+        },
+        {
+          "pair": "1_to_2",
+          "run": 1,
+          "score": 2.0,
+          "cost": 0.00014429999999999998,
+          "latency_s": 11.76,
+          "tokens_in": 710,
+          "tokens_out": 63,
+          "reasoning_excerpt": "The prompt's instruction for a 'camera dolly in' is contradicted by the visual evidence, as the main subject (the cat) a"
+        },
+        {
+          "pair": "2_to_3",
+          "run": 0,
+          "score": 2.0,
+          "cost": 0.0001446,
+          "latency_s": 11.96,
+          "tokens_in": 712,
+          "tokens_out": 63,
+          "reasoning_excerpt": "The prompt instructs to 'morph from glowing mushrooms to a package,' but the glowing mushrooms are still present and vis"
+        },
+        {
+          "pair": "2_to_3",
+          "run": 1,
+          "score": 2.0,
+          "cost": 0.0001422,
+          "latency_s": 9.48,
+          "tokens_in": 712,
+          "tokens_out": 59,
+          "reasoning_excerpt": "The prompt incorrectly describes a 'cinematic slow push-in' where the camera is static, and misinterprets the appearance"
+        },
+        {
+          "pair": "3_to_4",
+          "run": 0,
+          "score": 4.0,
+          "cost": 0.00015585,
+          "latency_s": 11.97,
+          "tokens_in": 731,
+          "tokens_out": 77,
+          "reasoning_excerpt": "The prompt accurately describes the subtle shift in reality with 'cosmic dust swirling around the edges' visible as glow"
+        },
+        {
+          "pair": "3_to_4",
+          "run": 1,
+          "score": 2.0,
+          "cost": 0.00015345,
+          "latency_s": 8.4,
+          "tokens_in": 731,
+          "tokens_out": 73,
+          "reasoning_excerpt": "The prompt describes an 'arcing camera move around the subject,' which is strongly contradicted by the static perspectiv"
+        },
+        {
+          "pair": "4_to_5",
+          "run": 0,
+          "score": 2.0,
+          "cost": 0.00015000000000000001,
+          "latency_s": 12.76,
+          "tokens_in": 720,
+          "tokens_out": 70,
+          "reasoning_excerpt": "The prompt explicitly requests a 'cinematic camera dollying forward,' which contradicts the input images as there is no "
+        },
+        {
+          "pair": "4_to_5",
+          "run": 1,
+          "score": 2.0,
+          "cost": 0.0001404,
+          "latency_s": 12.25,
+          "tokens_in": 720,
+          "tokens_out": 54,
+          "reasoning_excerpt": "The prompt accurately describes the morphing of a glowing element and maintaining consistent space scene lighting and fo"
+        },
+        {
+          "pair": "5_to_6",
+          "run": 0,
+          "score": 2.0,
+          "cost": 0.00014055,
+          "latency_s": 14.08,
+          "tokens_in": 737,
+          "tokens_out": 50,
+          "reasoning_excerpt": "The prompt explicitly contradicts the visual evidence by asking to 'Preserve general object placement,' despite the cat "
+        },
+        {
+          "pair": "5_to_6",
+          "run": 1,
+          "score": 2.0,
+          "cost": 0.00016035,
+          "latency_s": 16.14,
+          "tokens_in": 737,
+          "tokens_out": 83,
+          "reasoning_excerpt": "The prompt's instructions for a camera zoom-in, consistent light source direction and color grading, and preserving gene"
+        }
+      ]
+    },
+    {
+      "judge": "prompt_judge",
+      "model": "gemini-3-flash",
+      "n_calls": 10,
+      "score_mean": 3.0,
+      "score_stdev": 0.0,
+      "cost_total_usd": 0.0,
+      "cost_per_call_usd": 0.0,
+      "latency_mean_s": 1.95,
+      "calls": [
+        {
+          "pair": "1_to_2",
+          "run": 0,
+          "score": 3.0,
+          "cost": 0.0,
+          "latency_s": 1.86,
+          "tokens_in": 0,
+          "tokens_out": 0,
+          "reasoning_excerpt": "judge error (neutral fallback): ClientError(\"404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3-flash is"
+        },
+        {
+          "pair": "1_to_2",
+          "run": 1,
+          "score": 3.0,
+          "cost": 0.0,
+          "latency_s": 1.91,
+          "tokens_in": 0,
+          "tokens_out": 0,
+          "reasoning_excerpt": "judge error (neutral fallback): ClientError(\"404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3-flash is"
+        },
+        {
+          "pair": "2_to_3",
+          "run": 0,
+          "score": 3.0,
+          "cost": 0.0,
+          "latency_s": 1.9,
+          "tokens_in": 0,
+          "tokens_out": 0,
+          "reasoning_excerpt": "judge error (neutral fallback): ClientError(\"404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3-flash is"
+        },
+        {
+          "pair": "2_to_3",
+          "run": 1,
+          "score": 3.0,
+          "cost": 0.0,
+          "latency_s": 1.92,
+          "tokens_in": 0,
+          "tokens_out": 0,
+          "reasoning_excerpt": "judge error (neutral fallback): ClientError(\"404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3-flash is"
+        },
+        {
+          "pair": "3_to_4",
+          "run": 0,
+          "score": 3.0,
+          "cost": 0.0,
+          "latency_s": 1.84,
+          "tokens_in": 0,
+          "tokens_out": 0,
+          "reasoning_excerpt": "judge error (neutral fallback): ClientError(\"404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3-flash is"
+        },
+        {
+          "pair": "3_to_4",
+          "run": 1,
+          "score": 3.0,
+          "cost": 0.0,
+          "latency_s": 1.93,
+          "tokens_in": 0,
+          "tokens_out": 0,
+          "reasoning_excerpt": "judge error (neutral fallback): ClientError(\"404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3-flash is"
+        },
+        {
+          "pair": "4_to_5",
+          "run": 0,
+          "score": 3.0,
+          "cost": 0.0,
+          "latency_s": 1.96,
+          "tokens_in": 0,
+          "tokens_out": 0,
+          "reasoning_excerpt": "judge error (neutral fallback): ClientError(\"404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3-flash is"
+        },
+        {
+          "pair": "4_to_5",
+          "run": 1,
+          "score": 3.0,
+          "cost": 0.0,
+          "latency_s": 1.87,
+          "tokens_in": 0,
+          "tokens_out": 0,
+          "reasoning_excerpt": "judge error (neutral fallback): ClientError(\"404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3-flash is"
+        },
+        {
+          "pair": "5_to_6",
+          "run": 0,
+          "score": 3.0,
+          "cost": 0.0,
+          "latency_s": 2.39,
+          "tokens_in": 0,
+          "tokens_out": 0,
+          "reasoning_excerpt": "judge error (neutral fallback): ClientError(\"404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3-flash is"
+        },
+        {
+          "pair": "5_to_6",
+          "run": 1,
+          "score": 3.0,
+          "cost": 0.0,
+          "latency_s": 1.87,
+          "tokens_in": 0,
+          "tokens_out": 0,
+          "reasoning_excerpt": "judge error (neutral fallback): ClientError(\"404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3-flash is"
+        }
+      ]
+    }
+  ],
+  "clip_judge": [
+    {
+      "judge": "clip_judge",
+      "model": "gemini-2.5-flash",
+      "n_calls": 5,
+      "visual_quality_mean": 4.8,
+      "visual_quality_stdev": 0.24,
+      "anatomy_breaks_flagged": 0,
+      "cost_total_usd": 0.00102,
+      "cost_per_call_usd": 0.000205,
+      "latency_mean_s": 11.12,
+      "calls": [
+        {
+          "pair": "1_to_2",
+          "run": 0,
+          "visual_quality": 4.5,
+          "anatomy_ok": true,
+          "prompt_match": 1.0,
+          "cost": 0.00020324999999999998,
+          "latency_s": 8.36,
+          "tokens_in": 1003,
+          "tokens_out": 88,
+          "reasoning_excerpt": "The scene content changes drastically between frames, showing new objects and removing old ones, instead of a continuous"
+        },
+        {
+          "pair": "2_to_3",
+          "run": 0,
+          "visual_quality": 4.5,
+          "anatomy_ok": true,
+          "prompt_match": 2.0,
+          "cost": 0.00021014999999999999,
+          "latency_s": 12.87,
+          "tokens_in": 1005,
+          "tokens_out": 99,
+          "reasoning_excerpt": "The core 'morph from glowing mushrooms to a package' instruction was misinterpreted, as the mushrooms reappeared instead"
+        },
+        {
+          "pair": "3_to_4",
+          "run": 0,
+          "visual_quality": 5.0,
+          "anatomy_ok": true,
+          "prompt_match": 1.0,
+          "cost": 0.0002076,
+          "latency_s": 13.39,
+          "tokens_in": 1024,
+          "tokens_out": 90,
+          "reasoning_excerpt": "The clip entirely failed to incorporate any camera movement or a proper resolving transition as specified in the prompt,"
+        },
+        {
+          "pair": "4_to_5",
+          "run": 0,
+          "visual_quality": 5.0,
+          "anatomy_ok": true,
+          "prompt_match": 2.0,
+          "cost": 0.00019815000000000002,
+          "latency_s": 9.94,
+          "tokens_in": 1013,
+          "tokens_out": 77,
+          "reasoning_excerpt": "The clip completely failed to implement the requested cinematic camera dollying forward into the scene."
+        },
+        {
+          "pair": "5_to_6",
+          "run": 0,
+          "visual_quality": 5.0,
+          "anatomy_ok": true,
+          "prompt_match": 1.0,
+          "cost": 0.0002055,
+          "latency_s": 11.04,
+          "tokens_in": 1030,
+          "tokens_out": 85,
+          "reasoning_excerpt": "The clip completely fails to execute a seamless transition, zoom, or preserve object placement as requested, instead sho"
+        }
+      ]
+    },
+    {
+      "judge": "clip_judge",
+      "model": "gemini-3-flash",
+      "n_calls": 5,
+      "visual_quality_mean": 3.0,
+      "visual_quality_stdev": 0.0,
+      "anatomy_breaks_flagged": 0,
+      "cost_total_usd": 0.0,
+      "cost_per_call_usd": 0.0,
+      "latency_mean_s": 2.66,
+      "calls": [
+        {
+          "pair": "1_to_2",
+          "run": 0,
+          "visual_quality": 3.0,
+          "anatomy_ok": true,
+          "prompt_match": 3.0,
+          "cost": 0.0,
+          "latency_s": 2.46,
+          "tokens_in": 0,
+          "tokens_out": 0,
+          "reasoning_excerpt": "judge error (neutral fallback): ClientError(\"404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3-flash is"
+        },
+        {
+          "pair": "2_to_3",
+          "run": 0,
+          "visual_quality": 3.0,
+          "anatomy_ok": true,
+          "prompt_match": 3.0,
+          "cost": 0.0,
+          "latency_s": 2.75,
+          "tokens_in": 0,
+          "tokens_out": 0,
+          "reasoning_excerpt": "judge error (neutral fallback): ClientError(\"404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3-flash is"
+        },
+        {
+          "pair": "3_to_4",
+          "run": 0,
+          "visual_quality": 3.0,
+          "anatomy_ok": true,
+          "prompt_match": 3.0,
+          "cost": 0.0,
+          "latency_s": 2.51,
+          "tokens_in": 0,
+          "tokens_out": 0,
+          "reasoning_excerpt": "judge error (neutral fallback): ClientError(\"404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3-flash is"
+        },
+        {
+          "pair": "4_to_5",
+          "run": 0,
+          "visual_quality": 3.0,
+          "anatomy_ok": true,
+          "prompt_match": 3.0,
+          "cost": 0.0,
+          "latency_s": 2.81,
+          "tokens_in": 0,
+          "tokens_out": 0,
+          "reasoning_excerpt": "judge error (neutral fallback): ClientError(\"404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3-flash is"
+        },
+        {
+          "pair": "5_to_6",
+          "run": 0,
+          "visual_quality": 3.0,
+          "anatomy_ok": true,
+          "prompt_match": 3.0,
+          "cost": 0.0,
+          "latency_s": 2.79,
+          "tokens_in": 0,
+          "tokens_out": 0,
+          "reasoning_excerpt": "judge error (neutral fallback): ClientError(\"404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/gemini-3-flash is"
+        }
+      ]
+    },
+    {
+      "judge": "clip_judge",
+      "model": "gemini-2.5-pro",
+      "n_calls": 5,
+      "visual_quality_mean": 4.5,
+      "visual_quality_stdev": 0.77,
+      "anatomy_breaks_flagged": 0,
+      "cost_total_usd": 0.01059,
+      "cost_per_call_usd": 0.002119,
+      "latency_mean_s": 13.94,
+      "calls": [
+        {
+          "pair": "1_to_2",
+          "run": 0,
+          "visual_quality": 3.0,
+          "anatomy_ok": true,
+          "prompt_match": 2.0,
+          "cost": 0.00209375,
+          "latency_s": 18.85,
+          "tokens_in": 1003,
+          "tokens_out": 84,
+          "reasoning_excerpt": "The scene's content changes completely mid-clip, with the flag and rocket disappearing and being replaced by glowing mus"
+        },
+        {
+          "pair": "2_to_3",
+          "run": 0,
+          "visual_quality": 5.0,
+          "anatomy_ok": true,
+          "prompt_match": 2.0,
+          "cost": 0.00209625,
+          "latency_s": 12.27,
+          "tokens_in": 1005,
+          "tokens_out": 84,
+          "reasoning_excerpt": "The prompt did not mention a cat astronaut, which became the main subject, and there is no camera push-in."
+        },
+        {
+          "pair": "3_to_4",
+          "run": 0,
+          "visual_quality": 5.0,
+          "anatomy_ok": true,
+          "prompt_match": 2.0,
+          "cost": 0.00215,
+          "latency_s": 13.16,
+          "tokens_in": 1024,
+          "tokens_out": 87,
+          "reasoning_excerpt": "The clip completely fails to execute the requested 'slow, arcing camera move', appearing as a static image with effects "
+        },
+        {
+          "pair": "4_to_5",
+          "run": 0,
+          "visual_quality": 5.0,
+          "anatomy_ok": true,
+          "prompt_match": 2.0,
+          "cost": 0.00206625,
+          "latency_s": 10.74,
+          "tokens_in": 1013,
+          "tokens_out": 80,
+          "reasoning_excerpt": "The prompt requested a 'camera dollying forward' but the camera remains completely static throughout the clip."
+        },
+        {
+          "pair": "5_to_6",
+          "run": 0,
+          "visual_quality": 4.5,
+          "anatomy_ok": true,
+          "prompt_match": 1.0,
+          "cost": 0.0021875,
+          "latency_s": 14.66,
+          "tokens_in": 1030,
+          "tokens_out": 90,
+          "reasoning_excerpt": "The clip completely ignores the prompt's core request for a slow camera zoom and seamless transition, instead creating a"
+        }
+      ]
+    }
+  ],
+  "movie_judge": [
+    {
+      "judge": "movie_judge",
+      "model": "deepseek-chat",
+      "n_calls": 2,
+      "story_coherence_mean": 3.8,
+      "story_coherence_stdev": 0.0,
+      "weakest_seam_picks": [
+        2,
+        2
+      ],
+      "cost_total_usd": 0.00033,
+      "cost_per_call_usd": 0.000163,
+      "latency_mean_s": 3.7,
+      "calls": [
+        {
+          "run": 0,
+          "story_coherence": 3.8,
+          "character_continuity": 3.5,
+          "emotional_arc": 3.7,
+          "weakest_seam": 2,
+          "cost": 0.00016240000000000002,
+          "latency_s": 3.64,
+          "tokens_in": 866,
+          "tokens_out": 147,
+          "reasoning_excerpt": "The story arc is largely coherent, with a clear progression from approach to discovery to transformation. However, the weakest seam is pair 2_to_3, where an anatomy issue (hand merging with package edge) breaks character continuity and lowe"
+        },
+        {
+          "run": 1,
+          "story_coherence": 3.8,
+          "character_continuity": 3.5,
+          "emotional_arc": 3.7,
+          "weakest_seam": 2,
+          "cost": 0.00016408000000000001,
+          "latency_s": 3.75,
+          "tokens_in": 866,
+          "tokens_out": 153,
+          "reasoning_excerpt": "The sequence mostly follows the intended arc: approach, discovery, grasp, transformation, return. The weakest seam is the transition from clip 2 to 3 (pair 2_to_3), where an anatomy issue (hand merging with package edge) breaks character co"
+        }
+      ]
+    },
+    {
+      "judge": "movie_judge",
+      "model": "deepseek-reasoner",
+      "n_calls": 2,
+      "story_coherence_mean": 3.75,
+      "story_coherence_stdev": 0.25,
+      "weakest_seam_picks": [
+        2,
+        2
+      ],
+      "cost_total_usd": 0.00467,
+      "cost_per_call_usd": 0.002336,
+      "latency_mean_s": 12.15,
+      "calls": [
+        {
+          "run": 0,
+          "story_coherence": 3.5,
+          "character_continuity": 3.0,
+          "emotional_arc": 3.5,
+          "weakest_seam": 2,
+          "cost": 0.00274295,
+          "latency_s": 14.72,
+          "tokens_in": 866,
+          "tokens_out": 1035,
+          "reasoning_excerpt": "The sequence generally follows the intended 3-act arc of approach, discovery, transformation, and return. The first and last transitions are strong, maintaining visual quality and style. However, the second transition (pair 2) has an anatom"
+        },
+        {
+          "run": 1,
+          "story_coherence": 4.0,
+          "character_continuity": 3.5,
+          "emotional_arc": 4.0,
+          "weakest_seam": 2,
+          "cost": 0.00192827,
+          "latency_s": 9.58,
+          "tokens_in": 866,
+          "tokens_out": 663,
+          "reasoning_excerpt": "The sequence generally follows the intended 3-act arc: approach, discovery, transformation, return. The opening and final clips are strong, with good visual quality and style consistency. However, the transition from clip 2 to 3 (pair 2) ha"
+        }
+      ]
+    }
+  ]
+}

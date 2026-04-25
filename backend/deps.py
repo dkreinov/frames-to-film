@@ -63,3 +63,26 @@ def resolve_fal_key(x_fal_key: str | None) -> str:
             ),
         )
     return key
+
+
+def resolve_deepseek_key(x_deepseek_key: str | None) -> str:
+    """Resolve the DeepSeek API key for movie_judge calls (Phase 7.1+).
+
+    Same precedence shape:
+    1. `X-DeepSeek-Key` header.
+    2. `DEEPSEEK_KEY` env var.
+
+    Raises `HTTPException(400)` if neither is set. Judges fall back to
+    neutral 3.0 scores when called without a key, so this resolver is
+    only used by routes that explicitly require the judge to run.
+    """
+    key = (x_deepseek_key or "").strip() or os.getenv("DEEPSEEK_KEY")
+    if not key:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "DeepSeek API key required for movie_judge. "
+                "Paste a key in Settings or set the 'DEEPSEEK_KEY' env var."
+            ),
+        )
+    return key
