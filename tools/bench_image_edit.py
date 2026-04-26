@@ -108,7 +108,9 @@ PRICING_USD: dict[str, float] = {
     "gemini-3.1-flash-image-preview": 0.067,
     "gemini-3-pro-image-preview": 0.134,
     "gpt-image-2-medium": 0.053,
-    "qwen-image-edit": 0.025,  # rough; DashScope per-call billing varies
+    "qwen-image-edit": 0.045,        # base tier, DashScope international
+    "qwen-image-edit-plus": 0.045,   # 2509 release, 20B params
+    "qwen-image-edit-max": 0.084,    # top tier (estimate; verify by billing)
 }
 
 # ---------- Source prep ----------
@@ -147,6 +149,25 @@ def img_to_png_bytes(img: Image.Image) -> bytes:
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return buf.getvalue()
+
+def img_to_compact_bytes(img: Image.Image, max_long_edge: int = 2048,
+                         max_bytes: int = 9_500_000) -> tuple[bytes, str]:
+    """Return (bytes, mime). Resized + JPEG-encoded to fit DashScope 10MB cap."""
+    w, h = img.size
+    long_edge = max(w, h)
+    if long_edge > max_long_edge:
+        scale = max_long_edge / long_edge
+        img = img.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
+    rgb = img.convert("RGB")
+    quality = 92
+    while quality >= 60:
+        buf = io.BytesIO()
+        rgb.save(buf, format="JPEG", quality=quality, optimize=True)
+        data = buf.getvalue()
+        if len(data) <= max_bytes:
+            return data, "image/jpeg"
+        quality -= 5
+    return data, "image/jpeg"
 
 # ---------- Vendors ----------
 
@@ -192,16 +213,20 @@ def openai_edit(src_img: Image.Image, prompt: str, *, is_outpaint: bool,
 
     if is_outpaint and target_aspect:
         canvas, mask = pad_to_aspect(src_img, *target_aspect)
-        # gpt-image-2 supports 1024x1024, 1024x1536, 1536x1024
         cw, ch = canvas.size
         if cw >= ch:
             target_size = (1536, 1024)
         else:
             target_size = (1024, 1536)
-        canvas = canvas.resize(target_size, Image.LANCZOS)
-        mask = mask.resize(target_size, Image.LANCZOS)
+        canvas = canvas.resize(target_size, Image.LANCZOS).convert("RGBA")
+        mask = mask.resize(target_size, Image.NEAREST)
+        # OpenAI mask: RGBA PNG, alpha=0 marks the edit region (the new edge),
+        # alpha=255 marks the keep region (the original-photo area).
+        mask_rgba = Image.new("RGBA", target_size, (0, 0, 0, 0))
+        mask_rgba.putalpha(mask)
+        assert canvas.size == mask_rgba.size, (canvas.size, mask_rgba.size)
         img_bytes = img_to_png_bytes(canvas)
-        mask_bytes = img_to_png_bytes(mask)
+        mask_bytes = img_to_png_bytes(mask_rgba)
         size_str = f"{target_size[0]}x{target_size[1]}"
         result = client.images.edit(
             model="gpt-image-2",
@@ -231,22 +256,27 @@ def openai_edit(src_img: Image.Image, prompt: str, *, is_outpaint: bool,
     b64 = result.data[0].b64_json
     return base64.b64decode(b64)
 
-def qwen_image_edit(src_img: Image.Image, prompt: str) -> bytes:
-    """DashScope Singapore qwen-image-edit. Async: submit -> poll task."""
+def qwen_image_edit(src_img: Image.Image, prompt: str,
+                    model: str = "qwen-image-edit",
+                    size: str | None = None) -> bytes:
+    """DashScope Singapore qwen-image-edit / -plus / -max. Sync mode."""
     key = os.environ.get("QWEEN_KEY") or os.environ.get("QWEN_KEY")
     if not key:
         raise RuntimeError("QWEEN_KEY not set")
 
-    img_bytes = img_to_png_bytes(src_img)
+    img_bytes, mime = img_to_compact_bytes(src_img)
     img_b64 = base64.b64encode(img_bytes).decode()
-    data_uri = f"data:image/png;base64,{img_b64}"
+    data_uri = f"data:{mime};base64,{img_b64}"
 
     submit_url = (
         "https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/"
         "multimodal-generation/generation"
     )
+    params: dict[str, object] = {"negative_prompt": "", "watermark": False}
+    if size:
+        params["size"] = size
     payload = {
-        "model": "qwen-image-edit",
+        "model": model,
         "input": {
             "messages": [
                 {
@@ -258,7 +288,7 @@ def qwen_image_edit(src_img: Image.Image, prompt: str) -> bytes:
                 }
             ]
         },
-        "parameters": {"negative_prompt": "", "watermark": False},
+        "parameters": params,
     }
     headers = {
         "Authorization": f"Bearer {key}",
@@ -292,6 +322,8 @@ MODELS_TO_RUN = [
     "gemini-3-pro-image-preview",
     "gpt-image-2-medium",
     "qwen-image-edit",
+    "qwen-image-edit-plus",
+    "qwen-image-edit-max",
 ]
 
 def estimate_total_cost(models: list[str], n_tasks: int) -> float:
@@ -311,8 +343,8 @@ def run_one(model: str, task: Task) -> Result:
             data = openai_edit(src_img, task.prompt,
                                is_outpaint=task.is_outpaint,
                                target_aspect=task.target_aspect)
-        elif model == "qwen-image-edit":
-            data = qwen_image_edit(src_img, task.prompt)
+        elif model.startswith("qwen-image-edit"):
+            data = qwen_image_edit(src_img, task.prompt, model=model)
         else:
             raise RuntimeError(f"unknown model {model}")
         out_path.write_bytes(data)
