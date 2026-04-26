@@ -259,3 +259,35 @@ def test_post_stitch_loads_brief_from_project_json_when_kwarg_absent(tmp_path, m
     assert seen.get("brief") is not None, \
         "brief should be auto-loaded from metadata/project.json"
     assert "SENTINEL_SUBJECT_FROM_DISK" in str(seen["brief"])
+
+
+# --- order.json loop pair support ------------------------------------
+
+def test_discover_pairs_respects_order_json_loop(tmp_path):
+    """_discover_pairs must include the loop pair (25→1) when order.json
+    specifies a repeated first filename at the end."""
+    from backend.services.project_schema import EXTENDED_DIRNAME, METADATA_DIRNAME
+    from backend.services.prompts import ORDER_FILENAME
+
+    project = tmp_path / "proj"
+    ext = project / EXTENDED_DIRNAME
+    ext.mkdir(parents=True)
+    meta = project / METADATA_DIRNAME
+    meta.mkdir(parents=True)
+
+    # Create 6 numbered photos in extended/
+    for n in (1, 4, 13, 18, 24, 25):
+        (ext / f"{n}.jpg").write_bytes(b"\xff\xd8\xff\xe0")
+
+    # order.json specifying loop: 1→4→13→18→24→25→1
+    (meta / ORDER_FILENAME).write_text(json.dumps({
+        "order": ["1.jpg", "4.jpg", "13.jpg", "18.jpg", "24.jpg", "25.jpg", "1.jpg"]
+    }))
+
+    pairs = orchestrator._discover_pairs(project)
+    pair_keys = [pk for pk, _, _ in pairs]
+
+    assert len(pairs) == 6, f"expected 6 pairs (incl. loop), got {len(pairs)}: {pair_keys}"
+    assert "25_to_1" in pair_keys, f"loop pair 25_to_1 missing from {pair_keys}"
+    assert pair_keys[0] == "1_to_4"
+    assert pair_keys[-1] == "25_to_1"
