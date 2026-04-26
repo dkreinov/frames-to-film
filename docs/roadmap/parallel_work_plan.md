@@ -104,18 +104,24 @@ Each stream writes its progress here at the end of each work cycle:
 ### Stream A status (latest)
 
 ```
-[2026-04-26 12:30] DONE: 7.4/7.5 backend prep — kling_prompt_rules.yaml + research guide,
-            5 story arc YAMLs, 15-entry cinematic_devices.yaml, story.py + prompt_writer.py
-            services (TDD green), movie_judge story_arc/brief contract tests.
-Last commit: 5563e8d (Step 9 - movie_judge story_arc + brief contract verification)
-Test delta: 156 backend tests passing (was 141 baseline + 15 added).
-Next up: 7.2 eval harness OR 7.4 router (POST /projects/{id}/story endpoint
-         + main.py registration). Both unblocked now that Sub-plan B is done.
+[2026-04-26 evening] DONE: 2 cycles consecutive — 7.4/7.5 backend prep + CLI wrappers
+            + orchestrator disk-load + 7.2 eval harness baseline + close-out exec log.
+Last commit: <Step 13 of Cycle 2>
+Test delta: 165 backend + 6 integration tests passing (was 141 baseline; +24 net).
+Cycle artifacts: tools/cli/{run_story,run_prompts}.py, tools/eval_runner.py,
+                 fixtures/eval_set/{01_cats,02_olga_slice}/, eval_runs.csv (1st row),
+                 docs/roadmap/eval_baseline_2026-04.md,
+                 docs/roadmap/phase_7_streamA_cycle_2026-04-26_execution.md
+Cost: \$0.00 (all mock-mode).
+Next up: first real-API eval baseline (operator decision; ~\$5-10) OR
+         wire prompt_writer.py into prompts.py stage runner (auto vs CLI-only)
+         OR Phase 7.3 calibration prep.
 Blocked on: none.
 
-✅ STREAM A DONE WITH THIS CYCLE; SAFE FOR STREAM B SUB-PLAN B (already done).
-   movie_judge.py touched by tests only — strict-additive policy honored.
-   Stream B free to take 7.7 stitch xfade, 7.5b Wan 2.7 adapter, or 7.4 frontend.
+✅ STREAM A DONE WITH 2026-04-26. movie_judge.py source UNTOUCHED;
+   only test additions. Schema-conformance hard rules respected throughout.
+   Stream B free to pick: 7.7 stitch xfade, 7.5b Wan 2.7 adapter, or any
+   open task. data/cinematic_devices.yaml is shipped + ready for 7.7 dispatch.
 ```
 
 ### Stream B status (latest)
