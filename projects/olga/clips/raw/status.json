@@ -1,0 +1,242 @@
+{
+  "3_to_4": {
+    "result": "ok",
+    "task_id": "857004479554650138",
+    "file": "seg_3_to_4.mp4",
+    "size_mb": 6.0
+  },
+  "4_to_5": {
+    "result": "ok",
+    "task_id": "857005413576491076",
+    "file": "seg_4_to_5.mp4",
+    "size_mb": 6.0
+  },
+  "5_to_6": {
+    "result": "ok",
+    "task_id": "857006359907270725",
+    "file": "seg_5_to_6.mp4",
+    "size_mb": 4.9
+  },
+  "6_to_7": {
+    "result": "ok",
+    "task_id": "857007376396853341",
+    "file": "seg_6_to_7.mp4",
+    "size_mb": 5.8
+  },
+  "7_to_8": {
+    "result": "ok",
+    "task_id": "857008297646358625",
+    "file": "seg_7_to_8.mp4",
+    "size_mb": 6.6
+  },
+  "8_to_9": {
+    "result": "ok",
+    "task_id": "857009243009597468",
+    "file": "seg_8_to_9.mp4",
+    "size_mb": 5.4
+  },
+  "9_to_10": {
+    "result": "ok",
+    "task_id": "857010572352290830",
+    "file": "seg_9_to_10.mp4",
+    "size_mb": 6.9
+  },
+  "10_to_11": {
+    "result": "ok",
+    "task_id": "857011890864652373",
+    "file": "seg_10_to_11.mp4",
+    "size_mb": 7.6
+  },
+  "11_to_12": {
+    "result": "ok",
+    "task_id": "857013130839982159",
+    "file": "seg_11_to_12.mp4",
+    "size_mb": 7.0
+  },
+  "12_to_13": {
+    "result": "ok",
+    "task_id": "857014052538302511",
+    "file": "seg_12_to_13.mp4",
+    "size_mb": 5.4
+  },
+  "13_to_14": {
+    "result": "ok",
+    "task_id": "857014979235545105",
+    "file": "seg_13_to_14.mp4",
+    "size_mb": 8.3
+  },
+  "14_to_15": {
+    "result": "ok",
+    "task_id": "857015941455675475",
+    "file": "seg_14_to_15.mp4",
+    "size_mb": 6.4
+  },
+  "15_to_16": {
+    "result": "ok",
+    "task_id": "857016878919712787",
+    "file": "seg_15_to_16.mp4",
+    "size_mb": 5.3
+  },
+  "16_to_17": {
+    "result": "ok",
+    "task_id": "857034948178477102",
+    "file": "seg_16_to_17.mp4",
+    "size_mb": 6.9
+  },
+  "17_to_18": {
+    "result": "ok",
+    "task_id": "857035882535190624",
+    "file": "seg_17_to_18.mp4",
+    "size_mb": 7.8
+  },
+  "18_to_19": {
+    "result": "ok",
+    "task_id": "857036817387487323",
+    "file": "seg_18_to_19.mp4",
+    "size_mb": 6.4
+  },
+  "19_to_20": {
+    "result": "ok",
+    "task_id": "857037706407985244",
+    "file": "seg_19_to_20.mp4",
+    "size_mb": 6.6
+  },
+  "20_to_21": {
+    "result": "ok",
+    "task_id": "857038861728350281",
+    "file": "seg_20_to_21.mp4",
+    "size_mb": 6.6
+  },
+  "21_to_22": {
+    "result": "ok",
+    "task_id": "857039870450081816",
+    "file": "seg_21_to_22.mp4",
+    "size_mb": 5.8
+  },
+  "22_to_23": {
+    "result": "ok",
+    "task_id": "857040871618510873",
+    "file": "seg_22_to_23.mp4",
+    "size_mb": 5.9
+  },
+  "23_to_24": {
+    "result": "ok",
+    "task_id": "857041764161560665",
+    "file": "seg_23_to_24.mp4",
+    "size_mb": 7.5
+  },
+  "24_to_25": {
+    "result": "ok",
+    "task_id": "857042652406743089",
+    "file": "seg_24_to_25.mp4",
+    "size_mb": 8.2
+  },
+  "25_to_26": {
+    "result": "ok",
+    "task_id": "857043555008397373",
+    "file": "seg_25_to_26.mp4",
+    "size_mb": 7.4
+  },
+  "26_to_27": {
+    "result": "ok",
+    "task_id": "857044560911532120",
+    "file": "seg_26_to_27.mp4",
+    "size_mb": 7.4
+  },
+  "27_to_28": {
+    "result": "ok",
+    "task_id": "857045497013092392",
+    "file": "seg_27_to_28.mp4",
+    "size_mb": 9.2
+  },
+  "28_to_29": {
+    "result": "ok",
+    "task_id": "857046767631335519",
+    "file": "seg_28_to_29.mp4",
+    "size_mb": 8.4
+  },
+  "29_to_30": {
+    "result": "ok",
+    "task_id": "857047785777659945",
+    "file": "seg_29_to_30.mp4",
+    "size_mb": 7.6
+  },
+  "30_to_31": {
+    "result": "ok",
+    "task_id": "857048946773606443",
+    "file": "seg_30_to_31.mp4",
+    "size_mb": 7.8
+  },
+  "31_to_32": {
+    "result": "ok",
+    "task_id": "857050014453989434",
+    "file": "seg_31_to_32.mp4",
+    "size_mb": 7.3
+  },
+  "32_to_33": {
+    "result": "ok",
+    "task_id": "857050895275261995",
+    "file": "seg_32_to_33.mp4",
+    "size_mb": 7.2
+  },
+  "33_to_33_b": {
+    "result": "ok",
+    "task_id": "857051828646314070",
+    "file": "seg_33_to_33_b.mp4",
+    "size_mb": 7.4
+  },
+  "33_b_to_34": {
+    "result": "ok",
+    "task_id": "857052858247299084",
+    "file": "seg_33_b_to_34.mp4",
+    "size_mb": 6.8
+  },
+  "34_to_35": {
+    "result": "ok",
+    "task_id": "857053785737265161",
+    "file": "seg_34_to_35.mp4",
+    "size_mb": 7.2
+  },
+  "35_to_35_b": {
+    "result": "ok",
+    "task_id": "857063627097653314",
+    "file": "seg_35_to_35_b.mp4",
+    "size_mb": 8.3
+  },
+  "35_b_to_36": {
+    "result": "ok",
+    "task_id": "857064570715373572",
+    "file": "seg_35_b_to_36.mp4",
+    "size_mb": 8.6
+  },
+  "36_to_37": {
+    "result": "ok",
+    "task_id": "857065468123816022",
+    "file": "seg_36_to_37.mp4",
+    "size_mb": 8.1
+  },
+  "37_to_38": {
+    "result": "ok",
+    "task_id": "857066409715703902",
+    "file": "seg_37_to_38.mp4",
+    "size_mb": 7.0
+  },
+  "38_to_39": {
+    "result": "ok",
+    "task_id": "857067330168946730",
+    "file": "seg_38_to_39.mp4",
+    "size_mb": 5.2
+  },
+  "39_to_40": {
+    "result": "ok",
+    "task_id": "857068195184779277",
+    "file": "seg_39_to_40.mp4",
+    "size_mb": 9.8
+  },
+  "40_to_41": {
+    "result": "ok",
+    "task_id": "857069159338475611",
+    "file": "seg_40_to_41.mp4",
+    "size_mb": 11.7
+  }
+}

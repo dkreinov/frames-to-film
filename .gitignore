@@ -17,6 +17,8 @@ strips/
 *.mp3
 *.m4a
 *.zip
+*.pt
+concat_list.txt
 *.pdf
 *.html
 *.pyc
