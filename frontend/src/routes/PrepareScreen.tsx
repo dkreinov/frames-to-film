@@ -44,8 +44,8 @@ export default function PrepareScreen() {
 
   // Once done, list the outputs.
   const outputsQuery = useQuery({
-    queryKey: ['outputs', projectId, 'outpainted'],
-    queryFn: () => listStageOutputs(projectId, 'outpainted'),
+    queryKey: ['outputs', projectId, 'extended/_4_3'],
+    queryFn: () => listStageOutputs(projectId, 'extended/_4_3'),
     enabled: jobQuery.data?.status === 'done',
   })
 
@@ -69,7 +69,7 @@ export default function PrepareScreen() {
         {status === 'done' ? (
           <OutputsGrid
             projectId={projectId}
-            stage="outpainted"
+            stage="extended/_4_3"
             names={names}
             altPrefix="prepared photo"
           />

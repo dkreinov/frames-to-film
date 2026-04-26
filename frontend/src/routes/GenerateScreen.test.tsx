@@ -58,7 +58,7 @@ describe('GenerateScreen', () => {
     ;(client.getPrompts as any).mockResolvedValue(null) // 404 -> trigger prompts gen
     ;(client.getJob as any).mockResolvedValue({ ...jobDone, status: 'running' })
     ;(client.listStageOutputs as any).mockResolvedValue({
-      stage: 'kling_test',
+      stage: 'extended',
       outputs: ['1.jpg', '2.jpg', '3.jpg'],
     })
     ;(client.getProjectOrder as any).mockResolvedValue(null)
@@ -68,7 +68,7 @@ describe('GenerateScreen', () => {
 
   it('renders one PromptRow per pair once prompts resolve', async () => {
     ;(client.listStageOutputs as any).mockResolvedValue({
-      stage: 'kling_test',
+      stage: 'extended',
       outputs: ['1.jpg', '2.jpg', '3.jpg'],
     })
     ;(client.getProjectOrder as any).mockResolvedValue(null)
@@ -86,7 +86,7 @@ describe('GenerateScreen', () => {
 
   it('triggers one re-gen when server prompts keys do not match expected pair_keys', async () => {
     ;(client.listStageOutputs as any).mockResolvedValue({
-      stage: 'kling_test',
+      stage: 'extended',
       outputs: ['1.jpg', '2.jpg', '3.jpg'],
     })
     ;(client.getProjectOrder as any).mockResolvedValue(null)
@@ -106,7 +106,7 @@ describe('GenerateScreen', () => {
 
   it('shows the rendering spinner while generate job is running', async () => {
     ;(client.listStageOutputs as any).mockResolvedValue({
-      stage: 'kling_test',
+      stage: 'extended',
       outputs: ['1.jpg', '2.jpg', '3.jpg'],
     })
     ;(client.getProjectOrder as any).mockResolvedValue(null)
@@ -129,7 +129,7 @@ describe('GenerateScreen', () => {
 
   it('shows video lightbox triggers and enables Next once generate job is done', async () => {
     ;(client.listStageOutputs as any).mockResolvedValue({
-      stage: 'kling_test',
+      stage: 'extended',
       outputs: ['1.jpg', '2.jpg', '3.jpg'],
     })
     ;(client.getProjectOrder as any).mockResolvedValue(null)
@@ -172,7 +172,7 @@ describe('GenerateScreen', () => {
       })
     )
     ;(client.listStageOutputs as any).mockResolvedValue({
-      stage: 'kling_test',
+      stage: 'extended',
       outputs: ['1.jpg', '2.jpg', '3.jpg'],
     })
     ;(client.getProjectOrder as any).mockResolvedValue(null)

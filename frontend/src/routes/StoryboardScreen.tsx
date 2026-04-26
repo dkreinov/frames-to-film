@@ -52,8 +52,8 @@ export default function StoryboardScreen() {
     startMutation.isError ? 'error' : (jobQuery.data?.status ?? 'pending')
 
   const outputsQuery = useQuery({
-    queryKey: ['outputs', projectId, 'kling_test'],
-    queryFn: () => listStageOutputs(projectId, 'kling_test'),
+    queryKey: ['outputs', projectId, 'extended'],
+    queryFn: () => listStageOutputs(projectId, 'extended'),
     enabled: status === 'done',
   })
 
@@ -109,7 +109,7 @@ export default function StoryboardScreen() {
             </p>
             <SortableGrid
               projectId={projectId}
-              stage="kling_test"
+              stage="extended"
               names={order}
               onChange={setOrder}
             />

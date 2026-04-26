@@ -23,14 +23,14 @@ export function PromptRow({
     <div className="rounded-lg border border-border bg-card p-4 space-y-3">
       <div className="flex items-center gap-3">
         <img
-          src={artifactUrl(projectId, 'kling_test', frameA)}
+          src={artifactUrl(projectId, 'extended', frameA)}
           alt={`Frame ${frameA}`}
           className="h-14 w-24 rounded-md border border-border object-cover"
           loading="lazy"
         />
         <span aria-hidden className="text-muted-foreground">→</span>
         <img
-          src={artifactUrl(projectId, 'kling_test', frameB)}
+          src={artifactUrl(projectId, 'extended', frameB)}
           alt={`Frame ${frameB}`}
           className="h-14 w-24 rounded-md border border-border object-cover"
           loading="lazy"

@@ -25,8 +25,8 @@ let serverSegments: Array<{
 }> = []
 
 const server = setupServer(
-  http.get(`${BASE}/projects/:pid/outputs/kling_test`, () =>
-    HttpResponse.json({ stage: 'kling_test', outputs: ['1.jpg', '2.jpg', '3.jpg'] })
+  http.get(`${BASE}/projects/:pid/outputs/extended`, () =>
+    HttpResponse.json({ stage: 'extended', outputs: ['1.jpg', '2.jpg', '3.jpg'] })
   ),
   http.get(`${BASE}/projects/:pid/order`, () =>
     HttpResponse.text('not set', { status: 404 })

@@ -223,7 +223,7 @@ export async function listVideos(projectId: string): Promise<VideoItem[]> {
 }
 
 export function videoUrl(projectId: string, name: string): string {
-  return `${API_BASE}/projects/${projectId}/artifacts/kling_test/videos/${encodeURIComponent(name)}`
+  return `${API_BASE}/projects/${projectId}/artifacts/clips/raw/${encodeURIComponent(name)}`
 }
 
 export async function listSegments(projectId: string): Promise<Segment[]> {

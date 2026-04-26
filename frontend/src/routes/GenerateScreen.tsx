@@ -39,8 +39,8 @@ export default function GenerateScreen() {
 
   // --- Expected pair sequence (from /outputs + /order) ---
   const outputsQuery = useQuery({
-    queryKey: ['outputs', projectId, 'kling_test'],
-    queryFn: () => listStageOutputs(projectId, 'kling_test'),
+    queryKey: ['outputs', projectId, 'extended'],
+    queryFn: () => listStageOutputs(projectId, 'extended'),
     enabled: !!projectId,
   })
   const savedOrderQuery = useQuery({

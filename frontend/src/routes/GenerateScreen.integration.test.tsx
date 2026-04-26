@@ -24,8 +24,8 @@ const BASE = 'http://127.0.0.1:8000'
 
 const server = setupServer(
   // Outputs: frames are ready.
-  http.get(`${BASE}/projects/:pid/outputs/kling_test`, () =>
-    HttpResponse.json({ stage: 'kling_test', outputs: ['1.jpg', '2.jpg', '3.jpg'] })
+  http.get(`${BASE}/projects/:pid/outputs/extended`, () =>
+    HttpResponse.json({ stage: 'extended', outputs: ['1.jpg', '2.jpg', '3.jpg'] })
   ),
   // Order: none set (natural order).
   http.get(`${BASE}/projects/:pid/order`, () =>

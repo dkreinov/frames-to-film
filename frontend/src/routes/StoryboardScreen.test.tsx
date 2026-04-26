@@ -66,7 +66,7 @@ describe('StoryboardScreen', () => {
       status: 'done',
     })
     ;(client.listStageOutputs as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-      stage: 'kling_test',
+      stage: 'extended',
       outputs: ['1.jpg', '2.jpg', '3.jpg'],
     })
     ;(client.getProjectOrder as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(null)
@@ -81,7 +81,7 @@ describe('StoryboardScreen', () => {
     ;(client.getJob as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       ...baseJob,
       status: 'error',
-      error: 'outpainted dir missing',
+      error: 'extended/_4_3 dir missing',
     })
     renderAt()
     expect(await screen.findByRole('alert')).toBeInTheDocument()

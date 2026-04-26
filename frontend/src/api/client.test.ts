@@ -102,17 +102,18 @@ describe('api client', () => {
 
   it('listStageOutputs returns the array of names', async () => {
     server.use(
-      http.get('http://127.0.0.1:8000/projects/:pid/outputs/:stage', () =>
-        HttpResponse.json({ stage: 'outpainted', outputs: ['1.jpg', '2.jpg'] })
+      http.get(
+        'http://127.0.0.1:8000/projects/:pid/outputs/extended/_4_3',
+        () => HttpResponse.json({ stage: 'extended/_4_3', outputs: ['1.jpg', '2.jpg'] })
       )
     )
-    const r = await listStageOutputs('abc123', 'outpainted')
+    const r = await listStageOutputs('abc123', 'extended/_4_3')
     expect(r.outputs).toEqual(['1.jpg', '2.jpg'])
   })
 
   it('artifactUrl URL-encodes the filename', () => {
-    expect(artifactUrl('p', 'outpainted', 'a b.jpg')).toBe(
-      'http://127.0.0.1:8000/projects/p/artifacts/outpainted/a%20b.jpg'
+    expect(artifactUrl('p', 'extended/_4_3', 'a b.jpg')).toBe(
+      'http://127.0.0.1:8000/projects/p/artifacts/extended/_4_3/a%20b.jpg'
     )
   })
 

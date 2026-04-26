@@ -55,7 +55,7 @@ describe('ReviewScreen', () => {
   it('shows a loading state while videos are being fetched', async () => {
     // Never-resolving videos query keeps the screen in loading.
     ;(client.listStageOutputs as any).mockResolvedValue({
-      stage: 'kling_test',
+      stage: 'extended',
       outputs: ['1.jpg', '2.jpg', '3.jpg'],
     })
     ;(client.getProjectOrder as any).mockResolvedValue(null)
@@ -67,7 +67,7 @@ describe('ReviewScreen', () => {
 
   it('renders one row per video with persisted verdicts from listSegments', async () => {
     ;(client.listStageOutputs as any).mockResolvedValue({
-      stage: 'kling_test',
+      stage: 'extended',
       outputs: ['1.jpg', '2.jpg', '3.jpg'],
     })
     ;(client.getProjectOrder as any).mockResolvedValue(null)
@@ -91,7 +91,7 @@ describe('ReviewScreen', () => {
 
   it('clicking a verdict fires reviewSegment and updates aria-pressed on success', async () => {
     ;(client.listStageOutputs as any).mockResolvedValue({
-      stage: 'kling_test',
+      stage: 'extended',
       outputs: ['1.jpg', '2.jpg'],
     })
     ;(client.getProjectOrder as any).mockResolvedValue(null)
@@ -119,7 +119,7 @@ describe('ReviewScreen', () => {
 
   it('leaves aria-pressed unchanged if reviewSegment rejects', async () => {
     ;(client.listStageOutputs as any).mockResolvedValue({
-      stage: 'kling_test',
+      stage: 'extended',
       outputs: ['1.jpg', '2.jpg'],
     })
     ;(client.getProjectOrder as any).mockResolvedValue(null)
@@ -140,7 +140,7 @@ describe('ReviewScreen', () => {
 
   it('clicking Stitch & Export triggers startStitch and shows the spinner', async () => {
     ;(client.listStageOutputs as any).mockResolvedValue({
-      stage: 'kling_test',
+      stage: 'extended',
       outputs: ['1.jpg', '2.jpg'],
     })
     ;(client.getProjectOrder as any).mockResolvedValue(null)
@@ -163,7 +163,7 @@ describe('ReviewScreen', () => {
     // and pipe the new array back into the component. Still empty ->
     // local state MUST remain winner, not re-seed from the server.
     ;(client.listStageOutputs as any).mockResolvedValue({
-      stage: 'kling_test',
+      stage: 'extended',
       outputs: ['1.jpg', '2.jpg'],
     })
     ;(client.getProjectOrder as any).mockResolvedValue(null)
@@ -197,7 +197,7 @@ describe('ReviewScreen', () => {
 
   it('shows Download full movie link once stitch is done', async () => {
     ;(client.listStageOutputs as any).mockResolvedValue({
-      stage: 'kling_test',
+      stage: 'extended',
       outputs: ['1.jpg', '2.jpg'],
     })
     ;(client.getProjectOrder as any).mockResolvedValue(null)

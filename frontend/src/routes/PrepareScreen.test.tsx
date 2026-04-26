@@ -72,7 +72,7 @@ describe('PrepareScreen', () => {
       updated_at: '',
     })
     ;(client.listStageOutputs as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-      stage: 'outpainted',
+      stage: 'extended/_4_3',
       outputs: ['1.jpg', '2.jpg', '3.jpg'],
     })
     renderAt()
@@ -90,13 +90,13 @@ describe('PrepareScreen', () => {
       user_id: 'local',
       kind: 'prepare',
       payload: {},
-      error: 'outpainted dir missing',
+      error: 'extended/_4_3 dir missing',
       created_at: '',
       updated_at: '',
     })
     renderAt()
     expect(await screen.findByRole('alert')).toBeInTheDocument()
-    expect(screen.getByText(/outpainted dir missing/i)).toBeInTheDocument()
+    expect(screen.getByText(/extended\/_4_3 dir missing/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument()
   })
 

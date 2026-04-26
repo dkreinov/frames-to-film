@@ -26,8 +26,8 @@ export default function ReviewScreen() {
   const { modes } = useSettings()
 
   const outputsQuery = useQuery({
-    queryKey: ['outputs', projectId, 'kling_test'],
-    queryFn: () => listStageOutputs(projectId, 'kling_test'),
+    queryKey: ['outputs', projectId, 'extended'],
+    queryFn: () => listStageOutputs(projectId, 'extended'),
     enabled: !!projectId,
   })
   const savedOrderQuery = useQuery({

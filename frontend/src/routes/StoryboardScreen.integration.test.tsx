@@ -40,8 +40,8 @@ const server = setupServer(
       updated_at: '',
     })
   ),
-  http.get('http://127.0.0.1:8000/projects/:pid/outputs/kling_test', () =>
-    HttpResponse.json({ stage: 'kling_test', outputs: ['1.jpg', '2.jpg', '3.jpg'] })
+  http.get('http://127.0.0.1:8000/projects/:pid/outputs/extended', () =>
+    HttpResponse.json({ stage: 'extended', outputs: ['1.jpg', '2.jpg', '3.jpg'] })
   ),
   http.get('http://127.0.0.1:8000/projects/:pid/order', () =>
     HttpResponse.text('not set', { status: 404 })

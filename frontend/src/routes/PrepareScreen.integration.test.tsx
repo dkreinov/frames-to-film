@@ -33,8 +33,8 @@ const server = setupServer(
       updated_at: '',
     })
   }),
-  http.get('http://127.0.0.1:8000/projects/:pid/outputs/outpainted', () =>
-    HttpResponse.json({ stage: 'outpainted', outputs: ['1.jpg', '2.jpg'] })
+  http.get('http://127.0.0.1:8000/projects/:pid/outputs/extended/_4_3', () =>
+    HttpResponse.json({ stage: 'extended/_4_3', outputs: ['1.jpg', '2.jpg'] })
   )
 )
 
@@ -80,7 +80,7 @@ describe('PrepareScreen integration', () => {
           kind: 'prepare',
           status: 'error',
           payload: {},
-          error: 'outpainted dir missing',
+          error: 'extended/_4_3 dir missing',
           created_at: '',
           updated_at: '',
         })
@@ -88,7 +88,7 @@ describe('PrepareScreen integration', () => {
     )
     renderAt()
     expect(await screen.findByRole('alert', {}, { timeout: 5_000 })).toBeInTheDocument()
-    expect(screen.getByText(/outpainted dir missing/i)).toBeInTheDocument()
+    expect(screen.getByText(/extended\/_4_3 dir missing/i)).toBeInTheDocument()
   })
 
   it('surfaces POST /prepare 5xx to the error card (advisor-flagged bug)', async () => {
