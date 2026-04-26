@@ -255,6 +255,38 @@ def run_post_generate_judges(
 
 # --- post-stitch judge -----------------------------------------------
 
+_STORY_FILENAME = "story.json"
+_PROJECT_META_FILENAME = "project.json"
+
+
+def _load_story_from_disk(project_dir: Path) -> dict[str, Any] | None:
+    """Load metadata/story.json if present. Returns parsed dict or None."""
+    p = project_dir / METADATA_DIRNAME / _STORY_FILENAME
+    if not p.is_file():
+        return None
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def _load_brief_from_project_json(project_dir: Path) -> dict[str, Any] | None:
+    """Load brief shape (subject/tone/notes) from metadata/project.json
+    if those fields are present. Returns dict or None."""
+    p = project_dir / METADATA_DIRNAME / _PROJECT_META_FILENAME
+    if not p.is_file():
+        return None
+    try:
+        meta = json.loads(p.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+    # Only return a brief dict if at least one brief-shaped field exists.
+    keys = ("subject", "tone", "notes")
+    if not any(k in meta for k in keys):
+        return None
+    return {k: meta.get(k, "") for k in keys}
+
+
 def run_post_stitch_judge(
     project_dir: Path,
     deepseek_key: str | None = None,
@@ -267,10 +299,20 @@ def run_post_stitch_judge(
     Reads the existing `judges.clip` list as input. If empty, judges
     cannot run (movie_judge needs per-clip data); writes a placeholder
     entry noting the missing input.
+
+    Phase 7.4 wiring: when `story_arc` or `brief` kwargs are absent,
+    auto-loads from `metadata/story.json` and `metadata/project.json`.
+    Explicit kwargs always win over disk values.
     """
     project_dir = Path(project_dir)
     if deepseek_key is None:
         deepseek_key = os.getenv("DEEPSEEK_KEY") or ""
+
+    # Auto-load from disk if caller didn't pass story_arc / brief
+    if story_arc is None:
+        story_arc = _load_story_from_disk(project_dir)
+    if brief is None:
+        brief = _load_brief_from_project_json(project_dir)
 
     data = read_run_json(project_dir)
     clip_judges = [c.get("scores", {}) | {"pair": c.get("pair"), "reasoning": c.get("reasoning", "")}
