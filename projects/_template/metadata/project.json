@@ -1,0 +1,9 @@
+{
+  "slug": "__SLUG__",
+  "name": "__NAME__",
+  "created_at": "__CREATED_AT__",
+  "status": "draft",
+  "tags": [],
+  "audio_track": null,
+  "source": "operator_upload"
+}
