@@ -311,9 +311,24 @@ def main() -> int:
                 max_usd = float(env_cap)
             except ValueError:
                 pass
-    if args.mode == "api" and max_usd is not None:
+    if args.mode == "api":
+        # Preflight: FAL_KEY required
+        if not fal_key:
+            print(
+                "ERROR: FAL_KEY env var not set. api mode requires a valid fal.ai key.",
+                file=sys.stderr,
+            )
+            return 1
+        # Cost estimate
         estimated = sum(_estimate_fixture_cost(f) for f in fixtures)
-        if estimated > max_usd:
+        print(
+            f"[preflight] api mode — {len(fixtures)} fixture(s), "
+            f"estimated cost ${estimated:.2f} "
+            f"({int(estimated / _KLING_COST_PER_PAIR_USD + 0.5)} Kling pairs × "
+            f"${_KLING_COST_PER_PAIR_USD}/pair)"
+        )
+        # MAX_USD cap
+        if max_usd is not None and estimated > max_usd:
             print(
                 f"ERROR: estimated cost ${estimated:.2f} exceeds MAX_USD cap "
                 f"${max_usd:.2f}. Aborting. Pass --max-usd to override.",
