@@ -127,21 +127,19 @@ Blocked on: none.
 ### Stream B status (latest)
 
 ```
-[2026-04-26 evening] DONE: 7.7 stitch xfade polish — story-aware ffmpeg xfade per
-            cinematic device. stitch.py reads metadata/story.json when present,
-            dispatches to xfade filter_complex path; falls back to concat_videos
-            stream-copy when story.json absent. New pure helper
-            backend/services/stitch_xfade.py + 4 unit tests + 3 new integration
-            tests in test_stitch.py. Real ffmpeg smoke confirmed filter_complex valid.
-Last commit: 4e691b9 (feat: Step 5 - story-aware xfade in stitch)
-Test delta: 165 backend tests (was 156 baseline; +9 new tests).
-Next up: 7.4 frontend (UploadScreen brief + arc-type radio + story-source toggle)
-         OR 7.5b Wan 2.7 adapter.
-         7.7 eval gate (tools/eval_runner.py --label post-7.7) DEFERRED —
-         needs Stream A's eval_runner (in flight; Step 10 of Stream A plan).
+[2026-04-26 evening] REVISED + REVERTED: 7.7 ffmpeg xfade work rolled back.
+            Root cause: original 7.7 plan was wrong — Kling already renders the
+            cinematic transition inside each clip (first-frame → last-frame). Adding
+            ffmpeg xfade on top creates a double-transition artifact. Plain concat
+            is correct. stitch_xfade.py and test_stitch_xfade.py deleted;
+            stitch.py and test_stitch.py restored to pre-7.7 state.
+            phase_7_subplan_7_plan.md rewritten with correct understanding.
+            7.7 re-scoped: seam trim (optional) + music bed (v1.1) + eval gate.
+Last commit: revert of xfade work
+Test count: 156 backend tests (restored to baseline).
+Next up: 7.4 frontend (UploadScreen + StoryReviewScreen) — waiting on Stream A's
+         POST /projects/{id}/story endpoint. OR 7.5b Wan 2.7 adapter.
 Blocked on: none.
-
-✅ STREAM B 7.7 DONE. stitch.py + test_stitch.py locks released.
 
 [2026-04-26] DONE: Sub-plan A + Sub-plan B — canonical projects/{slug}/ schema in place.
             Backend, services, routers, tests, frontend all use the new layout.
