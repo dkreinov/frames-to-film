@@ -1,0 +1,12 @@
+{
+  "slug": "01_cats",
+  "name": "Cat astronauts wet-test (eval baseline)",
+  "created_at": "2026-04-26",
+  "status": "in_progress",
+  "tags": ["eval", "wet-test", "3-act-heroic"],
+  "audio_track": null,
+  "source": "wet_test_2026-04-25",
+  "subject": "Cat astronaut on alien moon",
+  "tone": "wonder, otherworldly",
+  "notes": "6 cat-astronaut frames from the 2026-04-25 wet test. Heroic 3-act mini-story. Reference for eval-set baseline runs."
+}
