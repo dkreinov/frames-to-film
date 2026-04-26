@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import statistics
 import subprocess
 import sys
@@ -103,14 +104,14 @@ def _run_cli(cmd: list[str], cwd: Path | None = None) -> int:
     return result.returncode
 
 
-def _generate_mock_clips(fixture: Path) -> int:
-    """Use existing backend.services.generate.run_generate in mock mode."""
+def _generate_clips(fixture: Path, mode: str, fal_key: str | None) -> int:
+    """Dispatch to run_generate with the requested mode (mock or api)."""
     from backend.services.generate import run_generate
     try:
-        run_generate(project_dir=fixture, mode="mock", fal_key=None)
+        run_generate(project_dir=fixture, mode=mode, fal_key=fal_key)
         return 0
     except Exception as exc:
-        print(f"  [generate mock] error: {exc!r}", file=sys.stderr)
+        print(f"  [generate {mode}] error: {exc!r}", file=sys.stderr)
         return 1
 
 
@@ -171,6 +172,7 @@ def run_fixture(
     *,
     label: str,
     mode: str,
+    fal_key: str | None = None,
 ) -> dict[str, Any] | None:
     """Run one fixture through the pipeline. Return CSV row dict, or
     None if fixture is broken / missing."""
@@ -207,8 +209,8 @@ def run_fixture(
     if rc != 0:
         return None
 
-    # Stage 4: generate clips (mock — black-frame stubs)
-    if _generate_mock_clips(fixture) != 0:
+    # Stage 4: generate clips
+    if _generate_clips(fixture, mode=mode, fal_key=fal_key) != 0:
         return None
 
     # Stage 5: post-generate judges (mock mode — judges skip in generate.py
@@ -283,11 +285,13 @@ def main() -> int:
         if not fixtures:
             print(f"  [skip] no fixture matches {args.fixture}", file=sys.stderr)
 
+    fal_key: str | None = os.environ.get("FAL_KEY") or None
+
     csv_path = eval_set / "eval_runs.csv"
     rows_to_write: list[dict[str, Any]] = []
     for fixture in fixtures:
         print(f"[{_ts()}] running {fixture.name} (mode={args.mode}) ...")
-        row = run_fixture(fixture, label=args.label, mode=args.mode)
+        row = run_fixture(fixture, label=args.label, mode=args.mode, fal_key=fal_key)
         if row is not None:
             rows_to_write.append(row)
             print(f"  done in {row['wall_time_s']}s; cost ${row['cost_usd']}")
