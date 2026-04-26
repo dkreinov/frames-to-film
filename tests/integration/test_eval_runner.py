@@ -124,3 +124,29 @@ def test_eval_runner_skips_missing_fixture(tmp_eval_set):
             rows = list(csv.DictReader(f))
         # No rows for the nonexistent fixture
         assert not any(r.get("fixture_id") == "99_nonexistent" for r in rows)
+
+
+def test_eval_runner_api_mode_calls_real_generate(tmp_eval_set, monkeypatch):
+    """--mode api must pass mode='api' to run_generate, not hard-coded 'mock'."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "eval_runner_under_test", REPO_ROOT / "tools" / "eval_runner.py"
+    )
+    eval_runner_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(eval_runner_mod)  # type: ignore[union-attr]
+
+    recorded: list[str] = []
+
+    def fake_run_generate(project_dir, mode, fal_key=None):
+        recorded.append(mode)
+        return {}
+
+    import backend.services.generate as gen_mod
+    monkeypatch.setattr(gen_mod, "run_generate", fake_run_generate)
+
+    fixture = tmp_eval_set / "01_minimal"
+    eval_runner_mod.run_fixture(fixture, label="test-api", mode="api")
+
+    assert recorded, "run_generate was never called"
+    assert recorded[0] == "api", f"expected mode='api', got {recorded[0]!r}"
