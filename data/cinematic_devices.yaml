@@ -1,0 +1,306 @@
+# Cinematic Devices Catalog
+# Maps film-grammar transition devices to Kling prompt templates,
+# ffmpeg xfade filters, and applicable story arc IDs.
+# Prompt templates MUST follow kling_prompt_rules.yaml:
+#   camera-first, ONE primary motion, sequential not stacked,
+#   no forbidden phrases (cinematic, beautiful, high quality, 4K,
+#   masterpiece, stunning, amazing, epic, breathtaking, etc.)
+
+- id: age_match_cut
+  name: "Age match cut"
+  description: |
+    Holds on a facial feature (eyes, smile line, jaw) shared between
+    two ages of the same person, then dissolves to preserve identity
+    across years — the signature device of the life-montage arc.
+    Borrowed from the "match on eyes" tradition; the dissolve lets the
+    audience feel continuity of self despite the passage of time.
+  applicable_arcs: [life-montage, event-recap]
+  required_image_hints:
+    - "both frames contain the same person"
+    - "face clearly visible in both images"
+    - "at least one shared facial feature (eyes, smile) legible in both"
+  prompt_template: |
+    Slow dolly push-in. Camera settles on {subject_feature} — eyes hold
+    still as the dissolve begins. {start_state} softens gradually toward
+    {end_state}. {environmental_anchor}. Gently.
+  ffmpeg_xfade: fade
+  duration_s: 5
+  xfade_duration_s: 1.0
+
+- id: cross_dissolve
+  name: "Cross dissolve"
+  description: |
+    A gentle 2-second overlap dissolve between two clips; the universal
+    default transition suited to almost any arc. Carries no strong
+    directional or emotional connotation, making it safe as a fallback
+    when a more specific device would distract from content.
+  applicable_arcs: [life-montage, 3-act-heroic, travel-diary, event-recap, day-in-life]
+  required_image_hints:
+    - "no specific constraint — works with any consecutive pair"
+  prompt_template: |
+    Steady tracking shot. Subject moves {primary_action} across frame.
+    {start_state} transitions to {end_state}. {environmental_anchor}.
+    Gradually.
+  ffmpeg_xfade: fade
+  duration_s: 5
+  xfade_duration_s: 1.0
+
+- id: photo_frame
+  name: "Photo frame"
+  description: |
+    One image becomes a physical photograph being held, pinned, or set
+    down in the next scene — a frame-within-a-frame device that collapses
+    the gap between past and present. Used effectively in scrapbook-style
+    recaps and travel diaries where archival imagery mingles with live footage.
+  applicable_arcs: [life-montage, travel-diary, event-recap]
+  required_image_hints:
+    - "subject or scene legible at reduced scale"
+    - "hands or surface visible in receiving frame for grounding"
+  prompt_template: |
+    Macro close-up, static. Hands lower a printed photograph onto a flat
+    surface. {start_state} visible within the photograph frame. Surface
+    texture — {environmental_anchor} — holds still as the photo settles.
+    Softly.
+  ffmpeg_xfade: pixelize
+  duration_s: 5
+  xfade_duration_s: 0.5
+
+- id: iris_in
+  name: "Iris in"
+  description: |
+    A black circle expands from a pinpoint to reveal the full scene B,
+    a la the La La Land opening iris wipe and classic silent-film chapter
+    cards. Works at the start of a new location or narrative chapter,
+    signalling arrival and wonder rather than simple continuity.
+  applicable_arcs: [travel-diary, day-in-life, event-recap]
+  required_image_hints:
+    - "scene B is a wide or establishing shot"
+    - "central subject positioned near frame center for clean iris reveal"
+  prompt_template: |
+    Pull-back reveal. Camera starts tight on {subject_feature} at the
+    center of frame, then widens as {start_state} gives way to the full
+    {end_state}. {environmental_anchor} fills the outer frame gradually.
+    Slowly.
+  ffmpeg_xfade: circleopen
+  duration_s: 5
+  xfade_duration_s: 0.8
+
+- id: iris_pinhole
+  name: "Iris pinhole"
+  description: |
+    Camera pushes into the focal point of scene A until the frame
+    collapses to a pinhole; scene B then emerges wide from that same
+    point. The inverse of iris_in, it signals departure or a journey
+    inward rather than a chapter opening.
+  applicable_arcs: [life-montage, travel-diary]
+  required_image_hints:
+    - "scene A has a clear focal point (face, object, doorway) at center"
+    - "scene B is wider than scene A"
+  prompt_template: |
+    Slow dolly push-in. Camera advances toward {subject_feature} until it
+    fills the frame center. {start_state} holds while surroundings blur.
+    {environmental_anchor} recedes. Unhurried.
+  ffmpeg_xfade: circleclose
+  duration_s: 5
+  xfade_duration_s: 0.8
+
+- id: portal_door
+  name: "Portal door"
+  description: |
+    A door, window, gate, or curtain in scene A opens or parts to reveal
+    scene B beyond it — a physical threshold that doubles as a narrative
+    boundary. Common in travel and heroic arcs wherever a literal or
+    symbolic passage between worlds needs to be felt.
+  applicable_arcs: [3-act-heroic, travel-diary, event-recap]
+  required_image_hints:
+    - "a door, window, archway, or curtain visible in scene A"
+    - "scene B content is plausible beyond that threshold"
+  prompt_template: |
+    Steady tracking shot. {subject_feature} reaches forward and pushes
+    the door open. {start_state} gives way as the door swings wide,
+    revealing {end_state} beyond. {environmental_anchor} holds behind the
+    threshold. Gradually.
+  ffmpeg_xfade: fade
+  duration_s: 5
+  xfade_duration_s: 0.5
+
+- id: obstruction_match
+  name: "Obstruction match"
+  description: |
+    A foreground object — a passing body, a wall edge, a swinging coat —
+    crosses the camera lens and momentarily blackens or obscures the frame;
+    when it clears, scene B is revealed. Inspired by the long-take grammar
+    of Birdman and Children of Men, it disguises the edit as a continuous
+    flow of physical space.
+  applicable_arcs: [3-act-heroic, event-recap]
+  required_image_hints:
+    - "foreground space available for a passing object or person"
+    - "both clips share a plausible continuous-space relationship"
+  prompt_template: |
+    Steady tracking shot. A figure or object swings through the foreground,
+    briefly covering the lens. {start_state} is visible before the
+    obstruction. As the obstruction clears, {end_state} occupies the frame.
+    {environmental_anchor}. Swiftly.
+  ffmpeg_xfade: fade
+  duration_s: 5
+  xfade_duration_s: 0.3
+
+- id: whip_pan
+  name: "Whip pan"
+  description: |
+    A fast horizontal camera whip blurs scene A into scene B in a single
+    swift motion, simulating a rapid head-turn or off-screen glance.
+    High-energy; best reserved for conflict escalation, the turning-point
+    moment in a heroic arc, or the burst of activity at an event peak.
+  applicable_arcs: [3-act-heroic, event-recap]
+  required_image_hints:
+    - "both clips have strong lateral composition"
+    - "motion direction consistent across the cut"
+  prompt_template: |
+    Whip pan. Camera snaps sharply from left to right as {subject_feature}
+    moves in the same direction. {start_state} blurs across frame; {end_state}
+    snaps into focus on the right side. {environmental_anchor}. Rapidly.
+  ffmpeg_xfade: wipeleft
+  duration_s: 5
+  xfade_duration_s: 0.2
+
+- id: match_cut_shape
+  name: "Match cut — shape"
+  description: |
+    A similar geometric shape shared between scene A and scene B drives the
+    edit — a clock face dissolving into a full moon, a spinning wheel into
+    a roundabout from above. The visual rhyme creates a sense of hidden order
+    in the world, common in lyrical and contemplative films.
+  applicable_arcs: [life-montage, travel-diary, day-in-life]
+  required_image_hints:
+    - "both frames share a dominant shape (circle, arch, rectangle) of similar scale"
+    - "shape positioned at roughly the same screen position"
+  prompt_template: |
+    Rack focus from the {subject_feature} shape in the foreground to a
+    matching shape in the midground. {start_state} holds its geometry while
+    focus shifts. {end_state} emerges from blur into sharpness.
+    {environmental_anchor}. Slowly.
+  ffmpeg_xfade: fade
+  duration_s: 5
+  xfade_duration_s: 0.4
+
+- id: match_cut_action
+  name: "Match cut — action"
+  description: |
+    The same physical motion initiated in scene A continues without pause
+    into scene B — a hand swings down and the cut fires mid-arc, completing
+    the swing in a new context. No xfade is used; the hard cut is the effect.
+    The device gives the impression of uninterrupted time or thematic unity
+    across separate moments.
+  applicable_arcs: [3-act-heroic, event-recap, day-in-life]
+  required_image_hints:
+    - "both clips share the same motion direction and approximate speed"
+    - "the action straddles the cut point naturally"
+  prompt_template: |
+    Steady tracking shot. Subject completes {primary_action} in a single
+    uninterrupted motion. {start_state} is mid-gesture at clip start.
+    {end_state} completes the same gesture in the new context.
+    {environmental_anchor}. Smoothly.
+  ffmpeg_xfade: ""
+  duration_s: 5
+  xfade_duration_s: 0.0
+
+- id: dolly_zoom
+  name: "Dolly zoom"
+  description: |
+    The camera physically dollies forward while the lens simultaneously
+    zooms out (or vice versa), keeping the subject the same size while the
+    background appears to stretch or compress — Hitchcock's vertigo effect.
+    Reserved for moments of psychological revelation or dread in heroic arcs;
+    the disorientation should feel earned.
+  applicable_arcs: [3-act-heroic]
+  required_image_hints:
+    - "subject in midground with a receding background"
+    - "background has depth cues (hallway, rows of seats, tree-lined path)"
+  prompt_template: |
+    Dolly zoom. Camera dollies forward while the focal length widens,
+    keeping {subject_feature} locked at constant screen size. {start_state}
+    holds expression still. Background behind subject compresses toward
+    {end_state}. {environmental_anchor} recedes unnaturally. Sharply.
+  ffmpeg_xfade: fade
+  duration_s: 5
+  xfade_duration_s: 0.6
+
+- id: smash_cut
+  name: "Smash cut"
+  description: |
+    An instant hard cut from a loud, active, or emotionally charged moment
+    to silence or stillness — or from silence directly into high action.
+    The shock of contrast is the device; no xfade softens the boundary.
+    Works at event peaks and heroic-arc conflict climaxes.
+  applicable_arcs: [3-act-heroic, event-recap]
+  required_image_hints:
+    - "scene A ends at a moment of peak energy, noise, or emotion"
+    - "scene B opens into its opposite (silence, stillness, or equal intensity)"
+  prompt_template: |
+    Static profile shot. Subject holds at peak {start_state} — posture tense,
+    gaze fixed. Then abruptly, {primary_action} snaps to stillness.
+    {end_state} settles in a single frame. {environmental_anchor}. Abrupt.
+  ffmpeg_xfade: ""
+  duration_s: 5
+  xfade_duration_s: 0.0
+
+- id: graphic_match
+  name: "Graphic match"
+  description: |
+    Visual continuity — matching color field, screen position, or compositional
+    weight — drives a cut where no single object or action is shared. A red coat
+    in frame-left of scene A rhymes with a red door in frame-left of scene B.
+    Common in lyrical travel films and day-in-life sequences where atmosphere
+    threads the clips together.
+  applicable_arcs: [travel-diary, day-in-life, life-montage]
+  required_image_hints:
+    - "dominant color, tonal value, or compositional region matches between A and B"
+    - "matching element occupies the same quadrant of the frame in both clips"
+  prompt_template: |
+    Slow dolly pull-back. Camera widens from {subject_feature} to expose the
+    full frame. {start_state} holds its color and position. {end_state}
+    introduces a rhyming visual element at the same screen position.
+    {environmental_anchor}. Languid.
+  ffmpeg_xfade: fade
+  duration_s: 5
+  xfade_duration_s: 0.4
+
+- id: fade_to_black
+  name: "Fade to black"
+  description: |
+    The frame dims to complete black and holds briefly before the next
+    scene rises. Signals a major time skip, the close of an arc chapter,
+    or the end of the film. Universal across all five arc types as a
+    structural punctuation mark rather than a flowing transition.
+  applicable_arcs: [life-montage, 3-act-heroic, travel-diary, event-recap, day-in-life]
+  required_image_hints:
+    - "transition marks a chapter boundary, time skip, or arc endpoint"
+  prompt_template: |
+    Slow dolly pull-back. Subject holds {start_state} as the camera gently
+    retreats. Ambient light dims — {environmental_anchor} fades from
+    warm to shadow. {end_state} is implied, not shown. Softly.
+  ffmpeg_xfade: fadeblack
+  duration_s: 5
+  xfade_duration_s: 1.2
+
+- id: time_card
+  name: "Time card"
+  description: |
+    A text insert — "Ten years later", "Later that morning", "Day 4 —
+    Lisbon" — appears between clips on a neutral background, functioning
+    as an intertitle or chapter card in the tradition of silent film and
+    contemporary documentary. The fade in and out frames the card as a
+    deliberate narrative pause.
+  applicable_arcs: [life-montage, day-in-life, travel-diary]
+  required_image_hints:
+    - "a time or location shift between A and B that benefits from explicit labeling"
+    - "both clips legible as standalone scenes without shared visual continuity"
+  prompt_template: |
+    Rack focus. Camera starts focused on {subject_feature} in the foreground;
+    focus shifts to the {environmental_anchor} in the background.
+    {start_state} blurs as {end_state} comes into sharpness.
+    Midground holds neutral. Slowly.
+  ffmpeg_xfade: fade
+  duration_s: 5
+  xfade_duration_s: 0.6
