@@ -11,6 +11,14 @@ from tools.bench_image_edit import OUT_BASE, MODELS_TO_RUN, TASKS, PRICING_USD  
 NOTES: dict[tuple[str, str], str] = {
     ("gemini-2.5-flash-image", "T2_outfit_swap"):
         "FAIL — moderation block (FinishReason.IMAGE_OTHER)",
+    ("gemini-2.5-flash-image", "T5_thong_swap"):
+        "skipped (moderation expected; not run)",
+    ("gemini-3.1-flash-image-preview", "T5_thong_swap"):
+        "FAIL — moderation block (empty response)",
+    ("gemini-3-pro-image-preview", "T5_thong_swap"):
+        "FAIL — moderation block (empty response)",
+    ("gpt-image-2-medium", "T5_thong_swap"):
+        "FAIL — explicit OpenAI safety-system rejection",
 }
 
 
@@ -136,6 +144,42 @@ def main() -> None:
     for m in MODELS_TO_RUN:
         lines.append(f"| `{m}` | ${PRICING_USD[m] * 6:.2f} |")
     lines.append("")
+
+    lines.append("## Aspect-ratio fidelity on instruction edits\n")
+    lines.append(
+        "On instruction-edit tasks (T2, T4, T5) the bench currently forces "
+        "`gpt-image-2` into the nearest supported canvas (1024×1536 / "
+        "1536×1024) by **resize**, which can drift the source aspect when the "
+        "input is far from 2:3. Measured on T2: source 0.506 → gpt output "
+        "0.667 (≈32% drift); compare Qwen Plus on T5: 0.506 → 0.511 (<1%). "
+        "Fix planned in a follow-up: pad the source onto the canvas with "
+        "transparent borders and pass the canvas as `image=` (no mask), so "
+        "the output keeps the source aspect. Until then, prefer Gemini or "
+        "Qwen for instruction edits on tall portrait sources.\n"
+    )
+
+    lines.append("## Moderation behavior — outfit swap (T2 vs T5)\n")
+    lines.append(
+        "Same source, two prompts: T2 swaps to a black turtleneck + trousers; "
+        "T5 swaps to a thong bikini. Verdicts:\n"
+    )
+    lines.append("| Model | T2 (turtleneck) | T5 (thong bikini) |")
+    lines.append("|---|---|---|")
+    lines.append("| `gemini-2.5-flash-image` | BLOCKED | not tested |")
+    lines.append("| `gemini-3.1-flash-image-preview` | OK | BLOCKED (empty) |")
+    lines.append("| `gemini-3-pro-image-preview` | OK | BLOCKED (empty) |")
+    lines.append("| `gpt-image-2-medium` | OK | BLOCKED (explicit safety rejection) |")
+    lines.append("| `qwen-image-edit-plus` | OK | **OK** |")
+    lines.append("| `qwen-image-edit-max` | OK | **OK** |")
+    lines.append("")
+    lines.append(
+        "Pattern: Gemini and OpenAI hard-refuse swimwear/lingerie outfit swaps "
+        "even on a non-explicit B&W studio shot. Qwen (Alibaba DashScope) "
+        "passes the same edit cleanly. If pipeline use cases include outfit "
+        "swaps that may trip Western moderation (swimwear, lingerie, "
+        "form-fitting wardrobe), Qwen Plus is the only viable tier on this "
+        "bench.\n"
+    )
 
     lines.append("## Failure modes observed\n")
     lines.append(

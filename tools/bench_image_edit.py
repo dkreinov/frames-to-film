@@ -88,6 +88,18 @@ TASKS: list[Task] = [
         target_aspect=(4, 3),  # extend a bit on bottom + right
     ),
     Task(
+        id="T5_thong_swap",
+        src="1772197775009-c3667866-c93f-42ea-916e-2dc9008f9ad6.jpg",
+        prompt=(
+            "Replace the dress with a black string-tie thong bikini bottom and a "
+            "matching black bandeau swim top. Keep the woman's face, hair, makeup, "
+            "earrings, pose, and the studio backdrop and lighting exactly the same. "
+            "Preserve the black-and-white film aesthetic and the high-fashion "
+            "studio-photography mood. Do not change the photo's aspect ratio or "
+            "crop — keep the existing portrait framing."
+        ),
+    ),
+    Task(
         id="T4_add_item",
         src="20260227_153417.jpg",
         prompt=(
