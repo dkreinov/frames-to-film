@@ -266,6 +266,56 @@ def test_movie_judge_falls_back_on_call_error(monkeypatch):
     assert "judge error" in js.reasoning
 
 
+def test_movie_judge_includes_story_arc_in_user_message(monkeypatch):
+    """Phase 7.4: movie_judge accepts optional story_arc kwarg and
+    surfaces it to the LLM. Verifies the kwarg flows through
+    _build_user_message into the LLM call."""
+    seen: dict = {}
+
+    def fake(**kwargs):
+        seen["msg"] = kwargs.get("user_message", "")
+        return ('{"story_coherence": 4.0, "character_continuity": 4.0, '
+                '"visual_quality": 4.0, "emotional_arc": 4.0, '
+                '"weakest_seam": null, "reasoning": "ok"}', 100, 30)
+    monkeypatch.setattr(movie_judge, "_call_deepseek", fake)
+
+    story_arc = {
+        "arc_paragraph": "Sarah's life from age 5 to 50",
+        "pair_intents": [{"from": 1, "to": 2, "device": "age_match_cut",
+                          "intent": "Age progression"}],
+    }
+    score_movie(
+        clip_judges=[{"x": 1}],
+        story_arc=story_arc,
+        key="k",
+    )
+    msg = seen.get("msg", "")
+    assert "STORY ARC" in msg, "story_arc should appear in user message"
+    assert "Sarah" in msg, "story_arc content should be serialized"
+
+
+def test_movie_judge_includes_brief_in_user_message(monkeypatch):
+    """Phase 7.4: movie_judge accepts optional brief kwarg."""
+    seen: dict = {}
+
+    def fake(**kwargs):
+        seen["msg"] = kwargs.get("user_message", "")
+        return ('{"story_coherence": 4.0, "character_continuity": 4.0, '
+                '"visual_quality": 4.0, "emotional_arc": 4.0, '
+                '"weakest_seam": null, "reasoning": "ok"}', 100, 30)
+    monkeypatch.setattr(movie_judge, "_call_deepseek", fake)
+
+    brief = {"subject": "Sarah's life", "tone": "nostalgic", "notes": ""}
+    score_movie(
+        clip_judges=[{"x": 1}],
+        brief=brief,
+        key="k",
+    )
+    msg = seen.get("msg", "")
+    assert "OPERATOR BRIEF" in msg
+    assert "nostalgic" in msg
+
+
 def test_movie_judge_invalid_weakest_seam(monkeypatch):
     """If the model returns a non-numeric weakest_seam, swallow it."""
     monkeypatch.setattr(
