@@ -18,6 +18,30 @@ Latest: commit on `master`
 
 All per-project artifacts live under `projects/{slug}/` (or `projects/{user_id}/{slug}/` in multi-user mode). See `docs/PROJECT_SCHEMA.md` for the authoritative folder layout. Constants in `backend/services/project_schema.py`. New projects start by copying `projects/_template/`.
 
+## Hard rules — schema conformance (NON-NEGOTIABLE)
+
+These rules apply to every agent (Claude Code session, codex helper, parallel stream, etc.) that touches this repo. They override any other instructions that conflict.
+
+1. **Read `docs/PROJECT_SCHEMA.md` BEFORE touching any code that reads or writes project files.** The doc is the single source of truth for the on-disk layout. If your task involves paths like `inputs/`, `extended/`, `clips/raw/`, `metadata/`, etc., read the schema first.
+
+2. **NEVER hardcode subfolder names as string literals.** Every reference to a project subfolder MUST come from `backend.services.project_schema`:
+   - Forbidden: `project_dir / "inputs"`, `"sources"`, `"outpainted"`, `"kling_test"`, `"kling_test/videos"`, `"prompts.json"` at project root, `"order.json"` at project root, `"run.json"` at project root.
+   - Required: `from backend.services.project_schema import INPUTS_DIRNAME, EXTENDED_DIRNAME, CLIPS_DIRNAME, CLIPS_RAW_DIRNAME, METADATA_DIRNAME, PROMPTS_DIRNAME, AUDIO_DIRNAME, FINAL_DIRNAME, EXPORTS_DIRNAME, LOGS_DIRNAME, STORAGE_ROOT_DIRNAME, ProjectMeta, project_root`.
+   - JSON state files: `prompts/prompts.json` (use `PROMPTS_FILENAME` from `backend.services.prompts`), `metadata/order.json` (use `ORDER_FILENAME`), `metadata/run.json` (use `RUN_JSON_NAME` from `judges.orchestrator`).
+
+3. **NEVER write project artifacts outside `projects/{slug}/`.** Legacy paths (`pipeline_runs/`, `outpainted/`, `kling_test/`, root-level `prompts.json`/`order.json`) are RETIRED. Pre-2026-04-26 references in `legacy/` and historical `docs/roadmap/phase_*.md` are frozen reference, do NOT add new ones.
+
+4. **New projects start from `projects/_template/`.** Operators copy the template, fill `metadata/project.json` (slug, name, created_at), drop photos in `inputs/`. Backend services discover project folders via `project_root(storage_root, user_id, slug)`.
+
+5. **If you change the schema, update BOTH `docs/PROJECT_SCHEMA.md` AND `backend/services/project_schema.py` in the same commit.** They are paired; drift between them is a bug.
+
+6. **Frontend path strings must mirror the schema.** The frontend doesn't import Python, but its hardcoded URL/stage strings (`extended`, `extended/_4_3`, `clips/raw`, etc.) must match the schema doc. When the schema changes, update both backend constants and frontend strings together.
+
+Violations are caught by:
+- `grep -rn 'pipeline_runs\|kling_test\|outpainted\|"sources"\|"kling_test/videos"' backend/ frontend/src/ tests/backend/` returns non-empty (excluding `legacy/`, `project_schema`, `_archive/`, historical docs).
+- pytest tests/backend/ fails on path mismatches.
+- Pre-commit hook does NOT enforce this; it's a code-review responsibility.
+
 ## How to start your work cycle
 
 1. `git pull --rebase origin master`
