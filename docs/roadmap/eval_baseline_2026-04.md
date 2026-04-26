@@ -80,6 +80,47 @@ Each meaningful change should produce a labeled row:
 
 Each row's `run_label` should be a short slug; the timestamp + model_versions disambiguate.
 
+## Wet-test usage (api mode)
+
+To run a real-spend evaluation that produces live Kling clips and real judge scores:
+
+```bash
+# Set keys
+export FAL_KEY=<your-fal-key>
+export QWEEN_KEY=<your-qwen-key>
+export DEEPSEEK_KEY=<your-deepseek-key>
+
+# Single fixture — estimated $0.84 (2 Kling pairs × $0.42)
+python tools/eval_runner.py \
+  --label "real-1" \
+  --mode api \
+  --fixture 02_olga_slice
+
+# All 3 fixtures — estimated ~$2.52 (6 total pairs)
+# MAX_USD=20 is the operator policy cap (default)
+python tools/eval_runner.py \
+  --label "real-baseline-1" \
+  --mode api \
+  --fixture all
+```
+
+**Safety guards:**
+- `FAL_KEY` missing → exits 1 with clear error (no spend)
+- `MAX_USD` env var or `--max-usd` flag sets a hard ceiling; default cap is $20 (operator policy)
+- Cost estimate prints to stdout before any Kling calls fire
+
+**What the output looks like:**
+```
+[preflight] api mode — 1 fixture(s), estimated cost $0.84 (2 Kling pairs × $0.42/pair)
+[2026-04-26T11:xx:xx+00:00] running 02_olga_slice (mode=api) ...
+  done in 47.2s; cost $0.051234
+wrote 1 rows to .../fixtures/eval_set/eval_runs.csv
+```
+
+`cost_usd` in the CSV row = real billed judge cost (Kling is separate, tracked by fal.ai billing dashboard).
+
+**Fixtures as of 2026-04-26:** 01_cats (3-act-heroic), 02_olga_slice (life-montage), 03_olga_travel (travel-diary)
+
 ## Rules
 
 1. Append-only — never edit prior rows. Mistakes get a corrective row with `run_label="correction-..."`.
