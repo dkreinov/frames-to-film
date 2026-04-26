@@ -257,6 +257,19 @@ def run_fixture(
     return row
 
 
+_KLING_COST_PER_PAIR_USD = 0.42  # Kling O3 5-second clip, April 2026 pricing
+
+
+def _estimate_fixture_cost(fixture: Path) -> float:
+    """Estimate Kling spend for one fixture: (n_inputs - 1) pairs × $0.42."""
+    inputs = fixture / "inputs"
+    if not inputs.is_dir():
+        return 0.0
+    n = sum(1 for f in inputs.iterdir()
+            if f.is_file() and f.suffix.lower() in {".jpg", ".jpeg", ".png"})
+    return max(0, n - 1) * _KLING_COST_PER_PAIR_USD
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description="Eval harness — walk fixtures, append CSV.")
     p.add_argument("--label", required=True, help="Run label (e.g. 'post-7.4-baseline')")
@@ -266,6 +279,8 @@ def main() -> int:
                    help="Path to eval_set directory")
     p.add_argument("--fixture", default="all",
                    help="Specific fixture id or 'all' (default 'all')")
+    p.add_argument("--max-usd", type=float, default=None,
+                   help="Hard cost ceiling in USD (overrides MAX_USD env var)")
     args = p.parse_args()
 
     eval_set = Path(args.eval_set).resolve()
@@ -286,6 +301,25 @@ def main() -> int:
             print(f"  [skip] no fixture matches {args.fixture}", file=sys.stderr)
 
     fal_key: str | None = os.environ.get("FAL_KEY") or None
+
+    # MAX_USD cost cap (api mode only)
+    max_usd: float | None = args.max_usd
+    if max_usd is None:
+        env_cap = os.environ.get("MAX_USD")
+        if env_cap:
+            try:
+                max_usd = float(env_cap)
+            except ValueError:
+                pass
+    if args.mode == "api" and max_usd is not None:
+        estimated = sum(_estimate_fixture_cost(f) for f in fixtures)
+        if estimated > max_usd:
+            print(
+                f"ERROR: estimated cost ${estimated:.2f} exceeds MAX_USD cap "
+                f"${max_usd:.2f}. Aborting. Pass --max-usd to override.",
+                file=sys.stderr,
+            )
+            return 1
 
     csv_path = eval_set / "eval_runs.csv"
     rows_to_write: list[dict[str, Any]] = []

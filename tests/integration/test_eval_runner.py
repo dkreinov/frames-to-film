@@ -126,6 +126,30 @@ def test_eval_runner_skips_missing_fixture(tmp_eval_set):
         assert not any(r.get("fixture_id") == "99_nonexistent" for r in rows)
 
 
+def test_eval_runner_max_usd_aborts_api_run(tmp_eval_set, monkeypatch):
+    """MAX_USD=0.001 must abort before running any fixture in api mode."""
+    monkeypatch.setenv("FAL_KEY", "fake-key")
+    monkeypatch.setenv("MAX_USD", "0.001")
+    result = subprocess.run(
+        [sys.executable, str(REPO_ROOT / "tools" / "eval_runner.py"),
+         "--label", "cap-test",
+         "--mode", "api",
+         "--eval-set", str(tmp_eval_set),
+         "--fixture", "all"],
+        capture_output=True, text=True, timeout=60,
+    )
+    assert result.returncode != 0, "expected non-zero exit when cost cap exceeded"
+    combined = result.stdout + result.stderr
+    assert "MAX_USD" in combined or "cost" in combined.lower(), (
+        f"no cost-cap message in output:\nstdout={result.stdout}\nstderr={result.stderr}"
+    )
+    # No rows written
+    csv_path = tmp_eval_set / "eval_runs.csv"
+    assert not csv_path.is_file() or open(csv_path).read().strip() == "", (
+        "rows were written despite cost cap"
+    )
+
+
 def test_eval_runner_api_mode_calls_real_generate(tmp_eval_set, monkeypatch):
     """--mode api must pass mode='api' to run_generate, not hard-coded 'mock'."""
     import importlib.util
