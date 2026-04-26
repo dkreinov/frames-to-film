@@ -18,6 +18,14 @@ safe_env_lookup_regex="(os\.(getenv|environ\.get)\([[:space:]]*['\"]PROMPT_LLM_A
 failed=0
 
 while IFS= read -r -d '' file; do
+  # Empty .gitkeep markers are safe — they preserve directory structure in git
+  # without carrying any log/secret content. Allow them anywhere.
+  case "$file" in
+    *.gitkeep|.gitkeep)
+      continue
+      ;;
+  esac
+
   case "$file" in
     .env|.env.*|*/.env|*/.env.*|\
     logs/*|log/*|*/logs/*|*/log/*|\

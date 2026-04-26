@@ -159,3 +159,7 @@ Before Sub-plan A, the repo wrote per-run state into `pipeline_runs/local/{user_
 **Historical experiments:** the 10 UUID-named folders that lived under `pipeline_runs/local/` are preserved at `projects/_archive/{uuid}/` for reference. Their contents are gitignored — the archive is for browsing on disk, not for re-running the pipeline.
 
 **Code update timing:** during Sub-plan A, backend code still writes to `pipeline_runs/`. Sub-plan B (`plans/plan-B-20260426-1500.md`) renames the constants and updates ~60 files so the backend reads/writes the new schema. Until Sub-plan B completes, any pipeline run will recreate `pipeline_runs/local/{uuid}/` next to `projects/`. That is expected and reconciled by Sub-plan B.
+
+**Other state still in `pipeline_runs/`** (NOT migrated by Sub-plan A — backend depends on these): `pipeline_runs/index.db` (SQLite), `pipeline_runs/models/`, plus a handful of legacy state JSONs (`build_movie_state.json`, `extend_tab_state.json`, `ui_state.json`) and dev scratch dirs (`build_jobs/`, `build_pool_test/`, `local-review-run/`, `step5-check/`, `tmp-approve-clears-redo/`). Sub-plan B will decide their fate when the backend rename happens.
+
+**Undecided: `next-app/`** — a stale untracked Next.js + shadcn prototype at the repo root. Sub-plan A attempted to relocate it to `experiments/next-app/` but the move failed (resource busy, likely an editor or node process holding files). Operator: either close any process holding files and run `mv next-app experiments/`, or `rm -rf next-app/` if confirmed obsolete.

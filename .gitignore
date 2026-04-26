@@ -7,13 +7,15 @@ kling_test/
 pipeline_runs/
 processed/
 strips/
-logs/
-log/
+/logs/
+/log/
 
 *.jpg
 *.jpeg
 *.png
 *.mp4
+*.mp3
+*.m4a
 *.zip
 *.pdf
 *.html
@@ -29,6 +31,13 @@ log/
 *.key
 *.p12
 *.pfx
+
+# Project data — media auto-ignored by extension globs above.
+# Track metadata (json, md, yaml) and structure (.gitkeep). Archive contents
+# fully ignored (heavy historical experiments) but the archive root stays
+# present via .gitkeep so the directory survives a fresh clone.
+projects/_archive/**
+!projects/_archive/.gitkeep
 
 work_log.md
 *_work_log.md
