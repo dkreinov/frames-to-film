@@ -131,19 +131,29 @@ def _build_rubric(
         f"  Notes: {brief.get('notes', '')}\n\n"
         f"Story-writer extra instructions for this arc:\n"
         f"{arc.get('story_writer_extra_instructions', '').strip()}\n\n"
-        f"KLING PROMPT RULES (motion is what you write, not redescription):\n"
-        f"  - Do NOT redescribe what's in the images. Only describe motion.\n"
-        f"  - Each pair_intent is ONE camera motion + ONE primary action.\n"
-        f"  - Prefer these camera vocabulary IDs: {allowed_movements}.\n"
-        f"  - DO NOT use these forbidden generic phrases: {forbidden}.\n"
-        f"  - Each pair_intent.intent should be 1-2 short sentences.\n\n"
+        f"PAIR_INTENT FORMAT — read carefully before writing:\n"
+        f"  Each intent must contain ONLY: one camera movement verb + one "
+        f"atmospheric or emotional quality. Max 2 sentences.\n\n"
+        f"  NEVER INCLUDE in intent: object names, prop names, clothing, "
+        f"character names, place names, building names, weather conditions, "
+        f"food, animals, or any noun describing scene content. Kling already "
+        f"sees the source and destination frames — it does not need you to "
+        f"describe them.\n\n"
+        f"  BAD (content nouns — will confuse Kling): "
+        f"'stroller fades as warm indoor glow replaces winter starkness'\n"
+        f"  GOOD (camera verb + atmosphere only): "
+        f"'slow dolly_forward, warmth blooms'\n\n"
+        f"  BAD: 'rack_focus from chandelier to her eyes in the banquet hall'\n"
+        f"  GOOD: 'rack_focus, intimacy sharpens'\n\n"
+        f"  Prefer camera vocabulary IDs: {allowed_movements}.\n"
+        f"  DO NOT use generic phrases: {forbidden}.\n\n"
         f"Pick a `device` for each pair from the preferred-transitions "
         f"list above (or any valid catalog id like cross_dissolve, "
         f"age_match_cut, photo_frame, iris_in, etc.).\n\n"
         f"Respond with ONLY single JSON object, no preamble, no markdown:\n"
         f'{{"arc_paragraph": "<3 paragraphs>", '
         f'"pair_intents": [{{"from": 1, "to": 2, "device": "<id>", '
-        f'"intent": "<motion>"}}, ...]}}'
+        f'"intent": "<camera_verb + atmosphere only>"}}, ...]}}'
     )
 
 
