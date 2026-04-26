@@ -217,18 +217,19 @@ def run_fixture(
     if _generate_clips(fixture, mode=mode, fal_key=fal_key) != 0:
         return None
 
-    # Stage 5: post-generate judges (mock mode — judges skip in generate.py
-    # mock branch; but orchestrator can be called directly to populate run.json
-    # with neutral fallbacks. Skip in pure mock to keep this fast.)
-    # Just write a baseline run.json with neutral judge fallbacks.
-    data = judges_orch.read_run_json(fixture)
-    data["stages"].setdefault("generate", {"status": "done"})
-    data["judges"]["prompt"] = []
-    data["judges"]["clip"] = []
-    judges_orch.write_run_json(fixture, data)
+    # Stage 5: prompt + clip judges
+    if mode == "api":
+        judges_orch.run_post_generate_judges(fixture)
+    else:
+        data = judges_orch.read_run_json(fixture)
+        data["stages"].setdefault("generate", {"status": "done"})
+        data["judges"]["prompt"] = []
+        data["judges"]["clip"] = []
+        judges_orch.write_run_json(fixture, data)
 
-    # Stage 6: post-stitch movie_judge (mock — neutral fallback since no key)
-    judges_orch.run_post_stitch_judge(fixture, deepseek_key="")
+    # Stage 6: movie judge
+    deepseek_key = os.environ.get("DEEPSEEK_KEY", "") if mode == "api" else ""
+    judges_orch.run_post_stitch_judge(fixture, deepseek_key=deepseek_key)
 
     wall = round(time.perf_counter() - t0, 2)
 
