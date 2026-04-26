@@ -1,0 +1,12 @@
+{
+  "slug": "03_olga_travel",
+  "name": "Olga travel-diary 6-frame slice (eval baseline)",
+  "created_at": "2026-04-26",
+  "status": "in_progress",
+  "tags": ["eval", "olga", "travel-diary"],
+  "audio_track": null,
+  "source": "projects/olga/inputs/IMG-{20170505,20170706,20180805,20180911,20200211,20210612}-WA*.jpg",
+  "subject": "Olga family across travel destinations 2017-2021",
+  "tone": "warm, wanderlust",
+  "notes": "Travel-diary arc — same core travelers (Olga + partner + 2 kids) across 6 distinct locations and years: Tenerife garden 2017-05, Prague Municipal House 2017-07, Warsaw Old Town 2018-08, Czech rock formations 2018-09, Mt Hermon ski 2020-02, Mediterranean garden 2021-06. Identity continuity across changing settings is the core challenge (different from 02_olga_slice life-montage which holds setting and shifts age). Chronological order = sort_key 1..6."
+}

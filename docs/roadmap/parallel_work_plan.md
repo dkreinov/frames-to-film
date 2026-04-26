@@ -127,6 +127,20 @@ Blocked on: none.
 ### Stream B status (latest)
 
 ```
+[2026-04-26 late] DONE: third eval fixture 03_olga_travel/ — travel-diary arc, 6 photos
+            from 2017-2021 spanning Tenerife garden / Prague / Warsaw / Czech rocks /
+            Mt Hermon ski / Mediterranean garden. project.json + expected_brief.json
+            mirror 02_olga_slice schema. Cost: $0. Diversifies eval set with a third
+            arc type (alongside 01_cats 3-act-heroic and 02_olga_slice life-montage).
+            Also refreshed image-gen pricing memory: Wan 2.5 T2I $0.021/img cheapest,
+            Gemini 2.5 Flash Image $0.039 std / $0.0195 Batch, gpt-image-2 medium $0.053,
+            Kimi has no image-gen API.
+Last commit: pending — feat: 03_olga_travel eval fixture + image-gen price snapshot
+Test count: unchanged (no code touched).
+Next up: 7.4 frontend (UploadScreen + StoryReviewScreen) once Stream A's
+         POST /projects/{id}/story endpoint lands. Or 7.5b Wan 2.7 adapter.
+Blocked on: none.
+
 [2026-04-26 evening] REVISED + REVERTED: 7.7 ffmpeg xfade work rolled back.
             Root cause: original 7.7 plan was wrong — Kling already renders the
             cinematic transition inside each clip (first-frame → last-frame). Adding
