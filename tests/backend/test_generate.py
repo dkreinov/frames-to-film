@@ -24,7 +24,7 @@ FIXTURE_DIR = REPO_ROOT / "tests" / "fixtures" / "fake_project"
 @pytest.fixture
 def client(tmp_path: Path):
     db = tmp_path / "index.db"
-    storage = tmp_path / "pipeline_runs"
+    storage = tmp_path / "projects"
     storage.mkdir()
     app.dependency_overrides[get_db_path] = lambda: db
     app.dependency_overrides[get_storage_root] = lambda: storage
@@ -58,7 +58,7 @@ def test_mock_generate_creates_n_minus_1_stubs(client, project_ready_for_generat
     jid = r.json()["job_id"]
     row = _job_row(db, jid)
     assert row["status"] == "done", row
-    videos = storage / "local" / project_ready_for_generate / "kling_test" / "videos"
+    videos = storage / "local" / project_ready_for_generate / "clips" / "raw"
     stubs = sorted(videos.glob("seg_*.mp4"))
     assert len(stubs) == 5, [s.name for s in stubs]
 
@@ -66,7 +66,7 @@ def test_mock_generate_creates_n_minus_1_stubs(client, project_ready_for_generat
 def test_each_stub_is_valid_mp4(client, project_ready_for_generate: str) -> None:
     c, _, storage = client
     c.post(f"/projects/{project_ready_for_generate}/generate", json={"mode": "mock"})
-    videos = storage / "local" / project_ready_for_generate / "kling_test" / "videos"
+    videos = storage / "local" / project_ready_for_generate / "clips" / "raw"
     ffprobe = generate_svc.FFMPEG_BIN.parent / "ffprobe.exe"
     if not ffprobe.exists():
         # ffprobe bundled alongside ffmpeg in newer builds; fall back to header-magic check
@@ -108,7 +108,7 @@ def test_generate_respects_order_json(client, project_ready_for_generate: str) -
         json={"order": ["6.jpg", "5.jpg", "4.jpg", "3.jpg", "2.jpg", "1.jpg"]},
     )
     c.post(f"/projects/{project_ready_for_generate}/generate", json={"mode": "mock"})
-    videos = storage / "local" / project_ready_for_generate / "kling_test" / "videos"
+    videos = storage / "local" / project_ready_for_generate / "clips" / "raw"
     names = sorted(p.name for p in videos.glob("seg_*.mp4"))
     expected = sorted(["seg_6_to_5.mp4", "seg_5_to_4.mp4", "seg_4_to_3.mp4",
                        "seg_3_to_2.mp4", "seg_2_to_1.mp4"])

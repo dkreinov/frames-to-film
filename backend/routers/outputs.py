@@ -42,7 +42,7 @@ def _resolve_safe(base: Path, *parts: str) -> Path:
     return target
 
 
-@router.get("/{stage}")
+@router.get("/{stage:path}")
 def list_stage_outputs(
     project_id: str,
     stage: str,

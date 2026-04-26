@@ -29,7 +29,7 @@ FIXTURE_DIR = REPO_ROOT / "tests" / "fixtures" / "fake_project"
 @pytest.fixture
 def client(tmp_path: Path):
     db = tmp_path / "index.db"
-    storage = tmp_path / "pipeline_runs"
+    storage = tmp_path / "projects"
     storage.mkdir()
     app.dependency_overrides[get_db_path] = lambda: db
     app.dependency_overrides[get_storage_root] = lambda: storage
@@ -98,7 +98,7 @@ def test_api_mode_calls_kling_fal_per_pair(client, project_ready, monkeypatch):
     # Every call used 5s duration per the plan directive.
     assert all(c_["duration"] == 5 for c_ in captured)
 
-    video_dir = storage / "local" / pid / "kling_test" / "videos"
+    video_dir = storage / "local" / pid / "clips" / "raw"
     mp4s = sorted(video_dir.glob("seg_*.mp4"))
     assert len(mp4s) == 5, [p.name for p in mp4s]
     # Each mp4 has the ftyp atom from our fake bytes.

@@ -26,7 +26,7 @@ WET_TEST_PROJECT = (
     REPO_ROOT / "pipeline_runs" / "local"
     / "3fadfa16c6454ac28f336f612ca58e2b"
 )
-KLING_DIR = WET_TEST_PROJECT / "kling_test"
+KLING_DIR = WET_TEST_PROJECT / "extended"
 VIDEO_DIR = KLING_DIR / "videos"
 
 

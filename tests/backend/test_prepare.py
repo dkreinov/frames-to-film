@@ -23,7 +23,7 @@ FIXTURE_DIR = REPO_ROOT / "tests" / "fixtures" / "fake_project"
 @pytest.fixture
 def client(tmp_path: Path):
     db = tmp_path / "index.db"
-    storage = tmp_path / "pipeline_runs"
+    storage = tmp_path / "projects"
     storage.mkdir()
     app.dependency_overrides[get_db_path] = lambda: db
     app.dependency_overrides[get_storage_root] = lambda: storage
@@ -54,7 +54,7 @@ def test_mock_prepare_copies_fixture_frames(client, project_id: str) -> None:
     jid = r.json()["job_id"]
     row = _job_row(db, jid)
     assert row["status"] == "done", row
-    out_dir = storage / "local" / project_id / "outpainted"
+    out_dir = storage / "local" / project_id / "extended/_4_3"
     produced = sorted(p.name for p in out_dir.glob("*.jpg"))
     assert len(produced) == 6, produced
 

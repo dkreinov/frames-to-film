@@ -18,7 +18,7 @@ from backend.main import app
 @pytest.fixture
 def client(tmp_path: Path):
     db = tmp_path / "index.db"
-    storage = tmp_path / "pipeline_runs"
+    storage = tmp_path / "projects"
     storage.mkdir()
     app.dependency_overrides[get_db_path] = lambda: db
     app.dependency_overrides[get_storage_root] = lambda: storage
@@ -42,7 +42,7 @@ def test_put_writes_order_json(client, project_id: str) -> None:
         json={"order": ["1.jpg", "3.jpg", "2.jpg"]},
     )
     assert r.status_code == 200, r.text
-    on_disk = json.loads((storage / "local" / project_id / "order.json").read_text())
+    on_disk = json.loads((storage / "local" / project_id / "metadata" / "order.json").read_text())
     assert on_disk == {"order": ["1.jpg", "3.jpg", "2.jpg"]}
 
 

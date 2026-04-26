@@ -27,7 +27,7 @@ PNG_BYTES = (
 @pytest.fixture
 def client(tmp_path: Path):
     db = tmp_path / "index.db"
-    storage = tmp_path / "pipeline_runs"
+    storage = tmp_path / "projects"
     storage.mkdir()
     app.dependency_overrides[get_db_path] = lambda: db
     app.dependency_overrides[get_storage_root] = lambda: storage
@@ -56,7 +56,7 @@ def test_upload_png_persists_file(client: TestClient, project_id: str, tmp_path:
     assert r.status_code == 201, r.text
     body = r.json()
     assert body["filename"] == "frame.png"
-    on_disk = tmp_path / "pipeline_runs" / "local" / project_id / "sources" / "frame.png"
+    on_disk = tmp_path / "projects" / "local" / project_id / "inputs" / "frame.png"
     assert on_disk.exists()
     assert on_disk.read_bytes() == PNG_BYTES
 
@@ -74,7 +74,7 @@ def test_delete_upload(client: TestClient, project_id: str, tmp_path: Path) -> N
     _upload(client, project_id, "gone.png", PNG_BYTES, "image/png")
     r = client.delete(f"/projects/{project_id}/uploads/gone.png")
     assert r.status_code == 204
-    assert not (tmp_path / "pipeline_runs" / "local" / project_id / "sources" / "gone.png").exists()
+    assert not (tmp_path / "projects" / "local" / project_id / "inputs" / "gone.png").exists()
 
 
 def test_delete_missing_upload_returns_404(client: TestClient, project_id: str) -> None:

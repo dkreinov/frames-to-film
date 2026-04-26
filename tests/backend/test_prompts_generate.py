@@ -18,7 +18,7 @@ from backend.services.prompts import (
 
 def _seed_kling(dir_: Path, count: int) -> None:
     from PIL import Image
-    d = dir_ / "kling_test"
+    d = dir_ / "extended"
     d.mkdir(parents=True, exist_ok=True)
     for i in range(1, count + 1):
         Image.new("RGB", (16, 16), (i * 30, 0, 0)).save(d / f"{i}.jpg", "JPEG")
@@ -32,7 +32,7 @@ def test_mock_produces_n_minus_1_pairs_for_n_frames(tmp_path: Path) -> None:
     for v in out.values():
         assert v == STYLE_PRESETS["cinematic"]
     # prompts.json written
-    saved = json.loads((tmp_path / "prompts.json").read_text())
+    saved = json.loads((tmp_path / "prompts" / "prompts.json").read_text())
     assert saved == out
 
 
@@ -82,7 +82,7 @@ def test_api_generator_calls_gemini_once_per_pair(tmp_path: Path, monkeypatch: p
     assert len(calls) == 5
     assert all(c["model"] == "gemini-2.0-flash" for c in calls)
     # generated prompts persisted
-    saved = json.loads((tmp_path / "prompts.json").read_text())
+    saved = json.loads((tmp_path / "prompts" / "prompts.json").read_text())
     assert saved == out
 
 
@@ -101,7 +101,8 @@ def test_pair_keys_honour_order_json_when_present(tmp_path: Path) -> None:
     from backend.services.prompts import _pair_keys_for_project
 
     _seed_kling(tmp_path, 3)
-    (tmp_path / "order.json").write_text(
+    (tmp_path / "metadata" / "order.json").parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path / "metadata" / "order.json").write_text(
         json.dumps({"order": ["3.jpg", "1.jpg", "2.jpg"]})
     )
     assert _pair_keys_for_project(tmp_path) == ["3_to_1", "1_to_2"]
@@ -113,7 +114,8 @@ def test_pair_keys_fall_back_when_order_references_missing_files(tmp_path: Path)
     from backend.services.prompts import _pair_keys_for_project
 
     _seed_kling(tmp_path, 3)
-    (tmp_path / "order.json").write_text(
+    (tmp_path / "metadata" / "order.json").parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path / "metadata" / "order.json").write_text(
         json.dumps({"order": ["ghost.jpg", "also-ghost.jpg"]})
     )
     # All referenced files are missing -> fall back to numeric sort.
@@ -124,7 +126,8 @@ def test_mock_generator_pairs_follow_order_json(tmp_path: Path) -> None:
     """End-to-end: writing order.json before mock-gen yields prompts.json
     keyed by the reordered pair_keys."""
     _seed_kling(tmp_path, 4)
-    (tmp_path / "order.json").write_text(
+    (tmp_path / "metadata" / "order.json").parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path / "metadata" / "order.json").write_text(
         json.dumps({"order": ["4.jpg", "2.jpg", "1.jpg", "3.jpg"]})
     )
     out = generate_prompts_mock(tmp_path, style="cinematic")
@@ -197,7 +200,7 @@ def test_prompts_api_endpoint_surfaces_header_key_to_runner(
     from backend.services import prompts as prompts_mod
 
     db = tmp_path / "index.db"
-    storage = tmp_path / "pipeline_runs"
+    storage = tmp_path / "projects"
     storage.mkdir()
     app.dependency_overrides[get_db_path] = lambda: db
     app.dependency_overrides[get_storage_root] = lambda: storage
@@ -228,7 +231,7 @@ def test_prompts_api_endpoint_surfaces_header_key_to_runner(
         with TestClient(app) as c:
             pid = c.post("/projects", json={"name": "X"}).json()["project_id"]
             # Seed kling_test frames.
-            d = storage / "local" / pid / "kling_test"
+            d = storage / "local" / pid / "extended"
             d.mkdir(parents=True, exist_ok=True)
             from PIL import Image
             for i in range(1, 4):
@@ -255,7 +258,7 @@ def test_prompts_api_endpoint_400_when_api_mode_and_no_key(
     from backend.main import app
 
     db = tmp_path / "index.db"
-    storage = tmp_path / "pipeline_runs"
+    storage = tmp_path / "projects"
     storage.mkdir()
     app.dependency_overrides[get_db_path] = lambda: db
     app.dependency_overrides[get_storage_root] = lambda: storage
@@ -283,7 +286,7 @@ def test_prompts_mock_mode_does_not_require_gemini_key(
     from backend.main import app
 
     db = tmp_path / "index.db"
-    storage = tmp_path / "pipeline_runs"
+    storage = tmp_path / "projects"
     storage.mkdir()
     app.dependency_overrides[get_db_path] = lambda: db
     app.dependency_overrides[get_storage_root] = lambda: storage
@@ -292,7 +295,7 @@ def test_prompts_mock_mode_does_not_require_gemini_key(
     try:
         with TestClient(app) as c:
             pid = c.post("/projects", json={"name": "X"}).json()["project_id"]
-            d = storage / "local" / pid / "kling_test"
+            d = storage / "local" / pid / "extended"
             d.mkdir(parents=True, exist_ok=True)
             from PIL import Image
             for i in range(1, 4):

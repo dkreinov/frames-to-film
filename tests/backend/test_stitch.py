@@ -22,7 +22,7 @@ FIXTURE_DIR = REPO_ROOT / "tests" / "fixtures" / "fake_project"
 @pytest.fixture
 def client(tmp_path: Path):
     db = tmp_path / "index.db"
-    storage = tmp_path / "pipeline_runs"
+    storage = tmp_path / "projects"
     storage.mkdir()
     app.dependency_overrides[get_db_path] = lambda: db
     app.dependency_overrides[get_storage_root] = lambda: storage
@@ -57,7 +57,7 @@ def test_mock_stitch_produces_full_movie_mp4(client, project_ready_for_stitch: s
     jid = r.json()["job_id"]
     row = _job_row(db, jid)
     assert row["status"] == "done", row
-    full_movie = storage / "local" / project_ready_for_stitch / "kling_test" / "videos" / "full_movie.mp4"
+    full_movie = storage / "local" / project_ready_for_stitch / "final" / "full_movie.mp4"
     assert full_movie.exists()
     assert full_movie.stat().st_size > 1000
 
@@ -66,7 +66,7 @@ def test_stitch_duration_equals_sum_of_segments(client, project_ready_for_stitch
     """5 segments × 1s each = ~5s total (stream-copy is exact)."""
     c, _, storage = client
     c.post(f"/projects/{project_ready_for_stitch}/stitch", json={"mode": "mock"})
-    full_movie = storage / "local" / project_ready_for_stitch / "kling_test" / "videos" / "full_movie.mp4"
+    full_movie = storage / "local" / project_ready_for_stitch / "final" / "full_movie.mp4"
     # Stream copy is exact — ffprobe to confirm.
     import subprocess
     ffprobe = Path("D:/Programming/olga_movie/tools/ffprobe.exe")

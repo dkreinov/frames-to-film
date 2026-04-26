@@ -22,7 +22,7 @@ FIXTURE_DIR = REPO_ROOT / "tests" / "fixtures" / "fake_project"
 @pytest.fixture
 def client(tmp_path: Path):
     db = tmp_path / "index.db"
-    storage = tmp_path / "pipeline_runs"
+    storage = tmp_path / "projects"
     storage.mkdir()
     app.dependency_overrides[get_db_path] = lambda: db
     app.dependency_overrides[get_storage_root] = lambda: storage
@@ -56,7 +56,7 @@ def test_mock_extend_copies_outpainted_to_kling_test(client, project_with_outpai
     jid = r.json()["job_id"]
     row = _job_row(db, jid)
     assert row["status"] == "done", row
-    kling = storage / "local" / project_with_outpainted / "kling_test"
+    kling = storage / "local" / project_with_outpainted / "extended"
     produced = sorted(p.name for p in kling.glob("*.jpg"))
     assert len(produced) == 6, produced
 
@@ -81,4 +81,4 @@ def test_extend_before_prepare_fails(client) -> None:
     jid = c.post(f"/projects/{pid}/extend", json={"mode": "mock"}).json()["job_id"]
     row = _job_row(db, jid)
     assert row["status"] == "error"
-    assert "outpainted" in row["error"].lower()
+    assert "extended/_4_3" in row["error"].lower()

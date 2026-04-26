@@ -25,7 +25,7 @@ FIXTURE_DIR = REPO_ROOT / "tests" / "fixtures" / "fake_project"
 @pytest.fixture
 def client(tmp_path: Path):
     db = tmp_path / "index.db"
-    storage = tmp_path / "pipeline_runs"
+    storage = tmp_path / "projects"
     storage.mkdir()
     app.dependency_overrides[get_db_path] = lambda: db
     app.dependency_overrides[get_storage_root] = lambda: storage
@@ -50,7 +50,7 @@ def project_fully_ran(client) -> str:
 
 def test_stream_outpainted_jpg(client, project_fully_ran: str) -> None:
     c, _ = client
-    r = c.get(f"/projects/{project_fully_ran}/artifacts/outpainted/1.jpg")
+    r = c.get(f"/projects/{project_fully_ran}/artifacts/extended/_4_3/1.jpg")
     assert r.status_code == 200
     assert r.headers["content-type"].startswith("image/")
     assert len(r.content) > 100
@@ -65,13 +65,13 @@ def test_download_shortcut_returns_full_movie(client, project_fully_ran: str) ->
 
 def test_missing_artifact_returns_404(client, project_fully_ran: str) -> None:
     c, _ = client
-    assert c.get(f"/projects/{project_fully_ran}/artifacts/outpainted/99.jpg").status_code == 404
+    assert c.get(f"/projects/{project_fully_ran}/artifacts/extended/_4_3/99.jpg").status_code == 404
 
 
 def test_path_traversal_blocked(client, project_fully_ran: str) -> None:
     """Serving ../../ or /etc/passwd must not be possible."""
     c, _ = client
-    r = c.get(f"/projects/{project_fully_ran}/artifacts/outpainted/..%2F..%2F..%2Fsecret.txt")
+    r = c.get(f"/projects/{project_fully_ran}/artifacts/extended/_4_3/..%2F..%2F..%2Fsecret.txt")
     assert r.status_code in (403, 404)
 
 
@@ -80,5 +80,5 @@ def test_artifact_scoped_to_user(client) -> None:
     pid = c.post("/projects", json={"name": "Alice"}, headers={"X-User-ID": "alice"}).json()["project_id"]
     c.post(f"/projects/{pid}/prepare", json={"mode": "mock"}, headers={"X-User-ID": "alice"})
     # bob cannot read alice's artifacts
-    r = c.get(f"/projects/{pid}/artifacts/outpainted/1.jpg", headers={"X-User-ID": "bob"})
+    r = c.get(f"/projects/{pid}/artifacts/extended/_4_3/1.jpg", headers={"X-User-ID": "bob"})
     assert r.status_code == 404

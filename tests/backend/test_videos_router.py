@@ -18,7 +18,7 @@ from backend.main import app
 @pytest.fixture
 def client(tmp_path: Path):
     db = tmp_path / "index.db"
-    storage = tmp_path / "pipeline_runs"
+    storage = tmp_path / "projects"
     storage.mkdir()
     app.dependency_overrides[get_db_path] = lambda: db
     app.dependency_overrides[get_storage_root] = lambda: storage
@@ -31,14 +31,14 @@ def client(tmp_path: Path):
 
 def _seed_frames(storage: Path, user: str, pid: str, count: int) -> None:
     from PIL import Image
-    d = storage / user / pid / "kling_test"
+    d = storage / user / pid / "extended"
     d.mkdir(parents=True, exist_ok=True)
     for i in range(1, count + 1):
         Image.new("RGB", (16, 16), (i * 30, 0, 0)).save(d / f"{i}.jpg", "JPEG")
 
 
 def _seed_video_stub(storage: Path, user: str, pid: str, name: str) -> None:
-    d = storage / user / pid / "kling_test" / "videos"
+    d = storage / user / pid / "clips" / "raw"
     d.mkdir(parents=True, exist_ok=True)
     (d / name).write_bytes(b"\x00\x00\x00\x18ftypmp42")  # enough bytes to be non-empty
 
@@ -76,7 +76,8 @@ def test_get_videos_honours_order_json(client) -> None:
     pid = c.post("/projects", json={"name": "V3"}).json()["project_id"]
     _seed_frames(storage, "local", pid, 3)
     # Save a non-numeric order.
-    (storage / "local" / pid / "order.json").write_text(
+    (storage / "local" / pid / "metadata" / "order.json").parent.mkdir(parents=True, exist_ok=True)
+    (storage / "local" / pid / "metadata" / "order.json").write_text(
         json.dumps({"order": ["3.jpg", "1.jpg", "2.jpg"]})
     )
     # With that order, pairs are 3_to_1 and 1_to_2.

@@ -13,6 +13,8 @@ from backend.db import connect, init_db
 from backend.deps import get_db_path, get_storage_root, get_user_id, resolve_gemini_key
 from backend.services import jobs as jobs_svc
 from backend.services import prompts as prompts_svc
+from backend.services.project_schema import PROMPTS_DIRNAME
+from backend.services.prompts import PROMPTS_FILENAME
 
 router = APIRouter(prefix="/projects/{project_id}/prompts", tags=["prompts"])
 
@@ -70,7 +72,7 @@ def get_prompts(
     init_db(db_path)
     if not _project_exists(db_path, project_id, user_id):
         raise HTTPException(status_code=404, detail="project not found")
-    pj = storage_root / user_id / project_id / "prompts.json"
+    pj = storage_root / user_id / project_id / PROMPTS_DIRNAME / PROMPTS_FILENAME
     if not pj.is_file():
         raise HTTPException(status_code=404, detail="prompts.json not generated yet")
     try:
@@ -107,11 +109,12 @@ def put_prompts(
         raise HTTPException(status_code=400, detail="prompts map must not be empty")
 
     project_dir = storage_root / user_id / project_id
-    project_dir.mkdir(parents=True, exist_ok=True)
-    target = project_dir / "prompts.json"
+    prompts_dir = project_dir / PROMPTS_DIRNAME
+    prompts_dir.mkdir(parents=True, exist_ok=True)
+    target = prompts_dir / PROMPTS_FILENAME
 
     # Atomic write: tempfile in same dir + os.replace.
-    fd, tmp_name = tempfile.mkstemp(prefix=".prompts-", suffix=".json", dir=project_dir)
+    fd, tmp_name = tempfile.mkstemp(prefix=".prompts-", suffix=".json", dir=prompts_dir)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(body.prompts, f, indent=2)

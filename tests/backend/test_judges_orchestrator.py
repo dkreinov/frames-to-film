@@ -57,7 +57,8 @@ def test_write_then_read_roundtrip(tmp_path):
 
 
 def test_corrupt_run_json_returns_default(tmp_path):
-    (tmp_path / "run.json").write_text("not json {", encoding="utf-8")
+    (tmp_path / "metadata" / "run.json").parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path / "metadata" / "run.json").write_text("not json {", encoding="utf-8")
     data = orchestrator.read_run_json(tmp_path)
     assert data["judges"]["prompt"] == []
 
@@ -65,16 +66,17 @@ def test_corrupt_run_json_returns_default(tmp_path):
 # --- post-generate orchestrator -------------------------------------
 
 def _make_project(tmp_path: Path) -> Path:
-    """Build a minimal kling_test/ + prompts.json + 2 mp4 stubs."""
-    img = tmp_path / "kling_test"
+    """Build a minimal extended/ + prompts/prompts.json + 2 mp4 stubs in clips/raw/."""
+    img = tmp_path / "extended"
     img.mkdir()
     for n in (1, 2, 3):
         (img / f"{n}.jpg").write_bytes(b"\xff\xd8\xff\xe0")
-    video = img / "videos"
-    video.mkdir()
+    video = tmp_path / "clips" / "raw"
+    video.mkdir(parents=True)
     (video / "seg_1_to_2.mp4").write_bytes(b"\x00\x00\x00 ftypmp42")
     (video / "seg_2_to_3.mp4").write_bytes(b"\x00\x00\x00 ftypmp42")
-    (tmp_path / "prompts.json").write_text(json.dumps({
+    (tmp_path / "prompts" / "prompts.json").parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path / "prompts" / "prompts.json").write_text(json.dumps({
         "1_to_2": "Slow dolly in",
         "2_to_3": "Cinematic morph",
     }))

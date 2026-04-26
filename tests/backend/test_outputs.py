@@ -22,7 +22,7 @@ FIXTURE_DIR = REPO_ROOT / "tests" / "fixtures" / "fake_project"
 @pytest.fixture
 def client(tmp_path: Path):
     db = tmp_path / "index.db"
-    storage = tmp_path / "pipeline_runs"
+    storage = tmp_path / "projects"
     storage.mkdir()
     app.dependency_overrides[get_db_path] = lambda: db
     app.dependency_overrides[get_storage_root] = lambda: storage
@@ -44,17 +44,17 @@ def project_prepared(client) -> str:
 
 def test_list_outputs_after_prepare(client, project_prepared: str) -> None:
     c, _ = client
-    r = c.get(f"/projects/{project_prepared}/outputs/outpainted")
+    r = c.get(f"/projects/{project_prepared}/outputs/extended/_4_3")
     assert r.status_code == 200
     body = r.json()
-    assert body["stage"] == "outpainted"
+    assert body["stage"] == "extended/_4_3"
     assert sorted(body["outputs"]) == ["1.jpg", "2.jpg", "3.jpg", "4.jpg", "5.jpg", "6.jpg"]
 
 
 def test_list_outputs_missing_stage_returns_404(client) -> None:
     c, _ = client
     pid = c.post("/projects", json={"name": "Empty"}).json()["project_id"]
-    r = c.get(f"/projects/{pid}/outputs/outpainted")
+    r = c.get(f"/projects/{pid}/outputs/extended/_4_3")
     assert r.status_code == 404
 
 
@@ -68,5 +68,5 @@ def test_list_outputs_scoped_to_user(client) -> None:
     c, _ = client
     pid = c.post("/projects", json={"name": "A"}, headers={"X-User-ID": "alice"}).json()["project_id"]
     c.post(f"/projects/{pid}/prepare", json={"mode": "mock"}, headers={"X-User-ID": "alice"})
-    r = c.get(f"/projects/{pid}/outputs/outpainted", headers={"X-User-ID": "bob"})
+    r = c.get(f"/projects/{pid}/outputs/extended/_4_3", headers={"X-User-ID": "bob"})
     assert r.status_code == 404

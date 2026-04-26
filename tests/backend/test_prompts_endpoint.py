@@ -20,7 +20,7 @@ from backend.main import app
 @pytest.fixture
 def client(tmp_path: Path):
     db = tmp_path / "index.db"
-    storage = tmp_path / "pipeline_runs"
+    storage = tmp_path / "projects"
     storage.mkdir()
     app.dependency_overrides[get_db_path] = lambda: db
     app.dependency_overrides[get_storage_root] = lambda: storage
@@ -33,7 +33,7 @@ def client(tmp_path: Path):
 
 def _seed_kling_into_project(storage_root: Path, user: str, pid: str, count: int) -> None:
     from PIL import Image
-    d = storage_root / user / pid / "kling_test"
+    d = storage_root / user / pid / "extended"
     d.mkdir(parents=True, exist_ok=True)
     for i in range(1, count + 1):
         Image.new("RGB", (16, 16), (i * 30, 0, 0)).save(d / f"{i}.jpg", "JPEG")
@@ -65,7 +65,7 @@ def test_mock_prompts_generate_writes_json(client, project_with_kling: str) -> N
     jid = r.json()["job_id"]
     row = _job_row(db, jid)
     assert row["status"] == "done", row
-    pj = storage / "local" / project_with_kling / "prompts.json"
+    pj = storage / "local" / project_with_kling / "prompts" / "prompts.json"
     assert pj.is_file()
     data = json.loads(pj.read_text())
     assert set(data.keys()) == {"1_to_2", "2_to_3", "3_to_4", "4_to_5", "5_to_6"}
@@ -145,7 +145,7 @@ def test_put_prompts_writes_json_atomically(client, project_with_kling: str) -> 
     assert r.status_code == 200, r.text
     assert r.json() == payload["prompts"]
     # file on disk matches
-    pj = storage / "local" / project_with_kling / "prompts.json"
+    pj = storage / "local" / project_with_kling / "prompts" / "prompts.json"
     assert pj.is_file()
     assert json.loads(pj.read_text()) == payload["prompts"]
     # GET round-trip
@@ -196,5 +196,5 @@ def test_put_prompts_overwrites_existing_file(client, project_with_kling: str) -
         f"/projects/{project_with_kling}/prompts",
         json={"prompts": {"1_to_2": "v2", "2_to_3": "v2"}},
     )
-    data = json.loads((storage / "local" / project_with_kling / "prompts.json").read_text())
+    data = json.loads((storage / "local" / project_with_kling / "prompts" / "prompts.json").read_text())
     assert data == {"1_to_2": "v2", "2_to_3": "v2"}

@@ -24,7 +24,8 @@ def test_style_presets_expose_four_keys() -> None:
 
 
 def test_resolver_prefers_project_json(tmp_path: Path) -> None:
-    (tmp_path / "prompts.json").write_text(json.dumps({"1_to_2": "CUSTOM PROMPT"}))
+    (tmp_path / "prompts" / "prompts.json").parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path / "prompts" / "prompts.json").write_text(json.dumps({"1_to_2": "CUSTOM PROMPT"}))
     result = resolve_prompt("1_to_2", project_dir=tmp_path, style="cinematic")
     assert result == "CUSTOM PROMPT"
 

@@ -9,6 +9,8 @@ from pydantic import BaseModel, Field
 
 from backend.db import connect, init_db
 from backend.deps import get_db_path, get_storage_root, get_user_id
+from backend.services.project_schema import METADATA_DIRNAME
+from backend.services.prompts import ORDER_FILENAME
 
 router = APIRouter(prefix="/projects/{project_id}/order", tags=["order"])
 
@@ -26,7 +28,7 @@ def _project_exists(db_path: Path, project_id: str, user_id: str) -> bool:
 
 
 def _order_path(storage_root: Path, user_id: str, project_id: str) -> Path:
-    return storage_root / user_id / project_id / "order.json"
+    return storage_root / user_id / project_id / METADATA_DIRNAME / ORDER_FILENAME
 
 
 @router.put("")
