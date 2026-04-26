@@ -1,0 +1,150 @@
+{
+  "qwen3-vl-plus": {
+    "24": {
+      "clip": "24",
+      "main_character_drift": 4,
+      "text_artifacts": 5,
+      "limb_anatomy": 5,
+      "unnatural_faces": 4,
+      "glitches": 3,
+      "specific_issues": "Frame 4 shows ghosting/mixing of both scenes (table + doorway) causing unnatural double exposure; frame 5 has slight face warping near door edge not in source; no text or limb issues.",
+      "_latency_s": 5.58,
+      "_tokens_in": 8125,
+      "_tokens_out": 98
+    },
+    "30": {
+      "clip": "30",
+      "main_character_drift": 2,
+      "text_artifacts": 5,
+      "limb_anatomy": 3,
+      "unnatural_faces": 2,
+      "glitches": 2,
+      "specific_issues": "main character's face distorts unnaturally at 2.5s and 4.5s (asymmetrical eyes, warped mouth); left arm appears duplicated/melted at 2.5s; purple outfit blends unnaturally with floral dress at 4.5s; background bookshelf geometry warps between frames; no text artifacts in sources or clip.",
+      "_latency_s": 7.25,
+      "_tokens_in": 8125,
+      "_tokens_out": 130
+    },
+    "34": {
+      "clip": "34",
+      "main_character_drift": 2,
+      "text_artifacts": 1,
+      "limb_anatomy": 5,
+      "unnatural_faces": 3,
+      "glitches": 2,
+      "specific_issues": "Main character changes from classroom setting (frames 3\u20134) to wedding (frame 5) with inconsistent age/outfit; Hebrew text on poster is clear in frames 3\u20134 but garbled in frame 5; face in frame 5 has slight distortion; heavy blur/garbling in frame 5 not present in sources.",
+      "_latency_s": 6.08,
+      "_tokens_in": 8125,
+      "_tokens_out": 124
+    },
+    "36": {
+      "clip": "36",
+      "main_character_drift": 1,
+      "text_artifacts": 5,
+      "limb_anatomy": 1,
+      "unnatural_faces": 2,
+      "glitches": 1,
+      "specific_issues": "Main character completely changes from pregnant woman in outdoor setting (Image 1) to bride in wedding scene (Image 3/4) and then to dancer in reception (Image 5) \u2014 not a morph but a scene replacement; limbs inconsistent (e.g., bride\u2019s arms pose differs unnaturally between Image 3 and 4); faces in Image 3/4 show slight warping (eyes/mouth asymmetry) not present in sources; heavy motion blur and ghosting in Image 5 not in sources.",
+      "_latency_s": 6.11,
+      "_tokens_in": 8125,
+      "_tokens_out": 160
+    },
+    "5": {
+      "clip": "5",
+      "main_character_drift": 5,
+      "text_artifacts": 5,
+      "limb_anatomy": 5,
+      "unnatural_faces": 5,
+      "glitches": 4,
+      "specific_issues": "minor edge artifact at left of frame 4 (torn photo overlay), but no Kling-introduced facial/anatomical issues; all changes consistent with source morph",
+      "_latency_s": 5.45,
+      "_tokens_in": 8124,
+      "_tokens_out": 86
+    },
+    "15": {
+      "clip": "15",
+      "main_character_drift": 2,
+      "text_artifacts": 5,
+      "limb_anatomy": 5,
+      "unnatural_faces": 1,
+      "glitches": 3,
+      "specific_issues": "main character's face at 2.5s is unnaturally distorted (exaggerated smile, misaligned eyes) not present in sources; clip frames 0.2s and 2.5s retain source START appearance too long, causing abrupt jump to END at 4.5s; slight blur/glitch in transition at 4.5s",
+      "_latency_s": 5.84,
+      "_tokens_in": 8125,
+      "_tokens_out": 128
+    }
+  },
+  "qwen3-vl-235b-a22b-thinking": {
+    "24": {
+      "clip": "24",
+      "main_character_drift": 5,
+      "text_artifacts": 5,
+      "limb_anatomy": 5,
+      "unnatural_faces": 5,
+      "glitches": 5,
+      "specific_issues": "none",
+      "_latency_s": 33.94,
+      "_tokens_in": 8127,
+      "_tokens_out": 1262
+    },
+    "30": {
+      "clip": "30",
+      "main_character_drift": 2,
+      "text_artifacts": 5,
+      "limb_anatomy": 5,
+      "unnatural_faces": 5,
+      "glitches": 5,
+      "specific_issues": "main character duplicated in 2.5s frame",
+      "_latency_s": 51.17,
+      "_tokens_in": 8127,
+      "_tokens_out": 2669
+    },
+    "34": {
+      "clip": "34",
+      "main_character_drift": 1,
+      "text_artifacts": 1,
+      "limb_anatomy": 5,
+      "unnatural_faces": 5,
+      "glitches": 1,
+      "specific_issues": "Main character appears in classroom setting in frames 3-4 not part of source morph; text on poster garbled in frame 5",
+      "_latency_s": 34.73,
+      "_tokens_in": 8127,
+      "_tokens_out": 1705
+    },
+    "36": {
+      "clip": "36",
+      "main_character_drift": 5,
+      "text_artifacts": 5,
+      "limb_anatomy": 5,
+      "unnatural_faces": 5,
+      "glitches": 5,
+      "specific_issues": "none",
+      "_latency_s": 67.01,
+      "_tokens_in": 8127,
+      "_tokens_out": 3164
+    },
+    "5": {
+      "clip": "5",
+      "main_character_drift": 5,
+      "text_artifacts": 5,
+      "limb_anatomy": 5,
+      "unnatural_faces": 5,
+      "glitches": 5,
+      "specific_issues": "none",
+      "_latency_s": 15.3,
+      "_tokens_in": 8126,
+      "_tokens_out": 532
+    },
+    "15": {
+      "clip": "15",
+      "main_character_drift": 5,
+      "text_artifacts": 3,
+      "limb_anatomy": 5,
+      "unnatural_faces": 5,
+      "glitches": 5,
+      "specific_issues": "right side date stamps missing in frame 4.5s",
+      "_latency_s": 137.41,
+      "_tokens_in": 8127,
+      "_tokens_out": 6808
+    }
+  }
+}

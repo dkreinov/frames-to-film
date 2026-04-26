@@ -90,14 +90,15 @@ def test_post_generate_runs_both_judges_per_pair(tmp_path, monkeypatch):
     )
     fake_clip = JudgeScore(
         judge="clip_judge",
-        scores={"visual_quality": 4.0, "anatomy_ok": True,
-                "style_consistency": 4.0, "prompt_match": 4.0},
-        reasoning="solid", model_used="gemini-3-flash-preview", cost_usd=0.0,
+        scores={"main_character_drift": 4.0, "text_artifacts": 5.0,
+                "limb_anatomy": 4.0, "unnatural_faces": 5.0,
+                "glitches": 4.0, "content_hallucination": 5.0},
+        reasoning="solid", model_used="qwen3-vl-plus", cost_usd=0.0,
     )
     monkeypatch.setattr(orchestrator, "score_prompt", lambda **kw: fake_prompt)
     monkeypatch.setattr(orchestrator, "score_clip", lambda **kw: fake_clip)
 
-    data = orchestrator.run_post_generate_judges(project, gemini_key="fake")
+    data = orchestrator.run_post_generate_judges(project, judge_key="fake")
     assert len(data["judges"]["prompt"]) == 2
     assert len(data["judges"]["clip"]) == 2
     assert data["judges"]["prompt"][0]["pair"] == "1_to_2"
@@ -107,7 +108,7 @@ def test_post_generate_runs_both_judges_per_pair(tmp_path, monkeypatch):
 
 def test_post_generate_no_key_writes_neutral_fallbacks(tmp_path):
     project = _make_project(tmp_path)
-    data = orchestrator.run_post_generate_judges(project, gemini_key="")
+    data = orchestrator.run_post_generate_judges(project, judge_key="")
     # Without a key, prompt judges still get logged with neutral 3.0
     # so run.json shape stays consistent for the eval harness.
     assert all(
@@ -124,15 +125,16 @@ def test_post_generate_is_idempotent(tmp_path, monkeypatch):
     )
     fake_clip = JudgeScore(
         judge="clip_judge",
-        scores={"visual_quality": 4.0, "anatomy_ok": True,
-                "style_consistency": 4.0, "prompt_match": 4.0},
+        scores={"main_character_drift": 4.0, "text_artifacts": 5.0,
+                "limb_anatomy": 4.0, "unnatural_faces": 5.0,
+                "glitches": 4.0, "content_hallucination": 5.0},
         model_used="x", cost_usd=0.0,
     )
     monkeypatch.setattr(orchestrator, "score_prompt", lambda **kw: fake_prompt)
     monkeypatch.setattr(orchestrator, "score_clip", lambda **kw: fake_clip)
 
-    orchestrator.run_post_generate_judges(project, gemini_key="k")
-    orchestrator.run_post_generate_judges(project, gemini_key="k")
+    orchestrator.run_post_generate_judges(project, judge_key="k")
+    orchestrator.run_post_generate_judges(project, judge_key="k")
     data = orchestrator.read_run_json(project)
     # Re-running should overwrite, not append, so still 2 (not 4).
     assert len(data["judges"]["prompt"]) == 2

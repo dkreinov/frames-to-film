@@ -65,6 +65,27 @@ def resolve_fal_key(x_fal_key: str | None) -> str:
     return key
 
 
+def resolve_qwen_key(x_qwen_key: str | None) -> str:
+    """Resolve the Qwen API key (Alibaba DashScope) for vision judges.
+
+    Same precedence shape as other resolvers:
+    1. `X-Qwen-Key` header.
+    2. `QWEEN_KEY` env var (operator-chosen spelling 2026-04-25).
+
+    Used by `prompt_judge` + `clip_judge` v2 (qwen3-vl-plus default).
+    """
+    key = (x_qwen_key or "").strip() or os.getenv("QWEEN_KEY")
+    if not key:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Qwen API key required. Paste a key in Settings or set "
+                "the 'QWEEN_KEY' env var (Alibaba DashScope, qwen.ai/apiplatform)."
+            ),
+        )
+    return key
+
+
 def resolve_deepseek_key(x_deepseek_key: str | None) -> str:
     """Resolve the DeepSeek API key for movie_judge calls (Phase 7.1+).
 

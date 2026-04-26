@@ -207,6 +207,82 @@ If any disagreements, tell me which and we adjust the rubric.
 - `docs/roadmap/_test_a2_frames/clip_*/` (extracted frames)
 - `tools/_test_a2_qwen_moonshot.py` (re-runnable v2 panel script)
 
+## v3 ADDENDUM (2026-04-26 follow-up)
+
+After v2 results, two operator concerns triggered a cheaper-tier panel:
+
+1. **Was Qwen failing because of free-tier text-only fallback?** — NO. Vision probe confirmed all Qwen variants (vl-plus, vl-max, 3-vl-plus, 3-vl-235b-thinking) plus Moonshot vision-preview can describe images correctly. The v2 task complexity is what broke `qwen-vl-plus` (calibration collapsed under 5-image rubric). Stronger Qwen tiers handle it.
+2. **Opus might be too expensive for production.** Operator wanted cheap alternatives benchmarked.
+
+### Stronger Qwen tiers re-run
+
+| Model | v2 verdicts (6 clips) | $/call | Latency | Notes |
+|---|---|---|---|---|
+| `qwen3-vl-plus` | **5/6 correct** | ~$0.005 | ~6s | **Cheap production winner** |
+| `qwen3-vl-235b-a22b-thinking` | 2/6 (too conservative) | ~$0.006 | 30-130s | Misses moderate issues |
+
+**`qwen3-vl-plus` is the cheap production answer.** It correctly identified 4/4 user-flagged clips (24, 30, 34, 36) AND correctly approved control clip 5. Only deviation: clip 15 face score (false positive).
+
+### Critical clip 34 finding
+
+Both qwen3-vl-plus AND qwen3-vl-235b-thinking independently observed:
+
+> "Main character changes from **classroom setting (frames 3-4) to wedding (frame 5)** with inconsistent age/outfit; Hebrew text on poster is clear in frames 3-4 but garbled in frame 5"
+
+The clip starts as a classroom (the teacher) and ends as the wedding. **But neither original assumed source (`outpainted/34.jpg` = wedding, `outpainted/35.jpg` = wedding) shows a classroom.** 
+
+**Correction to clip 34's source mapping:** with operator's confirmation, the actual source pair was `33_b.jpg` (classroom — woman teaching with Hebrew poster) + `34.jpg` (wedding ketubah). The naming convention supports `_b` intermediate frames. So:
+
+```
+clip 34 sources: 33_b.jpg → 34.jpg  (classroom → wedding)
+```
+
+This validates the v2 architecture: the cheap-tier model **correctly identified scenes from the rendered clip frames** even though we initially supplied the wrong source-pair. The "ketubah" assertion from Opus v2 was about the END source (34.jpg correctly = wedding); the START source we provided (35.jpg = also wedding) didn't match the actual classroom-to-wedding morph.
+
+**Real Kling failures in clip 34 (per operator + v3 panel):**
+1. Hebrew text on Hebrew classroom poster gets garbled across the morph
+2. Identity drift between teacher (33_b) and wedding scene (34) — but if intentional pair, this is expected morph
+
+When fed the CORRECT source pair (33_b, 34), the judge will only flag the Hebrew text degradation, not the scene morph (which is intentional). That's another argument for the v2 architecture.
+
+### Updated production recommendation
+
+| Tier | Model | Use case |
+|---|---|---|
+| **Primary (cheap, scriptable)** | **`qwen3-vl-plus`** | Default for all batch + SaaS contexts |
+| Optional escalation (free during operator session) | Opus 4.7 subagent | "Second opinion" when qwen3-vl-plus disagrees with itself or operator wants double-check |
+| Deprecated | `qwen-vl-plus`, `qwen-vl-max` | Calibration broken on v2 rubric — do not use |
+| Constrained | Kimi K2.5 / K2.6 | API rejects custom temperature; not viable for vision judging |
+
+Per-movie cost at 100 movies/month with `qwen3-vl-plus`: **$2.50** (vs current Gemini real billed $10–$20).
+
+### Add `content_hallucination` as 6th dimension
+
+The clip-34 classroom finding revealed a failure mode neither v1 nor v2 explicitly tested: **Kling rendering content not present in either source frame.**
+
+Recommend adding to the v2 rubric:
+
+```
+content_hallucination 1-5:
+  5 = all clip content traceable to source images
+  3 = minor invented details (e.g. unrelated background extras)
+  1 = clip invents a major scene/subject not in any source
+```
+
+`qwen3-vl-plus` already implicitly catches this (clip 34 + clip 36 it correctly flagged scene replacement vs morph). Making the dimension explicit tightens the rubric.
+
+### Source path resolution for production
+
+Production orchestrator needs to discover source pairs. Current `prompts.py:_sort_key` already handles `N_b` suffixes. Same logic produces the source pair list. For clip index `i`, source pair is `frames[i-1] → frames[i]` after sorting by the established sort key.
+
+Changes needed in production code (next commit):
+1. `clip_judge.py`: take `source_start_path` + `source_end_path`, use v2 rubric
+2. `prompt_judge.py`: same
+3. `orchestrator.py`: resolve source paths, pass to judges
+4. `deps.py`: add `resolve_qwen_key` (env: `QWEEN_KEY`)
+5. Vendor-agnostic dispatch in judges based on model prefix
+6. Tests: mock per-vendor calls
+
 ## Recommendation
 
 **Lock the v2 architecture** for production:

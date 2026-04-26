@@ -69,7 +69,7 @@ def test_prompt_judge_happy_path(monkeypatch, tmp_path):
         850,  # input tokens
         25,   # output tokens
     )
-    monkeypatch.setattr(prompt_judge, "_call_gemini_vision",
+    monkeypatch.setattr(prompt_judge, "_call_vision",
                         lambda **kwargs: fake_response)
 
     js = score_prompt(image_a=img_a, image_b=img_b,
@@ -79,8 +79,8 @@ def test_prompt_judge_happy_path(monkeypatch, tmp_path):
     assert js.reasoning == "well grounded"
     assert js.input_tokens == 850
     assert js.output_tokens == 25
-    assert js.cost_usd > 0
-    assert js.model_used == prompt_judge.DEFAULT_MODEL
+    # Default model is qwen3-vl-plus (Phase 7.1.1 v2 winner)
+    assert js.model_used == prompt_judge.DEFAULT_MODEL == "qwen3-vl-plus"
 
 
 def test_prompt_judge_handles_unfenced_json(monkeypatch, tmp_path):
@@ -90,7 +90,7 @@ def test_prompt_judge_handles_unfenced_json(monkeypatch, tmp_path):
     img_b.write_bytes(b"\xff\xd8\xff\xe0")
 
     monkeypatch.setattr(
-        prompt_judge, "_call_gemini_vision",
+        prompt_judge, "_call_vision",
         lambda **kwargs: ('{"score": 2.0, "reasoning": "vague"}', 500, 10),
     )
     js = score_prompt(image_a=img_a, image_b=img_b,
@@ -106,7 +106,7 @@ def test_prompt_judge_falls_back_on_call_error(monkeypatch, tmp_path):
 
     def boom(**kwargs):
         raise RuntimeError("network down")
-    monkeypatch.setattr(prompt_judge, "_call_gemini_vision", boom)
+    monkeypatch.setattr(prompt_judge, "_call_vision", boom)
 
     js = score_prompt(image_a=img_a, image_b=img_b,
                       prompt_text="x", key="k")
@@ -115,11 +115,24 @@ def test_prompt_judge_falls_back_on_call_error(monkeypatch, tmp_path):
     assert "judge error" in js.reasoning
 
 
+def test_prompt_judge_vendor_dispatch():
+    """Vendor selection by model prefix."""
+    assert prompt_judge._vendor_for_model("qwen-vl-plus") == "qwen"
+    assert prompt_judge._vendor_for_model("qwen3-vl-plus") == "qwen"
+    assert prompt_judge._vendor_for_model("gemini-2.5-flash") == "gemini"
+    assert prompt_judge._vendor_for_model("moonshot-v1-128k-vision-preview") == "moonshot"
+
+
 # --- clip_judge -------------------------------------------------------
 
 def test_clip_judge_happy_path(monkeypatch, tmp_path):
+    """v2 source-aware: caller passes source_start + source_end + video."""
     video = tmp_path / "clip.mp4"
     video.write_bytes(b"fake mp4")
+    src_a = tmp_path / "src_a.jpg"
+    src_b = tmp_path / "src_b.jpg"
+    src_a.write_bytes(b"\xff\xd8\xff\xe0")
+    src_b.write_bytes(b"\xff\xd8\xff\xe0")
 
     # Bypass ffmpeg by monkeypatching frame extraction.
     fake_frames = [tmp_path / f"f{i}.jpg" for i in range(3)]
@@ -129,54 +142,86 @@ def test_clip_judge_happy_path(monkeypatch, tmp_path):
                         lambda *a, **kw: fake_frames)
 
     monkeypatch.setattr(
-        clip_judge, "_call_gemini_vision",
+        clip_judge, "_call_vision",
         lambda **kwargs: (
-            '{"visual_quality": 4.5, "style_consistency": 4.0, '
-            '"prompt_match": 3.5, "anatomy_ok": true, "reasoning": "minor blur"}',
+            '{"main_character_drift": 4.5, "text_artifacts": 5, '
+            '"limb_anatomy": 4, "unnatural_faces": 5, "glitches": 3, '
+            '"content_hallucination": 5, "specific_issues": "minor blur"}',
             1200, 35,
         ),
     )
 
-    js = score_clip(video_path=video, prompt_text="dolly in", key="k")
+    js = score_clip(
+        video_path=video,
+        source_start_path=src_a, source_end_path=src_b,
+        key="k",
+    )
     assert js.judge == "clip_judge"
-    assert js.scores["visual_quality"] == 4.5
-    assert js.scores["anatomy_ok"] is True
+    assert js.scores["main_character_drift"] == 4.5
+    assert js.scores["content_hallucination"] == 5.0
+    assert js.scores["glitches"] == 3.0
     assert js.reasoning == "minor blur"
     assert js.input_tokens == 1200
+    assert js.model_used == "qwen3-vl-plus"
 
 
-def test_clip_judge_flags_anatomy_break(monkeypatch, tmp_path):
+def test_clip_judge_flags_anatomy_and_text(monkeypatch, tmp_path):
+    """v2 catches limb + text artifacts in same response."""
     video = tmp_path / "clip.mp4"
     video.write_bytes(b"fake")
+    src_a = tmp_path / "src_a.jpg"; src_a.write_bytes(b"\xff\xd8\xff\xe0")
+    src_b = tmp_path / "src_b.jpg"; src_b.write_bytes(b"\xff\xd8\xff\xe0")
     fake_frames = [tmp_path / f"f{i}.jpg" for i in range(3)]
     for f in fake_frames:
         f.write_bytes(b"\xff\xd8\xff\xe0")
     monkeypatch.setattr(clip_judge, "extract_frames_at_timestamps",
                         lambda *a, **kw: fake_frames)
     monkeypatch.setattr(
-        clip_judge, "_call_gemini_vision",
+        clip_judge, "_call_vision",
         lambda **kwargs: (
-            '{"visual_quality": 3.0, "style_consistency": 3.0, '
-            '"prompt_match": 3.0, "anatomy_ok": false, "reasoning": "extra fingers"}',
+            '{"main_character_drift": 3, "text_artifacts": 1, '
+            '"limb_anatomy": 2, "unnatural_faces": 3, "glitches": 3, '
+            '"content_hallucination": 4, "specific_issues": "Hebrew text garbled, missing arm"}',
             500, 20,
         ),
     )
-    js = score_clip(video_path=video, prompt_text="x", key="k")
-    assert js.scores["anatomy_ok"] is False
-    assert "fingers" in js.reasoning
+    js = score_clip(
+        video_path=video,
+        source_start_path=src_a, source_end_path=src_b,
+        key="k",
+    )
+    assert js.scores["text_artifacts"] == 1.0
+    assert js.scores["limb_anatomy"] == 2.0
+    assert "Hebrew" in js.reasoning
 
 
 def test_clip_judge_falls_back_on_ffmpeg_error(monkeypatch, tmp_path):
     video = tmp_path / "clip.mp4"
     video.write_bytes(b"fake")
+    src_a = tmp_path / "src_a.jpg"; src_a.write_bytes(b"\xff\xd8\xff\xe0")
+    src_b = tmp_path / "src_b.jpg"; src_b.write_bytes(b"\xff\xd8\xff\xe0")
 
     def boom(*a, **kw):
         raise RuntimeError("ffmpeg failed")
     monkeypatch.setattr(clip_judge, "extract_frames_at_timestamps", boom)
 
-    js = score_clip(video_path=video, prompt_text="x", key="k")
-    assert js.scores["visual_quality"] == 3.0
-    assert "judge error" in js.reasoning
+    js = score_clip(
+        video_path=video,
+        source_start_path=src_a, source_end_path=src_b,
+        key="k",
+    )
+    # Neutral fallback across all 6 dimensions
+    assert js.scores["main_character_drift"] == 3.0
+    assert js.scores["content_hallucination"] == 3.0
+    assert "frame extraction failed" in js.reasoning
+
+
+def test_clip_judge_vendor_dispatch():
+    """Vendor selection by model prefix."""
+    assert clip_judge._vendor_for_model("qwen-vl-plus") == "qwen"
+    assert clip_judge._vendor_for_model("qwen3-vl-plus") == "qwen"
+    assert clip_judge._vendor_for_model("gemini-3-flash-preview") == "gemini"
+    assert clip_judge._vendor_for_model("moonshot-v1-128k-vision-preview") == "moonshot"
 
 
 # --- movie_judge ------------------------------------------------------

@@ -144,33 +144,38 @@ def _load_prompts(project_dir: Path) -> dict[str, str]:
 
 def run_post_generate_judges(
     project_dir: Path,
-    gemini_key: str | None = None,
+    judge_key: str | None = None,
     *,
     skip_prompt: bool = False,
     skip_clip: bool = False,
+    model: str | None = None,
 ) -> dict[str, Any]:
     """Score every (prompt, image_a, image_b) tuple AND every rendered
-    clip. Persists to run.json. Returns the updated dict.
+    clip with the v2 source-aware judges. Persists to run.json.
+
+    `judge_key` is the API key for the judge model's vendor. Defaults
+    to QWEEN_KEY env var (qwen3-vl-plus is the default judge model
+    per Phase 7.1.1 v2 benchmark).
 
     Idempotent: re-running overwrites previous prompt/clip judge entries.
     """
     project_dir = Path(project_dir)
-    if gemini_key is None:
-        gemini_key = os.getenv("gemini") or ""
+    if judge_key is None:
+        judge_key = os.getenv("QWEEN_KEY") or os.getenv("gemini") or ""
 
     data = read_run_json(project_dir)
     data["stages"].setdefault("generate", {})
     data["judges"]["prompt"] = []
     data["judges"]["clip"] = []
 
-    if not gemini_key:
+    if not judge_key:
         # No key → log neutral fallback & bail. Judges still fire so the
         # caller sees a populated run.json with judge_error notes.
         for pair_key, img_a, img_b in _discover_pairs(project_dir):
             data["judges"]["prompt"].append({
                 "pair": pair_key, "judge": "prompt_judge",
                 "scores": {"prompt_image_alignment": 3.0},
-                "reasoning": "no gemini key (neutral fallback)",
+                "reasoning": "no judge API key (neutral fallback)",
                 "model_used": "none", "cost_usd": 0.0,
             })
         write_run_json(project_dir, data)
@@ -180,6 +185,12 @@ def run_post_generate_judges(
     pairs = _discover_pairs(project_dir)
     video_dir = project_dir / "kling_test" / "videos"
 
+    score_prompt_kwargs = {"key": judge_key}
+    score_clip_kwargs = {"key": judge_key}
+    if model:
+        score_prompt_kwargs["model"] = model
+        score_clip_kwargs["model"] = model
+
     for pair_key, img_a, img_b in pairs:
         prompt_text = prompts.get(pair_key, "")
         # prompt_judge
@@ -187,7 +198,7 @@ def run_post_generate_judges(
             try:
                 pj = score_prompt(
                     image_a=img_a, image_b=img_b,
-                    prompt_text=prompt_text, key=gemini_key,
+                    prompt_text=prompt_text, **score_prompt_kwargs,
                 )
                 entry = pj.model_dump()
                 entry["pair"] = pair_key
@@ -200,14 +211,15 @@ def run_post_generate_judges(
                     "model_used": "error", "cost_usd": 0.0,
                 })
 
-        # clip_judge
+        # clip_judge (v2 source-aware)
         clip_path = video_dir / f"seg_{pair_key}.mp4"
         if not skip_clip and clip_path.is_file():
             try:
                 cj = score_clip(
                     video_path=clip_path,
-                    prompt_text=prompt_text or "(no prompt)",
-                    key=gemini_key,
+                    source_start_path=img_a,
+                    source_end_path=img_b,
+                    **score_clip_kwargs,
                 )
                 entry = cj.model_dump()
                 entry["pair"] = pair_key
@@ -216,10 +228,12 @@ def run_post_generate_judges(
                 data["judges"]["clip"].append({
                     "pair": pair_key, "judge": "clip_judge",
                     "scores": {
-                        "visual_quality": 3.0,
-                        "style_consistency": 3.0,
-                        "prompt_match": 3.0,
-                        "anatomy_ok": True,
+                        "main_character_drift": 3.0,
+                        "text_artifacts": 3.0,
+                        "limb_anatomy": 3.0,
+                        "unnatural_faces": 3.0,
+                        "glitches": 3.0,
+                        "content_hallucination": 3.0,
                     },
                     "reasoning": f"orchestrator error: {exc!r}",
                     "model_used": "error", "cost_usd": 0.0,

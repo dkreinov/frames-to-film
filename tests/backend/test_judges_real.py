@@ -31,8 +31,8 @@ VIDEO_DIR = KLING_DIR / "videos"
 
 
 @pytest.mark.skipif(
-    not os.getenv("gemini"),
-    reason="gemini env var not set; skipping real prompt_judge smoke.",
+    not os.getenv("QWEEN_KEY"),
+    reason="QWEEN_KEY env var not set; skipping real prompt_judge smoke.",
 )
 def test_prompt_judge_real_smoke():
     img_a = KLING_DIR / "1.jpg"
@@ -43,7 +43,7 @@ def test_prompt_judge_real_smoke():
     js = score_prompt(
         image_a=img_a, image_b=img_b,
         prompt_text="Slow cinematic dolly in. Maintain lighting.",
-        key=os.environ["gemini"],
+        key=os.environ["QWEEN_KEY"],
     )
     score = js.scores["prompt_image_alignment"]
     assert 1.0 <= score <= 5.0, f"score out of range: {score}"
@@ -53,23 +53,32 @@ def test_prompt_judge_real_smoke():
 
 
 @pytest.mark.skipif(
-    not os.getenv("gemini"),
-    reason="gemini env var not set; skipping real clip_judge smoke.",
+    not os.getenv("QWEEN_KEY"),
+    reason="QWEEN_KEY env var not set; skipping real clip_judge smoke.",
 )
 def test_clip_judge_real_smoke():
     video = VIDEO_DIR / "seg_1_to_2.mp4"
-    if not video.exists():
-        pytest.skip("wet-test seg_1_to_2.mp4 missing")
+    img_a = KLING_DIR / "1.jpg"
+    img_b = KLING_DIR / "2.jpg"
+    if not (video.exists() and img_a.exists() and img_b.exists()):
+        pytest.skip("wet-test fixtures missing")
 
     js = score_clip(
         video_path=video,
-        prompt_text="Slow cinematic dolly in",
-        key=os.environ["gemini"],
+        source_start_path=img_a,
+        source_end_path=img_b,
+        key=os.environ["QWEEN_KEY"],
     )
-    vq = js.scores["visual_quality"]
-    assert 1.0 <= vq <= 5.0, f"visual_quality out of range: {vq}"
-    assert isinstance(js.scores["anatomy_ok"], bool)
-    print(f"\n[real clip_judge] vq={vq} anatomy={js.scores['anatomy_ok']} "
+    mc_drift = js.scores["main_character_drift"]
+    assert 1.0 <= mc_drift <= 5.0, f"main_character_drift out of range: {mc_drift}"
+    # All 6 v2 dimensions populated
+    for k in ("main_character_drift", "text_artifacts", "limb_anatomy",
+              "unnatural_faces", "glitches", "content_hallucination"):
+        assert k in js.scores
+    print(f"\n[real clip_judge v2] mc_drift={mc_drift} "
+          f"text={js.scores['text_artifacts']} "
+          f"limbs={js.scores['limb_anatomy']} "
+          f"halluc={js.scores['content_hallucination']} "
           f"cost=${js.cost_usd:.6f}")
 
 
