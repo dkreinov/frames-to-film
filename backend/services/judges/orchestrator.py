@@ -49,7 +49,7 @@ from backend.services.project_schema import (
     METADATA_DIRNAME,
     PROMPTS_DIRNAME,
 )
-from backend.services.prompts import PROMPTS_FILENAME
+from backend.services.prompts import ORDER_FILENAME, PROMPTS_FILENAME
 
 RUN_JSON_NAME = "run.json"
 
@@ -127,10 +127,23 @@ def _sort_key(filename: str) -> tuple[int, str]:
 
 
 def _discover_pairs(project_dir: Path) -> list[tuple[str, Path, Path]]:
-    """Return [(pair_key, image_a_path, image_b_path)] in render order."""
+    """Return [(pair_key, image_a_path, image_b_path)] in render order.
+    Reads metadata/order.json if present so loop pairs (e.g. 25→1) are
+    included; falls back to numeric sort otherwise."""
     img_dir = project_dir / EXTENDED_DIRNAME
     if not img_dir.is_dir():
         return []
+    order_path = project_dir / METADATA_DIRNAME / ORDER_FILENAME
+    if order_path.is_file():
+        try:
+            order = json.loads(order_path.read_text()).get("order") or []
+            existing = {p.name: p for p in img_dir.glob("*.jpg")}
+            frames = [existing[name] for name in order if name in existing]
+            if frames:
+                return [(f"{a.stem}_to_{b.stem}", a, b)
+                        for a, b in zip(frames, frames[1:])]
+        except (json.JSONDecodeError, OSError):
+            pass
     frames = sorted(img_dir.glob("*.jpg"), key=lambda p: _sort_key(p.name))
     return [
         (f"{a.stem}_to_{b.stem}", a, b)

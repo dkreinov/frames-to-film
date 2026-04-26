@@ -32,7 +32,7 @@ from backend.services.project_schema import (  # noqa: E402
     PROMPTS_DIRNAME,
 )
 from backend.services.prompt_writer import write_prompt  # noqa: E402
-from backend.services.prompts import PROMPTS_FILENAME  # noqa: E402
+from backend.services.prompts import ORDER_FILENAME, PROMPTS_FILENAME  # noqa: E402
 
 STORY_FILENAME = "story.json"
 
@@ -56,13 +56,26 @@ def _load_story(project_dir: Path) -> dict:
 
 def _discover_extended_pairs(project_dir: Path) -> list[tuple[str, Path, Path]]:
     """List of (pair_key, image_a, image_b) tuples in render order.
-    Mirrors generate.py / orchestrator pair-discovery logic."""
+    Reads metadata/order.json if present so loop pairs are included;
+    falls back to numeric sort otherwise."""
     img_dir = project_dir / EXTENDED_DIRNAME
     if not img_dir.is_dir():
         raise FileNotFoundError(
             f"extended/ missing: {img_dir}\nRun the extend stage first."
         )
     valid_exts = {".jpg", ".jpeg", ".png"}
+    order_path = project_dir / METADATA_DIRNAME / ORDER_FILENAME
+    if order_path.is_file():
+        try:
+            order = json.loads(order_path.read_text()).get("order") or []
+            existing = {p.name: p for p in img_dir.iterdir()
+                        if p.is_file() and p.suffix.lower() in valid_exts}
+            frames = [existing[name] for name in order if name in existing]
+            if frames:
+                return [(f"{a.stem}_to_{b.stem}", a, b)
+                        for a, b in zip(frames, frames[1:])]
+        except (json.JSONDecodeError, OSError):
+            pass
     frames = sorted(
         {p for p in img_dir.iterdir()
          if p.is_file() and p.suffix.lower() in valid_exts},

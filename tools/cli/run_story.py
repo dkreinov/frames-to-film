@@ -30,6 +30,7 @@ from backend.services.project_schema import (  # noqa: E402
     INPUTS_DIRNAME,
     METADATA_DIRNAME,
 )
+from backend.services.prompts import ORDER_FILENAME  # noqa: E402
 from backend.services.story import StoryDoc, write_story  # noqa: E402
 
 STORY_FILENAME = "story.json"
@@ -47,12 +48,23 @@ def _sort_key(filename: str) -> tuple[int, str]:
 
 
 def _discover_input_photos(project_dir: Path) -> list[Path]:
-    """Sorted unique list of photos in inputs/. Windows glob is case-
-    insensitive so we dedupe before counting."""
+    """Ordered list of photos for story generation. Reads metadata/order.json
+    if present (including loop duplicates); falls back to numeric sort."""
     inputs_dir = project_dir / INPUTS_DIRNAME
     if not inputs_dir.is_dir():
         raise FileNotFoundError(f"inputs/ missing: {inputs_dir}")
     valid_exts = {".jpg", ".jpeg", ".png"}
+    order_path = project_dir / METADATA_DIRNAME / ORDER_FILENAME
+    if order_path.is_file():
+        try:
+            order = json.loads(order_path.read_text()).get("order") or []
+            existing = {p.name: p for p in inputs_dir.iterdir()
+                        if p.is_file() and p.suffix.lower() in valid_exts}
+            photos = [existing[name] for name in order if name in existing]
+            if len(photos) >= 2:
+                return photos
+        except (json.JSONDecodeError, OSError):
+            pass
     photos = sorted(
         {p for p in inputs_dir.iterdir()
          if p.is_file() and p.suffix.lower() in valid_exts},
