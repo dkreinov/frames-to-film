@@ -127,13 +127,26 @@ Blocked on: none.
 ### Stream B status (latest)
 
 ```
+[2026-04-26 evening] DONE: 7.7 stitch xfade polish — story-aware ffmpeg xfade per
+            cinematic device. stitch.py reads metadata/story.json when present,
+            dispatches to xfade filter_complex path; falls back to concat_videos
+            stream-copy when story.json absent. New pure helper
+            backend/services/stitch_xfade.py + 4 unit tests + 3 new integration
+            tests in test_stitch.py. Real ffmpeg smoke confirmed filter_complex valid.
+Last commit: 4e691b9 (feat: Step 5 - story-aware xfade in stitch)
+Test delta: 165 backend tests (was 156 baseline; +9 new tests).
+Next up: 7.4 frontend (UploadScreen brief + arc-type radio + story-source toggle)
+         OR 7.5b Wan 2.7 adapter.
+         7.7 eval gate (tools/eval_runner.py --label post-7.7) DEFERRED —
+         needs Stream A's eval_runner (in flight; Step 10 of Stream A plan).
+Blocked on: none.
+
+✅ STREAM B 7.7 DONE. stitch.py + test_stitch.py locks released.
+
 [2026-04-26] DONE: Sub-plan A + Sub-plan B — canonical projects/{slug}/ schema in place.
             Backend, services, routers, tests, frontend all use the new layout.
             141 backend tests green, 90 frontend tests green, tsc clean.
 Last commit: backend renamed to projects/ schema (Sub-plan B Step 12).
-Next up: resume Stream B queue — 7.7 stitch xfade polish OR 7.5b Wan 2.7 adapter
-         OR 7.4 frontend (Upload + StoryReview screens after Stream A's /story endpoint).
-Blocked on: none.
 
 🔓 SHARED-FILE LOCK RELEASED (Sub-plan B complete)
     Stream A: free to edit backend/services/*, backend/routers/*, tests/backend/*
