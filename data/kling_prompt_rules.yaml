@@ -1,0 +1,250 @@
+# Kling AI Prompt Engineering Rules
+# Loaded by backend/services/story.py and backend/services/prompt_writer.py
+# Sources: see source_attributions at bottom
+# Last updated: 2026-04-25
+
+framework: "SCALE"
+# SCALE = Shot type, Camera move, Action, Lighting/atmosphere, Emotion/tone
+# Camera-first: always open with camera move + shot type before describing content
+
+i2v_core_rule: |
+  In image-to-video (I2V) mode, Kling already has the source image.
+  DO NOT redescribe what the image looks like — Kling will ignore or
+  contradict your description. Instead, describe ONLY what should CHANGE
+  or MOVE: camera motion, subject motion, and end state.
+  Rule: "Describe the motion, not the image."
+  Good: "Slow dolly push-in. Subject turns head left. Eyes close gently."
+  Bad: "A woman with long brown hair stands in a warm kitchen. She is
+  wearing a red dress. Slow dolly push-in."
+  The bad example wastes 60% of the prompt budget redescribing visible content.
+
+camera_vocabulary:
+  movements:
+    - id: dolly_forward
+      phrase: "slow dolly push-in"
+      use_when: "intimacy, reveal, intensify emotion on a face or object"
+    - id: dolly_back
+      phrase: "slow dolly pull-back"
+      use_when: "reveal context, transition from close to wide, isolation"
+    - id: smooth_orbit
+      phrase: "smooth orbit around subject"
+      use_when: "360-degree reveal, highlight a static subject from multiple angles"
+    - id: steady_tracking_shot
+      phrase: "steady tracking shot"
+      use_when: "follow a moving subject laterally; keep subject centered in frame"
+    - id: crane_up
+      phrase: "crane up"
+      use_when: "upward reveal, end-of-scene elevation, transition to aerial"
+    - id: pull_back_reveal
+      phrase: "pull-back reveal"
+      use_when: "start tight, end wide to expose surprising context behind subject"
+    - id: dolly_zoom
+      phrase: "dolly zoom"
+      use_when: "vertigo effect, psychological tension, disorientation"
+    - id: rack_focus
+      phrase: "rack focus"
+      use_when: "shift audience attention from foreground to background (or reverse)"
+    - id: whip_pan
+      phrase: "whip pan"
+      use_when: "fast scene transition, high energy cut-feel within a single clip"
+    - id: aerial_view
+      phrase: "aerial view, slow drift"
+      use_when: "establish scale, landscape reveal, overhead context shot"
+    - id: POV
+      phrase: "POV shot"
+      use_when: "first-person perspective, immersive approach, subjective experience"
+    - id: profile_shot
+      phrase: "static profile shot"
+      use_when: "side-on reveal of subject, silhouette emphasis, clean composition"
+    - id: macro_close_up
+      phrase: "macro close-up, static"
+      use_when: "texture reveal, detail emphasis, objects smaller than a hand"
+
+  pacing:
+    slow:
+      - "slowly"
+      - "gently"
+      - "gradually"
+      - "unhurried"
+      - "languid"
+      - "softly"
+    fast:
+      - "quickly"
+      - "sharply"
+      - "snaps to"
+      - "rapid"
+      - "swift"
+      - "abrupt"
+
+motion_constraints:
+  primary_motion_count: 1
+  secondary_motion_count: 1
+  sequencing: >
+    Describe motions in strict temporal order (first → then → finally).
+    Never stack two simultaneous primary actions — Kling will pick one
+    and ignore the other. Secondary motions (e.g., environmental drift,
+    background elements) may overlap the primary only if they are
+    subordinate and non-conflicting.
+
+forbidden_phrases:
+  # Generic quality/aesthetic adjectives that Kling 3.0 explicitly ignores
+  # per fal.ai prompting docs — they add noise without directing motion.
+  - "cinematic"
+  - "beautiful"
+  - "high quality"
+  - "4K"
+  - "masterpiece"
+  - "stunning"
+  - "amazing"
+  - "epic"
+  - "breathtaking"
+  - "gorgeous"
+  - "professional"
+  - "ultra-realistic"
+  - "best quality"
+  - "photorealistic"
+  - "hyper-detailed"
+  - "perfect"
+  - "incredible"
+  - "spectacular"
+  - "vivid"
+  - "lifelike"
+
+forbidden_patterns:
+  - id: conceptual_only
+    description: >
+      Prompt describes mood, theme, or narrative concept without any concrete
+      camera motion or physical subject action. Kling cannot infer motion
+      from abstract intent.
+    example: >
+      "A moment of pure nostalgia. The warmth of memory embraces the scene.
+      Time stands still as love fills the air."
+
+  - id: redescribe_image
+    description: >
+      Prompt spends words restating visible image content (subject appearance,
+      static scene elements) instead of describing what should change.
+      In I2V mode, Kling has the source image; restating it wastes budget
+      and can cause hallucination.
+    example: >
+      "A young girl with blonde curly hair in a white dress stands in a sunny
+      backyard next to a wooden fence. She is smiling. Slow dolly push-in."
+
+  - id: simultaneous_motions
+    description: >
+      Two or more primary subject motions are stacked without temporal ordering.
+      Kling will typically honor only the first-mentioned motion and drop the rest,
+      or blend them incoherently.
+    example: >
+      "She turns her head to the left and raises her arms and walks toward the camera."
+
+  - id: contradicts_source
+    description: >
+      Prompt introduces content that cannot plausibly emerge from the source image:
+      wrong season, added objects not in frame, different lighting direction, wrong
+      time of day. Kling will either ignore the contradiction or produce an
+      incoherent result.
+    example: >
+      "Snow begins falling. [Source image is a sunny beach scene.]"
+
+prompt_template_universal: >
+  {camera_motion}. {primary_action}. {start_state} transitions to {end_state}.
+  {environmental_anchor}. {pacing_modifier}.
+
+# Placeholder reference:
+#   {camera_motion}        — camera move phrase from camera_vocabulary.movements
+#   {primary_action}       — single concrete subject action in temporal order
+#   {start_state}          — brief description of initial subject state (what changes from)
+#   {end_state}            — brief description of final subject state (what changes to)
+#   {environmental_anchor} — one stable environmental detail that grounds the scene
+#   {pacing_modifier}      — one pacing word from camera_vocabulary.pacing
+
+word_budget:
+  min: 15
+  max: 80
+  ideal_min: 40
+  ideal_max: 60
+  # Research from fal.ai, atlabs.ai, and invideo.io converges on 40-60 words
+  # as the sweet spot: enough to constrain motion clearly, short enough to
+  # avoid Kling picking up conflicting signals from verbose descriptions.
+
+multi_shot:
+  max_shots: 6
+  sweet_spot_shots:
+    - 4
+    - 6
+  sweet_spot_duration_s:
+    - 10
+    - 15
+  format: >
+    Number each shot on a new line with a prefix: "Shot 1: [prompt]. Shot 2: [prompt]."
+    Keep each per-shot prompt self-contained (camera move + action + anchor).
+    Do not carry narrative context across shot boundaries — Kling processes
+    each shot prompt independently. Total combined prompt should not exceed 300 words.
+
+examples_good:
+  - >
+    Slow dolly push-in. Child lifts gaze from the ground and meets the camera directly.
+    Neutral expression softens into a shy half-smile. Dappled backyard light holds steady.
+    Gently.
+  - >
+    Steady tracking shot. Subject walks left to right across frame. Arms swing naturally.
+    Stride transitions from hesitant shuffle to confident step. Concrete sidewalk, midday sun.
+    Gradually.
+  - >
+    Pull-back reveal. Camera starts tight on hands gripping a letter, slowly widens
+    to reveal an empty station platform behind. Hands remain still. Quiet fluorescent light.
+    Unhurried.
+  - >
+    Rack focus from foreground candle flame to subject face in background.
+    Subject's eyes open. Candlelight holds. No camera movement. Slowly.
+  - >
+    Crane up. Camera lifts from ground level to eye level as subject stands from seated
+    position. End state: subject fully upright, facing camera. Autumn park, warm afternoon light.
+    Smoothly.
+  - >
+    Static profile shot. Subject turns head 90 degrees from left-facing to forward-facing.
+    Eyes stay open throughout. Studio neutral background. Gently.
+  - >
+    Aerial view, slow drift. Scene shifts from directly overhead to a 45-degree angle.
+    No subject motion. Rooftop garden, late afternoon shadows lengthen. Languid.
+
+examples_bad:
+  - text: >
+      "Cinematic high quality 4K masterpiece. A beautiful woman stands elegantly
+      in a stunning garden. Her amazing presence fills the frame with breathtaking
+      emotion and epic nostalgia."
+    why: >
+      Entire prompt is forbidden phrases and conceptual language. Zero camera motion,
+      zero subject action, zero temporal ordering. Kling will produce an arbitrary
+      slow zoom or nothing useful.
+
+  - text: >
+      "She has long red hair and is wearing a green jacket and is standing near a river
+      bank with trees behind her. Gentle zoom in."
+    why: >
+      In I2V mode, the first 30 words redescribe visible image content. Only the last
+      four words instruct Kling. The description may also conflict with the actual
+      source image, causing hallucination.
+
+  - text: >
+      "She smiles and waves her hand and turns around and walks away and the camera
+      follows her through the park."
+    why: >
+      Five simultaneous/chained primary actions with no temporal ordering.
+      Kling will likely honor only the first one (smile) or produce incoherent blending.
+
+  - text: >
+      "Snow falls heavily as she shivers in the cold. [Source image: sunny outdoor
+      picnic, green grass, summer clothing.]"
+    why: >
+      Directly contradicts source image content. Kling cannot add snow to a sunny
+      scene; result will be either ignored or will destroy the source composition.
+
+source_attributions:
+  - https://blog.fal.ai/kling-3-0-prompting-guide/
+  - https://fal.ai/learn/devs/kling-2-6-pro-prompt-guide
+  - https://leonardo.ai/news/kling-ai-prompts/
+  - https://www.atlabs.ai/blog/kling-3-0-prompting-guide-master-ai-video-generation
+  - https://help.runwayml.com/hc/en-us/articles/48324313115155-Image-to-Video-Prompting-Guide
+  - https://invideo.io/blog/best-prompts-for-ai-image-to-video/
