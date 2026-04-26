@@ -162,6 +162,39 @@ def test_write_story_unknown_arc_type_raises(tmp_path):
         )
 
 
+# --- rubric motion-only enforcement ----------------------------------
+
+def test_rubric_forbids_content_nouns(monkeypatch, tmp_path):
+    """_build_rubric must explicitly prohibit object/prop/person/place nouns
+    in pair_intents — not just say 'only motion'. The LLM needs strong
+    negative constraints to avoid content hallucination in prompts."""
+    images = _make_image_paths(tmp_path, n=3)
+    seen: dict = {}
+
+    def fake_call(**kwargs):
+        seen["rubric"] = kwargs.get("rubric", "")
+        return _fake_llm_response_text(2), 100, 30
+
+    monkeypatch.setattr(story, "_call_vision", fake_call)
+    write_story(
+        image_paths=images,
+        brief={"subject": "x", "tone": "y", "notes": ""},
+        arc_type="life-montage",
+        key="k",
+    )
+    rubric = seen.get("rubric", "")
+    # Must explicitly prohibit content nouns — "only describe motion" is not enough
+    assert any(phrase in rubric.lower() for phrase in [
+        "never include", "do not include", "no objects", "no nouns",
+        "never mention", "prohibited", "forbidden words",
+    ]), f"rubric must explicitly prohibit content nouns; got:\n{rubric[-600:]}"
+    # Must specify what a good intent looks like — format guidance
+    assert any(phrase in rubric.lower() for phrase in [
+        "camera verb", "camera movement", "bad:", "good:", "example:",
+        "format:", "must contain", "only camera",
+    ]), f"rubric must include format guidance or contrast example; got:\n{rubric[-600:]}"
+
+
 # --- vendor dispatch -------------------------------------------------
 
 def test_story_vendor_dispatch():
