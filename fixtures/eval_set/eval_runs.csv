@@ -1,0 +1,3 @@
+run_label,fixture_id,timestamp,arc_type,n_pairs,mode,prompt_align_mean,prompt_align_min,clip_main_drift_mean,clip_text_artifacts_mean,clip_limb_anatomy_mean,clip_unnatural_faces_mean,clip_glitches_mean,clip_content_halluc_mean,movie_story_coh,movie_continuity,movie_visual,movie_arc,weakest_seam,cost_usd,wall_time_s,model_versions
+post-7.4-baseline-mock,01_cats,2026-04-26T10:01:57+00:00,3-act-heroic,5,mock,,,,,,,,,3.0,3.0,3.0,3.0,,0.0,3.05,prompt=qwen3-vl-plus;clip=qwen3-vl-plus;movie=deepseek-chat
+post-7.4-baseline-mock,02_olga_slice,2026-04-26T10:02:02+00:00,life-montage,5,mock,,,,,,,,,3.0,3.0,3.0,3.0,,0.0,4.38,prompt=qwen3-vl-plus;clip=qwen3-vl-plus;movie=deepseek-chat

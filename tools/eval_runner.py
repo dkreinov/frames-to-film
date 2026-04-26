@@ -67,15 +67,26 @@ def _ts() -> str:
 
 def _seed_extended_from_inputs(fixture: Path) -> None:
     """For mock mode: skip the extend stage by copying inputs/ into
-    extended/. Real eval would run the actual extend service."""
+    extended/. Real eval would run the actual extend service.
+
+    PNG inputs are converted to JPEG since generate.py globs *.jpg.
+    """
     inputs = fixture / "inputs"
     extended = fixture / EXTENDED_DIRNAME
     extended.mkdir(parents=True, exist_ok=True)
     for f in inputs.iterdir():
-        if f.is_file() and f.suffix.lower() in {".jpg", ".jpeg", ".png"}:
-            dst = extended / f.name
-            if not dst.exists():
-                dst.write_bytes(f.read_bytes())
+        if not f.is_file() or f.suffix.lower() not in {".jpg", ".jpeg", ".png"}:
+            continue
+        # Normalize to .jpg (generate.py globs *.jpg)
+        dst = extended / (f.stem + ".jpg")
+        if dst.exists():
+            continue
+        if f.suffix.lower() == ".png":
+            from PIL import Image as _PIL
+            with _PIL.open(f) as im:
+                im.convert("RGB").save(dst, "JPEG", quality=90)
+        else:
+            dst.write_bytes(f.read_bytes())
 
 
 def _run_cli(cmd: list[str], cwd: Path | None = None) -> int:
