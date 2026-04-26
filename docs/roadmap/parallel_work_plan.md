@@ -113,10 +113,23 @@ Blocked on: none / waiting for B's API contract / etc.
 ### Stream B status (latest)
 
 ```
-[2026-04-26 evening] In progress: ___
-Last commit: ___
-Next up: ___
-Blocked on: none / waiting for A's story.json contract / etc.
+[2026-04-26] In progress: Sub-plan A — filesystem cleanup + canonical projects/{slug}/ schema
+            (plans/plan-A-20260426-1500.md, autonomous, Opus). No backend code changes.
+Last commit: 0084b3f (judges shipped)
+Next up: Sub-plan B (plans/plan-B-20260426-1500.md) — backend rename to projects/ schema
+         (~190 path refs across ~60 files). Heavy shared-file refactor.
+Blocked on: none for Sub-plan A.
+
+⚠️  COORDINATION WARNING for Sub-plan B (next session, NOT this one):
+    Sub-plan B will rename pipeline_runs/sources/outpainted/kling_test paths to
+    projects/inputs/extended/clips/raw across:
+      backend/services/{generate,prompts,prepare,extend,stitch,judges/orchestrator}.py
+      backend/routers/{videos,uploads,outputs,artifacts}.py
+      backend/deps.py + backend/db.py
+      tests/backend/* (most files)
+      frontend/src/api/* + frontend/src/routes/*
+    Stream A: please pause edits to those files when Sub-plan B starts. Sub-plan B
+    will lock + release the file ownership in this doc at start/end.
 ```
 
 (Each session updates only its own status row when it commits.)
