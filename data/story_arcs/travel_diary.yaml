@@ -1,0 +1,60 @@
+id: travel_diary
+name: "Travel diary"
+continuity_rule: |
+  Different places with same travelers; place-to-place transitions are the spine;
+  supporting cast can vary.
+  The travelers (core group of people) must be recognizable across all locations.
+  The environment is expected to change dramatically between photo pairs — that
+  contrast is the intended effect, not a continuity error.
+  Local extras, guides, or crowds appearing in one location and absent in another
+  are normal — do not flag them as cast mismatches.
+pacing: episodic
+music_tone: curious_regional
+camera_language: |
+  Use expansive, place-establishing moves to open each new location, then
+  ground the travelers inside it.
+
+  Preferred movements from kling_prompt_rules camera_vocabulary:
+    - aerial_view ("aerial view, slow drift") to establish scale and geography
+      at the start of each new location episode
+    - crane_up ("crane up") for upward reveals that transition from intimate
+      to landscape — ideal for the first shot of a new place
+    - pull_back_reveal ("pull-back reveal") between locations: start tight on
+      a travel detail (passport, map, door handle) then widen to the new scene
+    - POV ("POV shot") for immersion — put the audience in the traveler's shoes
+      as they arrive or explore
+
+  AVOID dolly_zoom — vertigo effect is disorienting in an episodic travelogue
+  and clashes with the curious, open tone.
+  AVOID profile_shot as an establishing move — it flattens the sense of place.
+
+  Pacing modifiers: "languid", "gradually", "gently", "slowly", "unhurried".
+  Each episode should feel self-contained but connected by the travelers' presence.
+transitions_preferred:
+  - portal_door
+  - iris_in
+  - photo_frame
+  - graphic_match
+  - fade_to_black
+story_writer_extra_instructions: |
+  Each photo pair is a place-to-place transition. Structure prompts to emphasize
+  GEOGRAPHIC and CULTURAL shift:
+    - The travelers stay; the environment changes entirely between pairs.
+    - Use environmental anchors that are location-specific (a particular
+      landmark's light quality, a local texture like cobblestone vs. sand).
+    - Opening each new location with aerial_view or crane_up establishes
+      "we are somewhere new" before showing the travelers within it.
+
+  Narrative rhythm for each episode (location):
+    1. Arrival shot: crane_up or aerial_view to reveal the place at scale.
+    2. Immersion shot: POV to put us inside the experience.
+    3. Departure hint (if transitioning): pull_back_reveal from a close travel
+       detail outward, leaving space for the next location to fill.
+
+  Do NOT invent specific place names unless they are visible in the source image.
+  Instead use environmental descriptors: "cobbled square, afternoon shade",
+  "wide desert highway, flat horizon", "dense rainforest canopy, diffuse light."
+
+  The emotional through-line is curiosity and discovery — prompts should describe
+  subjects moving forward, looking outward, and engaging with the environment,
+  not standing passively for the camera.

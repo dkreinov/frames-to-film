@@ -1,0 +1,68 @@
+id: day_in_life
+name: "Day in life"
+continuity_rule: |
+  Hours of single day, morning → noon → evening; ambient mood changes with
+  light; main subject consistent; routine moments not dramatic.
+  Do not flag changes in clothing across the day as continuity errors — wardrobe
+  changes between morning and evening are expected and realistic. Environmental
+  light quality (warm morning, harsh midday, golden dusk) is the primary signal
+  of time passing and should be preserved faithfully between prompts in the same
+  time-of-day segment.
+pacing: steady
+music_tone: ambient_mood_following
+camera_language: |
+  Camera movement should feel observational and unhurried — the viewer is a
+  quiet companion moving through the day alongside the subject.
+  Preferred movements from kling_prompt_rules camera_vocabulary:
+    - steady_tracking_shot ("steady tracking shot") as the default — follow the
+      subject laterally through routine actions: commute, cooking, walking
+    - rack_focus ("rack focus") for environmental texture — shift from a foreground
+      detail (coffee mug, keyboard, window rain) to the subject's face, or reverse
+    - macro_close_up ("macro close-up, static") for routine details — alarm clock
+      face, handwritten note, food being prepared, laces being tied
+    - POV ("POV shot") for immersive moments — looking out a window at morning
+      light, hands on a steering wheel, scanning a crowded room at lunch
+
+  AVOID dolly_zoom ("dolly zoom") — the vertigo/tension effect is too dramatic
+  and psychologically jarring for the steady, observational tone of a day-in-life.
+  AVOID smooth_orbit ("smooth orbit around subject") — it implies a subject of
+  ceremonial importance; routine moments do not warrant that weight.
+  AVOID whip_pan ("whip pan") — frenetic energy contradicts the steady pacing.
+
+  Pacing modifiers: "gradually", "slowly", "gently", "unhurried".
+  Never use fast pacing words ("quickly", "sharply", "rapid") except in a single
+  midday-energy shot if the day explicitly has a high-energy work or commute peak.
+transitions_preferred:
+  - match_cut_action
+  - cross_dissolve
+  - time_card
+  - graphic_match
+  - iris_in
+story_writer_extra_instructions: |
+  Divide the day into three broad segments: morning (waking → departure),
+  midday (work / errand / social), evening (return → wind-down → rest).
+  Each photo pair represents one hour or one part-of-day transition — do not
+  try to compress the whole day into a single dramatic arc.
+
+  Lighting shift is the primary rhythm, not the subject's mood:
+    - Morning: warm, low-angle, soft — golden hour before 9am
+    - Midday: neutral, overhead, flatter — no strong shadows
+    - Late afternoon / dusk: golden again but longer shadows, cooler edges
+    - Evening: artificial light sources — lamps, screens, candles
+
+  Subject mood should follow the day organically — do not manufacture emotional
+  drama. Tiredness in the evening is a valid end-state. Contentment is valid.
+  Mundane is intentional: do not reach for "transformation" language.
+
+  For each pair write a single prompt following the SCALE framework:
+    - Open with the observational camera move appropriate to the time of day
+      (steady_tracking_shot for active moments, rack_focus or macro_close_up
+      for still moments)
+    - Describe ONE primary subject action in temporal order
+    - Ground with a stable environmental anchor that signals time of day
+      (morning light through blinds, overhead office fluorescent, evening lamp)
+    - Close with an unhurried pacing modifier
+
+  Use time_card or graphic_match transitions at the segment boundaries
+  (morning → midday, midday → evening) to signal the time jump clearly.
+  Within a segment, cross_dissolve and match_cut_action preserve flow.

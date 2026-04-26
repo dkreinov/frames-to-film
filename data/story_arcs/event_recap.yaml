@@ -1,0 +1,64 @@
+id: event_recap
+name: "Event recap"
+continuity_rule: |
+  Single event timeline; main subject(s) consistent throughout; build to peak
+  (ceremony / cake / climax) then afterglow; supporting cast varies by moment.
+  Do not flag changes in crowd composition or venue framing between shots as
+  continuity errors — different vantage points and moments are expected within
+  a single event. Preserve the emotional throughline from anticipation through
+  climax to resolution.
+pacing: medium_arc
+music_tone: emotional_crescendo
+camera_language: |
+  Camera movement should reflect the emotional arc: restrained during build,
+  expansive at peak, tender during afterglow.
+  Preferred movements from kling_prompt_rules camera_vocabulary:
+    - profile_shot ("static profile shot") for intimate, side-on moments during
+      build — e.g., waiting at the altar, quiet pre-party moments
+    - smooth_orbit ("smooth orbit around subject") for the peak moment — circle
+      the decisive action (first kiss, cake-cutting, toast) to give it weight
+    - pull_back_reveal ("pull-back reveal") for crowd shots — start on one face,
+      pull back to expose the full scene behind
+    - macro_close_up ("macro close-up, static") for emotional close-ups — tears,
+      rings, hands clasped, candle flames
+
+  AVOID whip_pan ("whip pan") during quiet build or afterglow moments — it
+  breaks the emotional register even if the event itself is energetic.
+  AVOID dolly_zoom ("dolly zoom") — the vertigo/tension effect clashes with
+  the celebratory tone of most event recaps.
+
+  Pacing modifiers during build: "gently", "slowly", "gradually".
+  Pacing modifiers at peak: "smoothly", "swiftly" (single shot only).
+  Pacing modifiers during afterglow: "languid", "softly", "unhurried".
+transitions_preferred:
+  - match_cut_action
+  - smash_cut
+  - cross_dissolve
+  - photo_frame
+  - fade_to_black
+story_writer_extra_instructions: |
+  Identify the single peak moment of the event — the ceremony exchange, the
+  first dance, the cake-cutting, the group toast, the goal scored — and treat
+  it as the structural anchor of the entire arc.
+
+  Arc structure:
+    - Pairs 1–2: Build anticipation. Quiet preparation, arrivals, charged
+      waiting. Use profile_shot and dolly_forward to keep scale intimate.
+    - Pair 3 (peak): The decisive single moment. Use smooth_orbit to give it
+      360-degree weight. Apply smash_cut transition into this pair for impact.
+      This is ONE pair only — do not dilute the peak by spreading across two.
+    - Pairs 4–end: Afterglow. Laughter, embraces, quiet winding-down. Return
+      to macro_close_up and cross_dissolve for tenderness. Pace slows here.
+
+  Emphasize emotional arc, not chronology. It is acceptable to reorder
+  supporting moments if doing so strengthens the build → peak → afterglow
+  structure. Flag this reordering in your reasoning, not in the prompt text.
+
+  For each pair write a single prompt following the SCALE framework:
+    - Open with the camera move appropriate to the arc position
+    - Describe ONE primary subject action in temporal order
+    - Ground with a stable environmental anchor (venue, light quality, object)
+    - Close with the appropriate pacing modifier for the arc position
+
+  Supporting cast should feel present without being foregrounded during the
+  peak — the main subject(s) own that pair.

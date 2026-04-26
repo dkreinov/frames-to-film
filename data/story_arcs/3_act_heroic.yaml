@@ -1,0 +1,58 @@
+id: 3_act_heroic
+name: "3-act heroic"
+continuity_rule: |
+  Same character + same world across all clips; tension builds setup → conflict →
+  resolution; supporting cast can shift between scenes.
+  The protagonist must be recognizable across all three acts. World-building details
+  (location palette, costume core, props) should be consistent unless a deliberate
+  change signals a narrative shift (e.g., torn clothing in the conflict act).
+  Do not flag cast additions or removals as errors — adversaries and allies enter
+  and exit by design.
+pacing: medium_arc
+music_tone: driving_swelling
+camera_language: |
+  Follow the classic wide → push-in → reveal pattern across the three acts:
+    Act 1 (Setup): wide establishing shots, then dolly_forward to introduce
+      the protagonist ("slow dolly push-in" to read their expression).
+    Act 2 (Conflict): escalating movement — steady_tracking_shot to follow
+      action, dolly_zoom ("dolly zoom") at the climax moment for psychological
+      tension and vertigo.
+    Act 3 (Resolution): whip_pan ("whip pan") to punctuate the turning point,
+      then a pull_back_reveal or crane_up to signal triumph or release.
+
+  Permitted at climax: whip_pan and dolly_zoom — both are high-energy moves
+  appropriate for the conflict beat.
+  Use steady_tracking_shot for action sequences in Act 2.
+  AVOID rack_focus and smooth_orbit in conflict beats — they are too meditative
+  for the driving tension this arc requires.
+
+  Pacing modifiers for setup: "gradually", "slowly".
+  Pacing modifiers for conflict: "sharply", "swift", "rapid".
+  Pacing modifiers for resolution: "smoothly", "gently".
+transitions_preferred:
+  - match_cut_action
+  - smash_cut
+  - dolly_zoom
+  - whip_pan
+  - portal_door
+story_writer_extra_instructions: |
+  Identify exactly 3 narrative beats from the source photos:
+    Beat 1 — Setup: establish protagonist, world, and the inciting condition.
+    Beat 2 — Conflict: the central challenge, confrontation, or ordeal peaks.
+    Beat 3 — Resolution: aftermath, triumph, or earned rest.
+
+  Distribute photo pairs across beats:
+    - First 1-2 pairs: Act 1 establish — wide camera language, calm subject motion
+    - Middle 1-2 pairs: Act 2 escalate — action tracking, tension close-ups,
+      dolly_zoom at the emotional peak
+    - Last 1-2 pairs: Act 3 resolve — pull back, breath returns, posture relaxes
+
+  Promote tension through camera language: push the camera toward the subject
+  as threat increases; pull back or elevate as resolution arrives.
+
+  For animal subjects (e.g., cats being bathed): treat reluctance as conflict,
+  drying/calm as resolution. The "heroic" frame applies to any subject facing
+  a clear ordeal — not just human protagonists.
+
+  Each prompt must specify one primary subject action in strict temporal order.
+  Never stack simultaneous actions — Kling will honor only the first.

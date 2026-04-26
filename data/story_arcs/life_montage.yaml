@@ -1,0 +1,52 @@
+id: life_montage
+name: "Life montage"
+continuity_rule: |
+  Same person aging across years; preserve identity (eyes, smile, body type)
+  across age changes; supporting cast can change between source photos by design.
+  The audience should always recognize the central subject as the same individual
+  despite the passage of time. Do not flag changes in hair, clothing, or companions
+  as continuity errors — these are intentional marks of time passing.
+pacing: slow_contemplative
+music_tone: nostalgic_swell
+camera_language: |
+  Use gentle, unhurried camera movements that honor the emotional weight of time.
+  Preferred movements from kling_prompt_rules camera_vocabulary:
+    - dolly_forward ("slow dolly push-in") for intimacy and emotional close-ups
+    - dolly_back ("slow dolly pull-back") to reveal context or suggest growth
+    - smooth_orbit ("smooth orbit around subject") for reflective moments
+    - rack_focus ("rack focus") to shift from childhood detail to adult face
+
+  AVOID whip_pan ("whip pan") — it is too frenetic and breaks the meditative tone.
+  AVOID aerial_view ("aerial view, slow drift") — overhead distance contradicts
+  the personal, intimate scale of a life story.
+  AVOID dolly_zoom — the vertigo effect is psychologically jarring and clashes
+  with slow_contemplative pacing.
+
+  Pacing modifiers: "slowly", "gently", "languid", "softly", "unhurried".
+  Never use fast pacing words: "quickly", "sharply", "snaps to", "rapid".
+transitions_preferred:
+  - age_match_cut
+  - cross_dissolve
+  - photo_frame
+  - iris_pinhole
+  - time_card
+story_writer_extra_instructions: |
+  Identify life-stage moments from the source photos and map them to a timeline:
+    infant → toddler → school-age → teen → young adult → adult → 50+
+  Each adjacent photo pair represents a leap in time — treat it as a chapter
+  boundary, not a continuous scene.
+
+  Mention age implicitly through visual cues only (height relative to furniture,
+  graduation gown, gray at the temples) — NEVER state ages explicitly in prompts.
+
+  Emphasize EMOTIONAL continuity, not visual continuity. The goal is the feeling
+  of recognition across years, not matching outfits or backgrounds.
+
+  For each pair write a single prompt following the SCALE framework:
+    - Open with a gentle camera move (dolly_forward or rack_focus preferred)
+    - Describe what physically changes in the subject (posture, expression, gaze)
+    - Ground the scene with one stable environmental anchor
+    - Close with a slow pacing modifier
+
+  Supporting cast changes are story beats, not errors — acknowledge them as
+  "new companions enter the frame" or "the room empties around her."
