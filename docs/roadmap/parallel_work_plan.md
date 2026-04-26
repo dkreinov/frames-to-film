@@ -113,23 +113,22 @@ Blocked on: none / waiting for B's API contract / etc.
 ### Stream B status (latest)
 
 ```
-[2026-04-26] In progress: Sub-plan A — filesystem cleanup + canonical projects/{slug}/ schema
-            (plans/plan-A-20260426-1500.md, autonomous, Opus). No backend code changes.
-Last commit: 0084b3f (judges shipped)
-Next up: Sub-plan B (plans/plan-B-20260426-1500.md) — backend rename to projects/ schema
-         (~190 path refs across ~60 files). Heavy shared-file refactor.
-Blocked on: none for Sub-plan A.
+[2026-04-26] In progress: Sub-plan B — backend rename to canonical projects/ schema
+            (plans/plan-B-20260426-1500.md, autonomous). Plan A complete.
+Last commit: bfde24f (Sub-plan A done — schema doc + _template + Olga migrated + archive)
+Next up: nothing queued after Sub-plan B; resume Stream B 7.7/7.5b/7.4-frontend after.
+Blocked on: none.
 
-⚠️  COORDINATION WARNING for Sub-plan B (next session, NOT this one):
-    Sub-plan B will rename pipeline_runs/sources/outpainted/kling_test paths to
-    projects/inputs/extended/clips/raw across:
-      backend/services/{generate,prompts,prepare,extend,stitch,judges/orchestrator}.py
+🔒 SHARED-FILE LOCK ACTIVE (Sub-plan B in progress)
+    Stream A: please PAUSE edits to these files until Sub-plan B completes:
+      backend/deps.py
+      backend/db.py
+      backend/services/{generate,prompts,prepare,extend,stitch}.py
+      backend/services/judges/orchestrator.py
       backend/routers/{videos,uploads,outputs,artifacts}.py
-      backend/deps.py + backend/db.py
-      tests/backend/* (most files)
-      frontend/src/api/* + frontend/src/routes/*
-    Stream A: please pause edits to those files when Sub-plan B starts. Sub-plan B
-    will lock + release the file ownership in this doc at start/end.
+      tests/backend/* (most files; rename touches fixture paths)
+      frontend/src/api/* + frontend/src/routes/* (path-string updates)
+    Lock released by Sub-plan B's Step 12 commit ("backend renamed to projects/ schema").
 ```
 
 (Each session updates only its own status row when it commits.)
