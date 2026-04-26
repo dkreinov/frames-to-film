@@ -1,0 +1,150 @@
+{
+  "qwen": {
+    "24": {
+      "clip": "24",
+      "main_character_drift": 3,
+      "text_artifacts": 1,
+      "limb_anatomy": 1,
+      "unnatural_faces": 2,
+      "glitches": 3,
+      "specific_issues": "main_character_drift: subtle facial changes in the woman between frames; text_artifacts: bottle labels slightly less legible in middle frame; limb_anatomy: arm positioning appears unnatural in middle frame; unnatural_faces: face in middle frame looks slightly distorted/scary; glitches: moderate blur and ghosting effects present in all clip frames.",
+      "_latency_s": 4.88,
+      "_tokens_in": 5737,
+      "_tokens_out": 126
+    },
+    "30": {
+      "clip": "30",
+      "main_character_drift": 2,
+      "text_artifacts": 1,
+      "limb_anatomy": 1,
+      "unnatural_faces": 1,
+      "glitches": 3,
+      "specific_issues": "main_character_drift: face appears slightly different at 2.5s; text_artifacts: calendar text less legible in clip; limb_anatomy: arm appears distorted in 4.5s frame; unnatural_faces: face looks slightly unnatural in 4.5s frame; glitches: heavy blur and ghosting present in all clip frames",
+      "_latency_s": 4.77,
+      "_tokens_in": 5737,
+      "_tokens_out": 129
+    },
+    "34": {
+      "clip": "34",
+      "main_character_drift": 2,
+      "text_artifacts": 1,
+      "limb_anatomy": 1,
+      "unnatural_faces": 1,
+      "glitches": 2,
+      "specific_issues": "main character's face appears slightly distorted in Image 5; text on the poster is blurry in Image 5; arm positioning looks unnatural in Image 4; some motion blur present in Image 5",
+      "_latency_s": 4.67,
+      "_tokens_in": 5737,
+      "_tokens_out": 99
+    },
+    "36": {
+      "clip": "36",
+      "main_character_drift": 1,
+      "text_artifacts": 1,
+      "limb_anatomy": 1,
+      "unnatural_faces": 2,
+      "glitches": 3,
+      "specific_issues": "Image 5 shows heavy blur and ghosting artifacts; Image 4 has unnatural facial expressions on the main character; Image 3 has distorted limb anatomy on the main character.",
+      "_latency_s": 4.92,
+      "_tokens_in": 5737,
+      "_tokens_out": 94
+    },
+    "5": {
+      "clip": "5",
+      "main_character_drift": 1,
+      "text_artifacts": 1,
+      "limb_anatomy": 1,
+      "unnatural_faces": 1,
+      "glitches": 2,
+      "specific_issues": "none",
+      "_latency_s": 4.17,
+      "_tokens_in": 5736,
+      "_tokens_out": 59
+    },
+    "15": {
+      "clip": "15",
+      "main_character_drift": 3,
+      "text_artifacts": 1,
+      "limb_anatomy": 1,
+      "unnatural_faces": 2,
+      "glitches": 2,
+      "specific_issues": "main_character_drift: subtle changes in facial expression and hair movement; text_artifacts: faint vertical text artifacts visible in Image 5; limb_anatomy: slight distortion in the shoulder area in Image 4; unnatural_faces: slightly distorted facial features in Image 4; glitches: minor blur and ghosting effects present in all clip frames.",
+      "_latency_s": 4.93,
+      "_tokens_in": 5737,
+      "_tokens_out": 128
+    }
+  },
+  "moonshot": {
+    "24": {
+      "clip": "24",
+      "main_character_drift": 4,
+      "text_artifacts": 5,
+      "limb_anatomy": 5,
+      "unnatural_faces": 5,
+      "glitches": 4,
+      "specific_issues": "none",
+      "_latency_s": 15.77,
+      "_tokens_in": 5799,
+      "_tokens_out": 65
+    },
+    "30": {
+      "clip": "30",
+      "main_character_drift": 2,
+      "text_artifacts": 5,
+      "limb_anatomy": 5,
+      "unnatural_faces": 5,
+      "glitches": 2,
+      "specific_issues": "main character's face drifts unnaturally between frames; some blurriness in the clip",
+      "_latency_s": 16.2,
+      "_tokens_in": 5799,
+      "_tokens_out": 82
+    },
+    "34": {
+      "clip": "34",
+      "main_character_drift": 1,
+      "text_artifacts": 2,
+      "limb_anatomy": 5,
+      "unnatural_faces": 5,
+      "glitches": 2,
+      "specific_issues": "Text on the poster is garbled in frames 3-5; face is slightly distorted in frame 5.",
+      "_latency_s": 15.88,
+      "_tokens_in": 5800,
+      "_tokens_out": 88
+    },
+    "36": {
+      "clip": "36",
+      "main_character_drift": 1,
+      "text_artifacts": 5,
+      "limb_anatomy": 5,
+      "unnatural_faces": 5,
+      "glitches": 5,
+      "specific_issues": "none",
+      "_latency_s": 15.45,
+      "_tokens_in": 5800,
+      "_tokens_out": 66
+    },
+    "5": {
+      "clip": "5",
+      "main_character_drift": "5",
+      "text_artifacts": "5",
+      "limb_anatomy": "5",
+      "unnatural_faces": "5",
+      "glitches": "5",
+      "specific_issues": "none",
+      "_latency_s": 12.87,
+      "_tokens_in": 5799,
+      "_tokens_out": 70
+    },
+    "15": {
+      "clip": "15",
+      "main_character_drift": 5,
+      "text_artifacts": 5,
+      "limb_anatomy": 5,
+      "unnatural_faces": 5,
+      "glitches": 5,
+      "specific_issues": "none",
+      "_latency_s": 12.53,
+      "_tokens_in": 5799,
+      "_tokens_out": 65
+    }
+  }
+}
