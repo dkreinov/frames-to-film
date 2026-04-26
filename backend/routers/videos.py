@@ -1,10 +1,10 @@
 """GET /projects/{id}/videos — list generated mp4 clips in pair order.
 
-Videos land at <project>/kling_test/videos/seg_<a>_to_<b>.mp4 after
-the Generate stage runs. This endpoint returns them in the sequence
-implied by the frozen `_ordered_frames` helper (which honours
-order.json when present, numeric sort otherwise) so the UI can line
-up each pair thumbnail with its produced clip deterministically.
+Videos land at <project>/clips/raw/seg_<a>_to_<b>.mp4 after the Generate
+stage runs. This endpoint returns them in the sequence implied by the
+frozen `_ordered_frames` helper (which honours order.json when present,
+numeric sort otherwise) so the UI can line up each pair thumbnail with
+its produced clip deterministically.
 """
 from __future__ import annotations
 
@@ -15,6 +15,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from backend.db import connect, init_db
 from backend.deps import get_db_path, get_storage_root, get_user_id
 from backend.services.generate import _ordered_frames
+from backend.services.project_schema import (
+    CLIPS_DIRNAME,
+    CLIPS_RAW_DIRNAME,
+    EXTENDED_DIRNAME,
+)
 
 router = APIRouter(prefix="/projects/{project_id}/videos", tags=["videos"])
 
@@ -39,8 +44,8 @@ def list_videos(
         raise HTTPException(status_code=404, detail="project not found")
 
     project_dir = storage_root / user_id / project_id
-    img_dir = project_dir / "kling_test"
-    video_dir = img_dir / "videos"
+    img_dir = project_dir / EXTENDED_DIRNAME
+    video_dir = project_dir / CLIPS_DIRNAME / CLIPS_RAW_DIRNAME
 
     if not video_dir.is_dir() or not img_dir.is_dir():
         return {"videos": []}

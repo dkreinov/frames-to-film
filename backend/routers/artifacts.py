@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse
 
 from backend.db import connect, init_db
 from backend.deps import get_db_path, get_storage_root, get_user_id
+from backend.services.project_schema import FINAL_DIRNAME
 
 router = APIRouter(prefix="/projects/{project_id}", tags=["artifacts"])
 
@@ -72,7 +73,7 @@ def download_full_movie(
     if not _project_exists(db_path, project_id, user_id):
         raise HTTPException(status_code=404, detail="project not found")
     project_dir = storage_root / user_id / project_id
-    target = project_dir / "kling_test" / "videos" / "full_movie.mp4"
+    target = project_dir / FINAL_DIRNAME / "full_movie.mp4"
     if not target.is_file():
         raise HTTPException(status_code=404, detail="full_movie.mp4 not found (run stitch?)")
     return FileResponse(target, media_type="video/mp4", filename="full_movie.mp4")

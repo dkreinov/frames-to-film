@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from backend.db import connect, init_db
 from backend.deps import get_db_path, get_storage_root, get_user_id
+from backend.services.project_schema import INPUTS_DIRNAME
 
 router = APIRouter(prefix="/projects/{project_id}/uploads", tags=["uploads"])
 
@@ -32,8 +33,8 @@ def _project_exists(db_path: Path, project_id: str, user_id: str) -> bool:
     return row is not None
 
 
-def _sources_dir(storage_root: Path, user_id: str, project_id: str) -> Path:
-    return storage_root / user_id / project_id / "sources"
+def _inputs_dir(storage_root: Path, user_id: str, project_id: str) -> Path:
+    return storage_root / user_id / project_id / INPUTS_DIRNAME
 
 
 def _now_iso() -> str:
@@ -56,7 +57,7 @@ async def upload_file(
     if not file.filename:
         raise HTTPException(status_code=400, detail="missing filename")
 
-    dest_dir = _sources_dir(storage_root, user_id, project_id)
+    dest_dir = _inputs_dir(storage_root, user_id, project_id)
     dest_dir.mkdir(parents=True, exist_ok=True)
     dest = dest_dir / file.filename
     data = await file.read()
@@ -110,6 +111,6 @@ def delete_upload(
         deleted = cur.rowcount
     if deleted == 0:
         raise HTTPException(status_code=404, detail="upload not found")
-    disk_path = _sources_dir(storage_root, user_id, project_id) / filename
+    disk_path = _inputs_dir(storage_root, user_id, project_id) / filename
     if disk_path.exists():
         disk_path.unlink()

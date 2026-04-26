@@ -2,7 +2,12 @@
 
 Companion to artifacts.py's per-file stream endpoint. The Prepare
 screen (Phase 4 sub-plan 2) calls this after the prepare job hits
-`done`, then requests each listed name from /artifacts/outpainted/<name>.
+`done`, then requests each listed name from /artifacts/extended/<name>.
+
+`stage` is a dynamic path component supplied by the frontend; the
+router does not hardcode subfolder names, but valid stages match the
+canonical schema (see backend.services.project_schema):
+inputs, extended, prompts, clips/raw, clips/selected, audio, final, exports.
 """
 from __future__ import annotations
 
