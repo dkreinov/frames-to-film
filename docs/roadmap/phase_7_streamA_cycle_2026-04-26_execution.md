@@ -129,3 +129,39 @@ If Stream B is also free, the highest-leverage next move is **first real-API eva
 - `plans/plan-20260426-1230.md` — deleted (Cycle 2 success, this commit)
 
 Both confirmed deleted before this exec log was committed.
+
+---
+
+## Addendum — Cycle 3: eval_runner api-mode (2026-04-26 ~14:20)
+
+Plan file: `plans/plan-20260426-1420.md` (deleted on success)
+Mode: autonomous, Sonnet 4.6, Medium thinking
+
+### What shipped
+
+| Step | Commit | Summary |
+|---|---|---|
+| 2 | `0026e73` | Failing test: `test_eval_runner_api_mode_calls_real_generate` (TDD red) |
+| 3 | `cc96d6e` | `_generate_mock_clips` → `_generate_clips(fixture, mode, fal_key)` — passes mode through to `run_generate` |
+| 4 | `607eb73` | `MAX_USD` cost cap: env var + `--max-usd` flag, aborts before any fixture runs, test green |
+| 5 | `44ada0b` | api-mode preflight: FAL_KEY check + per-fixture cost estimate printed before spend |
+| 7 | `4b25f0c` | `eval_baseline_2026-04.md` — "Wet-test usage" section with copy-paste command |
+
+### After this cycle, operator can run
+
+```bash
+export FAL_KEY=<key>
+python tools/eval_runner.py --label real-1 --mode api --fixture 02_olga_slice
+```
+
+Estimated cost: $0.84 (2 Kling pairs). Safety guard: set `MAX_USD=5` to cap spend.
+
+### Test delta
+
++2 integration tests (6 total in `tests/integration/test_eval_runner.py`). All 6 green.
+
+### Notes
+
+Stream B had already created `fixtures/eval_set/03_olga_travel/` concurrently (B-a option).
+Mock regression run (Step 6) wrote 3 rows: 01_cats, 02_olga_slice, 03_olga_travel.
+No shared files edited (only `tools/eval_runner.py`, test file, and doc).
