@@ -187,25 +187,29 @@ def run_fixture(
     # Stage 1: ensure extended/ exists (mock skips real extend)
     _seed_extended_from_inputs(fixture)
 
-    # Stage 2: write story (mock CLI)
-    rc = _run_cli([
+    # Stage 2: write story
+    story_cmd = [
         sys.executable, str(REPO_ROOT / "tools" / "cli" / "run_story.py"),
         "--project", str(fixture),
         "--arc-type", arc_type,
         "--subject", expected.get("subject", ""),
         "--tone", expected.get("tone", ""),
         "--notes", expected.get("notes", ""),
-        "--mock",
-    ])
+    ]
+    if mode != "api":
+        story_cmd.append("--mock")
+    rc = _run_cli(story_cmd)
     if rc != 0:
         return None
 
-    # Stage 3: write per-pair prompts (mock CLI)
-    rc = _run_cli([
+    # Stage 3: write per-pair prompts
+    prompts_cmd = [
         sys.executable, str(REPO_ROOT / "tools" / "cli" / "run_prompts.py"),
         "--project", str(fixture),
-        "--mock",
-    ])
+    ]
+    if mode != "api":
+        prompts_cmd.append("--mock")
+    rc = _run_cli(prompts_cmd)
     if rc != 0:
         return None
 

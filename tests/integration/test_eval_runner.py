@@ -166,6 +166,9 @@ def test_eval_runner_api_mode_calls_real_generate(tmp_eval_set, monkeypatch):
         recorded.append(mode)
         return {}
 
+    # Stub CLI subprocesses (story + prompts) so no real LLM key needed.
+    monkeypatch.setattr(eval_runner_mod, "_run_cli", lambda cmd, cwd=None: 0)
+
     import backend.services.generate as gen_mod
     monkeypatch.setattr(gen_mod, "run_generate", fake_run_generate)
 
