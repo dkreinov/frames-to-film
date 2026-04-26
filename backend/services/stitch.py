@@ -8,16 +8,24 @@ from __future__ import annotations
 from pathlib import Path
 
 from backend.services.judges import orchestrator as judges_orch
+from backend.services.project_schema import (
+    CLIPS_DIRNAME,
+    CLIPS_RAW_DIRNAME,
+    EXTENDED_DIRNAME,
+    FINAL_DIRNAME,
+)
 
 
 def run_stitch(project_dir: Path, mode: str | None = None) -> dict:
     project_dir = Path(project_dir)
-    img_dir = project_dir / "kling_test"
-    video_dir = img_dir / "videos"
-    output_file = video_dir / "full_movie.mp4"
+    img_dir = project_dir / EXTENDED_DIRNAME
+    video_dir = project_dir / CLIPS_DIRNAME / CLIPS_RAW_DIRNAME
+    final_dir = project_dir / FINAL_DIRNAME
+    final_dir.mkdir(parents=True, exist_ok=True)
+    output_file = final_dir / "full_movie.mp4"
 
     if not video_dir.is_dir():
-        raise FileNotFoundError(f"videos dir missing (run generate first): {video_dir}")
+        raise FileNotFoundError(f"clips/raw dir missing (run generate first): {video_dir}")
     segments = sorted(video_dir.glob("seg_*_to_*.mp4"))
     if not segments:
         raise RuntimeError(f"no segments to stitch in {video_dir}")

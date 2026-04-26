@@ -15,6 +15,14 @@ from pathlib import Path
 from backend.db import REPO_ROOT
 from backend.services import kling_fal
 from backend.services.judges import orchestrator as judges_orch
+from backend.services.project_schema import (
+    CLIPS_DIRNAME,
+    CLIPS_RAW_DIRNAME,
+    EXTENDED_DIRNAME,
+    METADATA_DIRNAME,
+    PROMPTS_DIRNAME,
+)
+from backend.services.prompts import ORDER_FILENAME, PROMPTS_FILENAME
 
 # Default prompt used when a pair has no entry in prompts.json.
 _FALLBACK_PROMPT = "Smooth cinematic transition between the two frames."
@@ -62,7 +70,7 @@ def _make_stub(dst: Path) -> None:
 def _load_order(project_dir: Path) -> list[str] | None:
     """Return the user's saved Storyboard ordering (Phase 4 sub-plan 3),
     or None if no order.json has been written."""
-    pj = project_dir / "order.json"
+    pj = project_dir / METADATA_DIRNAME / ORDER_FILENAME
     if not pj.is_file():
         return None
     try:
@@ -88,8 +96,8 @@ def _ordered_frames(img_dir: Path, project_dir: Path) -> list[Path]:
 
 
 def _load_prompts(project_dir: Path) -> dict[str, str]:
-    """Return the {pair_key: prompt} map from <project>/prompts.json, or {}."""
-    p = project_dir / "prompts.json"
+    """Return the {pair_key: prompt} map from <project>/prompts/prompts.json, or {}."""
+    p = project_dir / PROMPTS_DIRNAME / PROMPTS_FILENAME
     if not p.is_file():
         return {}
     try:
@@ -103,11 +111,11 @@ def _load_prompts(project_dir: Path) -> dict[str, str]:
 
 def run_generate(project_dir: Path, mode: str, fal_key: str | None = None) -> dict:
     project_dir = Path(project_dir)
-    img_dir = project_dir / "kling_test"
-    video_dir = img_dir / "videos"
+    img_dir = project_dir / EXTENDED_DIRNAME
+    video_dir = project_dir / CLIPS_DIRNAME / CLIPS_RAW_DIRNAME
 
     if not img_dir.is_dir():
-        raise FileNotFoundError(f"kling_test dir missing (run extend first): {img_dir}")
+        raise FileNotFoundError(f"extended dir missing (run extend first): {img_dir}")
     video_dir.mkdir(parents=True, exist_ok=True)
 
     if mode == "mock":

@@ -42,6 +42,14 @@ from pathlib import Path
 from typing import Any
 
 from backend.services.judges import score_clip, score_movie, score_prompt
+from backend.services.project_schema import (
+    CLIPS_DIRNAME,
+    CLIPS_RAW_DIRNAME,
+    EXTENDED_DIRNAME,
+    METADATA_DIRNAME,
+    PROMPTS_DIRNAME,
+)
+from backend.services.prompts import PROMPTS_FILENAME
 
 RUN_JSON_NAME = "run.json"
 
@@ -66,7 +74,7 @@ def _now_iso() -> str:
 
 
 def read_run_json(project_dir: Path) -> dict[str, Any]:
-    p = Path(project_dir) / RUN_JSON_NAME
+    p = Path(project_dir) / METADATA_DIRNAME / RUN_JSON_NAME
     if not p.is_file():
         return {
             "project_id": Path(project_dir).name,
@@ -91,7 +99,8 @@ def read_run_json(project_dir: Path) -> dict[str, Any]:
 
 
 def write_run_json(project_dir: Path, data: dict[str, Any]) -> None:
-    p = Path(project_dir) / RUN_JSON_NAME
+    p = Path(project_dir) / METADATA_DIRNAME / RUN_JSON_NAME
+    p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
@@ -119,7 +128,7 @@ def _sort_key(filename: str) -> tuple[int, str]:
 
 def _discover_pairs(project_dir: Path) -> list[tuple[str, Path, Path]]:
     """Return [(pair_key, image_a_path, image_b_path)] in render order."""
-    img_dir = project_dir / "kling_test"
+    img_dir = project_dir / EXTENDED_DIRNAME
     if not img_dir.is_dir():
         return []
     frames = sorted(img_dir.glob("*.jpg"), key=lambda p: _sort_key(p.name))
@@ -130,7 +139,7 @@ def _discover_pairs(project_dir: Path) -> list[tuple[str, Path, Path]]:
 
 
 def _load_prompts(project_dir: Path) -> dict[str, str]:
-    p = project_dir / "prompts.json"
+    p = project_dir / PROMPTS_DIRNAME / PROMPTS_FILENAME
     if not p.is_file():
         return {}
     try:
@@ -183,7 +192,7 @@ def run_post_generate_judges(
 
     prompts = _load_prompts(project_dir)
     pairs = _discover_pairs(project_dir)
-    video_dir = project_dir / "kling_test" / "videos"
+    video_dir = project_dir / CLIPS_DIRNAME / CLIPS_RAW_DIRNAME
 
     score_prompt_kwargs = {"key": judge_key}
     score_clip_kwargs = {"key": judge_key}

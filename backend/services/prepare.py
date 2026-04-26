@@ -1,6 +1,6 @@
 """Prepare stage service — 4:3 normalize.
 
-Mock mode copies `tests/fixtures/fake_project/frame_*.png` → `<project>/outpainted/*.jpg`.
+Mock mode copies `tests/fixtures/fake_project/frame_*.png` → `<project>/extended/*.jpg`.
 API mode is not wired to a productized path as of Phase 6 — the
 original legacy outpaint script lives at `legacy/scripts/outpaint_images.py`
 but is not imported here (Settings UI keeps prepare→api disabled).
@@ -13,6 +13,7 @@ from pathlib import Path
 from PIL import Image
 
 from backend.db import REPO_ROOT
+from backend.services.project_schema import EXTENDED_DIRNAME
 
 DEFAULT_FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "fake_project"
 
@@ -23,7 +24,11 @@ def get_fixture_root() -> Path:
 
 def run_prepare(project_dir: Path, mode: str, fixture_dir: Path | None = None) -> dict:
     project_dir = Path(project_dir)
-    out_dir = project_dir / "outpainted"
+    # Stage 1 (4:3 normalize) writes the intermediate frames into a
+    # leading-underscore subfolder of `extended/` so the operator-facing
+    # `extended/` listing surfaces only the final 16:9 frames produced by
+    # the extend stage.
+    out_dir = project_dir / EXTENDED_DIRNAME / "_4_3"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     if mode == "mock":

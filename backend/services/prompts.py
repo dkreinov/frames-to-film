@@ -6,9 +6,9 @@ Replaces the Olga-specific `PAIR_PROMPTS` + `FALLBACK_PROMPT` pattern with:
    — each is a short camera-first description, De-Olga'd (no "childhood B&W studio",
    no "wedding chuppah", etc.).
 2. A **resolver** that picks the best available prompt in precedence:
-   project `prompts.json` > style preset > generic fallback.
-3. Two **generators** (mock + api) that populate `<project>/prompts.json` from
-   the pairs discovered in `<project>/kling_test/*.jpg`.
+   project `prompts/prompts.json` > style preset > generic fallback.
+3. Two **generators** (mock + api) that populate `<project>/prompts/prompts.json`
+   from the pairs discovered in `<project>/extended/*.jpg`.
 
 The Phase-6 legacy move retired the Olga-era `image_pair_prompts.py` +
 `generate_all_videos.py` path — both now live under `legacy/scripts/`.
@@ -20,6 +20,15 @@ import json
 import re
 from pathlib import Path
 from typing import Any
+
+from backend.services.project_schema import (
+    EXTENDED_DIRNAME,
+    METADATA_DIRNAME,
+    PROMPTS_DIRNAME,
+)
+
+PROMPTS_FILENAME = "prompts.json"
+ORDER_FILENAME = "order.json"
 
 FALLBACK_PROMPT = (
     "Gentle push-in. Transition naturally between the two source frames. "
@@ -61,7 +70,7 @@ def resolve_prompt(
         3. fallback
     """
     if project_dir is not None:
-        pj = Path(project_dir) / "prompts.json"
+        pj = Path(project_dir) / PROMPTS_DIRNAME / PROMPTS_FILENAME
         if pj.is_file():
             try:
                 data = json.loads(pj.read_text())
@@ -84,7 +93,7 @@ def _load_order(project_dir: Path) -> list[str] | None:
     """Return the Storyboard-saved order (Phase 4 sub-plan 3) if present.
     Mirrors backend/services/generate.py::_load_order so prompts + videos
     use the same precedence rule."""
-    pj = project_dir / "order.json"
+    pj = project_dir / METADATA_DIRNAME / ORDER_FILENAME
     if not pj.is_file():
         return None
     try:
@@ -98,9 +107,9 @@ def _load_order(project_dir: Path) -> list[str] | None:
 
 
 def _pair_keys_for_project(project_dir: Path) -> list[str]:
-    img_dir = project_dir / "kling_test"
+    img_dir = project_dir / EXTENDED_DIRNAME
     if not img_dir.is_dir():
-        raise FileNotFoundError(f"kling_test dir missing: {img_dir}")
+        raise FileNotFoundError(f"extended dir missing: {img_dir}")
     all_frames = sorted(img_dir.glob("*.jpg"), key=lambda p: _sort_key(p.name))
     if len(all_frames) < 2:
         raise FileNotFoundError(f"need >=2 jpgs in {img_dir}, got {len(all_frames)}")
@@ -128,7 +137,9 @@ def generate_prompts_mock(project_dir: Path | str, style: str = "cinematic") -> 
     pairs = _pair_keys_for_project(project_dir)
     preset = STYLE_PRESETS.get(style, FALLBACK_PROMPT)
     out = {k: preset for k in pairs}
-    (project_dir / "prompts.json").write_text(json.dumps(out, indent=2))
+    prompts_path = project_dir / PROMPTS_DIRNAME / PROMPTS_FILENAME
+    prompts_path.parent.mkdir(parents=True, exist_ok=True)
+    prompts_path.write_text(json.dumps(out, indent=2))
     return out
 
 
@@ -170,7 +181,7 @@ def generate_prompts_api(
     """
     project_dir = Path(project_dir)
     pairs = _pair_keys_for_project(project_dir)
-    img_dir = project_dir / "kling_test"
+    img_dir = project_dir / EXTENDED_DIRNAME
     preset = STYLE_PRESETS.get(style, FALLBACK_PROMPT)
 
     client = _get_genai_client(key)
@@ -192,7 +203,9 @@ def generate_prompts_api(
         except Exception:  # fall back per-pair; don't lose the whole run
             out[pair_key] = preset
 
-    (project_dir / "prompts.json").write_text(json.dumps(out, indent=2))
+    prompts_path = project_dir / PROMPTS_DIRNAME / PROMPTS_FILENAME
+    prompts_path.parent.mkdir(parents=True, exist_ok=True)
+    prompts_path.write_text(json.dumps(out, indent=2))
     return out
 
 
