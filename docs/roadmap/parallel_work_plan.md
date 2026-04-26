@@ -113,22 +113,18 @@ Blocked on: none / waiting for B's API contract / etc.
 ### Stream B status (latest)
 
 ```
-[2026-04-26] In progress: Sub-plan B — backend rename to canonical projects/ schema
-            (plans/plan-B-20260426-1500.md, autonomous). Plan A complete.
-Last commit: bfde24f (Sub-plan A done — schema doc + _template + Olga migrated + archive)
-Next up: nothing queued after Sub-plan B; resume Stream B 7.7/7.5b/7.4-frontend after.
+[2026-04-26] DONE: Sub-plan A + Sub-plan B — canonical projects/{slug}/ schema in place.
+            Backend, services, routers, tests, frontend all use the new layout.
+            141 backend tests green, 90 frontend tests green, tsc clean.
+Last commit: backend renamed to projects/ schema (Sub-plan B Step 12).
+Next up: resume Stream B queue — 7.7 stitch xfade polish OR 7.5b Wan 2.7 adapter
+         OR 7.4 frontend (Upload + StoryReview screens after Stream A's /story endpoint).
 Blocked on: none.
 
-🔒 SHARED-FILE LOCK ACTIVE (Sub-plan B in progress)
-    Stream A: please PAUSE edits to these files until Sub-plan B completes:
-      backend/deps.py
-      backend/db.py
-      backend/services/{generate,prompts,prepare,extend,stitch}.py
-      backend/services/judges/orchestrator.py
-      backend/routers/{videos,uploads,outputs,artifacts}.py
-      tests/backend/* (most files; rename touches fixture paths)
-      frontend/src/api/* + frontend/src/routes/* (path-string updates)
-    Lock released by Sub-plan B's Step 12 commit ("backend renamed to projects/ schema").
+🔓 SHARED-FILE LOCK RELEASED (Sub-plan B complete)
+    Stream A: free to edit backend/services/*, backend/routers/*, tests/backend/*
+    again. New code MUST import path constants from backend.services.project_schema
+    (do not hardcode "inputs"/"extended"/"clips/raw" etc.).
 ```
 
 (Each session updates only its own status row when it commits.)

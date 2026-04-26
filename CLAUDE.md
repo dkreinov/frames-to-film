@@ -10,8 +10,13 @@
 
 Phase 7.1 ✓ done (judges)
 Phase 7.1.1 ✓ done (v2 source-aware judges shipped — `qwen3-vl-plus` is production default)
-135 backend tests green
-Latest: commit `0084b3f`
+Schema cleanup ✓ done (Sub-plan A + B 2026-04-26 — canonical `projects/{slug}/` layout, see `docs/PROJECT_SCHEMA.md`)
+141 backend tests green, 90 frontend tests green
+Latest: commit on `master`
+
+## Project storage
+
+All per-project artifacts live under `projects/{slug}/` (or `projects/{user_id}/{slug}/` in multi-user mode). See `docs/PROJECT_SCHEMA.md` for the authoritative folder layout. Constants in `backend/services/project_schema.py`. New projects start by copying `projects/_template/`.
 
 ## How to start your work cycle
 

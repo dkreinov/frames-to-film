@@ -22,11 +22,14 @@ import pytest
 from backend.services.judges import score_clip, score_movie, score_prompt
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+# Archived legacy run; on-disk layout still uses the pre-Sub-plan-B subfolder
+# names (kling_test/videos) — this fixture intentionally exercises the judge
+# stack against frozen historical cached output, NOT the new schema.
 WET_TEST_PROJECT = (
-    REPO_ROOT / "pipeline_runs" / "local"
+    REPO_ROOT / "projects" / "_archive"
     / "3fadfa16c6454ac28f336f612ca58e2b"
 )
-KLING_DIR = WET_TEST_PROJECT / "extended"
+KLING_DIR = WET_TEST_PROJECT / "kling_test"
 VIDEO_DIR = KLING_DIR / "videos"
 
 

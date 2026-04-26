@@ -11,7 +11,7 @@
 - Backend: `uvicorn backend.main:app --host 127.0.0.1 --port 8000` (mock-default stages).
 - Frontend: `npm run dev` serving Vite on `127.0.0.1:5173` with React `<StrictMode>` enabled.
 - Browser: Chromium via `claude-in-chrome` MCP tool.
-- Fixture photos: `tests/fixtures/fake_project/frame_{1..4}_gemini.png` (4 input frames → 6 outpainted → 5 pair clips).
+- Fixture photos: `tests/fixtures/fake_project/frame_{1..4}_gemini.png` (4 input frames → 6 extended → 5 pair clips). Post-2026-04-26 the on-disk layout is `projects/{slug}/extended/_4_3/` and `projects/{slug}/extended/`; legacy `outpainted/` and `kling_test/` paths are retired (see `docs/PROJECT_SCHEMA.md`).
 
 ## Tooling caveat — READ BEFORE RE-RUNNING
 

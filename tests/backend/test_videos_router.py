@@ -1,6 +1,6 @@
 """Phase 4 sub-plan 4 Step 3: GET /projects/{id}/videos (TDD).
 
-Lists <project>/kling_test/videos/seg_*.mp4 in the order implied by
+Lists <project>/clips/raw/seg_*.mp4 in the order implied by
 _ordered_frames — so the UI can line pair_key -> mp4 deterministically.
 """
 from __future__ import annotations
