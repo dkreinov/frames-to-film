@@ -1,8 +1,9 @@
 """SQLite index for the olga_movie backend.
 
-One database file (`pipeline_runs/index.db` by default) holds metadata rows:
+One database file (`projects/index.db` by default) holds metadata rows:
 projects, uploads, jobs, and segment verdicts. Large artifacts stay on disk
-under `pipeline_runs/<user_id>/<project_id>/`.
+under `projects/<slug>/` (or `projects/<user_id>/<slug>/` in multi-user mode);
+see `docs/PROJECT_SCHEMA.md` and `backend.services.project_schema`.
 
 The schema is intentionally loose: TEXT IDs (UUID4) + JSON payload columns
 so later phases can extend without migrations.
@@ -14,8 +15,10 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
 
+from backend.services.project_schema import STORAGE_ROOT_DIRNAME
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_DB_PATH = REPO_ROOT / "pipeline_runs" / "index.db"
+DEFAULT_DB_PATH = REPO_ROOT / STORAGE_ROOT_DIRNAME / "index.db"
 
 
 SCHEMA_STATEMENTS = (

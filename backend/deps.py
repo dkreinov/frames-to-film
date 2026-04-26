@@ -7,8 +7,9 @@ from pathlib import Path
 from fastapi import Header, HTTPException
 
 from backend.db import DEFAULT_DB_PATH, REPO_ROOT
+from backend.services.project_schema import STORAGE_ROOT_DIRNAME
 
-DEFAULT_STORAGE_ROOT = REPO_ROOT / "pipeline_runs"
+DEFAULT_STORAGE_ROOT = REPO_ROOT / STORAGE_ROOT_DIRNAME
 
 
 def get_db_path() -> Path:
