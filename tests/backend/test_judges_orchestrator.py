@@ -183,3 +183,79 @@ def test_post_stitch_no_key_neutral_fallback(tmp_path):
     orchestrator.write_run_json(project, data)
     data = orchestrator.run_post_stitch_judge(project, deepseek_key="")
     assert "DEEPSEEK_KEY" in data["judges"]["movie"]["reasoning"]
+
+
+def test_post_stitch_loads_story_arc_from_disk_when_kwarg_absent(tmp_path, monkeypatch):
+    """Phase 7.4 wiring: when run_post_stitch_judge is called without an
+    explicit story_arc kwarg, it should load metadata/story.json if
+    present and forward it to score_movie."""
+    project = _make_project(tmp_path)
+    data = orchestrator.read_run_json(project)
+    data["judges"]["clip"] = [
+        {"pair": "1_to_2", "scores": {"visual_quality": 4.0, "anatomy_ok": True},
+         "reasoning": "ok"},
+    ]
+    orchestrator.write_run_json(project, data)
+    # Seed story.json with a sentinel arc_paragraph
+    from backend.services.project_schema import METADATA_DIRNAME
+    story_path = project / METADATA_DIRNAME / "story.json"
+    story_path.parent.mkdir(parents=True, exist_ok=True)
+    story_path.write_text(json.dumps({
+        "arc_paragraph": "SENTINEL_ARC_TEXT_FROM_DISK",
+        "pair_intents": [{"from": 1, "to": 2, "device": "fade", "intent": "x"}],
+        "arc_type": "life-montage",
+    }))
+
+    seen: dict = {}
+    def fake_score_movie(**kwargs):
+        seen["story_arc"] = kwargs.get("story_arc")
+        return JudgeScore(
+            judge="movie_judge",
+            scores={"story_coherence": 4.0, "character_continuity": 4.0,
+                    "visual_quality": 4.0, "emotional_arc": 4.0},
+            reasoning="ok", model_used="x", cost_usd=0.0,
+        )
+    monkeypatch.setattr(orchestrator, "score_movie", fake_score_movie)
+
+    orchestrator.run_post_stitch_judge(project, deepseek_key="k")
+
+    assert seen.get("story_arc") is not None, \
+        "story_arc should be auto-loaded from metadata/story.json"
+    assert "SENTINEL_ARC_TEXT_FROM_DISK" in str(seen["story_arc"])
+
+
+def test_post_stitch_loads_brief_from_project_json_when_kwarg_absent(tmp_path, monkeypatch):
+    """Phase 7.4: when brief kwarg absent, orchestrator pulls subject/tone/notes
+    from metadata/project.json if present."""
+    project = _make_project(tmp_path)
+    data = orchestrator.read_run_json(project)
+    data["judges"]["clip"] = [
+        {"pair": "1_to_2", "scores": {"visual_quality": 4.0}, "reasoning": ""},
+    ]
+    orchestrator.write_run_json(project, data)
+    from backend.services.project_schema import METADATA_DIRNAME
+    pj_path = project / METADATA_DIRNAME / "project.json"
+    pj_path.parent.mkdir(parents=True, exist_ok=True)
+    pj_path.write_text(json.dumps({
+        "slug": "test", "name": "Test", "created_at": "2026-04-26",
+        "subject": "SENTINEL_SUBJECT_FROM_DISK",
+        "tone": "nostalgic_sentinel",
+        "notes": "extra notes",
+    }))
+
+    seen: dict = {}
+    def fake_score_movie(**kwargs):
+        seen["brief"] = kwargs.get("brief")
+        return JudgeScore(
+            judge="movie_judge",
+            scores={"story_coherence": 4.0, "character_continuity": 4.0,
+                    "visual_quality": 4.0, "emotional_arc": 4.0},
+            reasoning="ok", model_used="x", cost_usd=0.0,
+        )
+    monkeypatch.setattr(orchestrator, "score_movie", fake_score_movie)
+
+    orchestrator.run_post_stitch_judge(project, deepseek_key="k")
+
+    assert seen.get("brief") is not None, \
+        "brief should be auto-loaded from metadata/project.json"
+    assert "SENTINEL_SUBJECT_FROM_DISK" in str(seen["brief"])
