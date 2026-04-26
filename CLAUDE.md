@@ -105,6 +105,17 @@ Auto-loaded `~/.claude/projects/D--Programming-olga-movie/memory/MEMORY.md` inde
 - `reference_model_prices_2026_04.md` — pricing snapshot (re-verify before quoting)
 - `reference_gemini_web_automation.md` — web-sub Gemini pattern
 
+## Active coordination points
+
+| Concern | Status |
+|---|---|
+| Stream A 7.4/7.5 backend prep (kling rules + arcs + devices + story.py + prompt_writer.py) | ✓ done 2026-04-26 12:30, commits `722a216`–`5563e8d` |
+| Stream B Sub-plan B (path-rename to `projects/` schema) | ✓ done 2026-04-26, commit `f504ed1` released file lock |
+| `movie_judge.py` accepts `story_arc` + `brief` kwargs | ✓ Phase 7.1 already wired; tests added by Stream A Step 9 |
+| 7.4 router (`POST /projects/{id}/story`) needs `main.py` registration | ⏳ pending — coordinate before edit |
+| 7.2 eval harness needs final path schema | ✓ schema now in `backend.services.project_schema` — read it |
+| New backend code MUST use schema constants | rule — never hardcode `kling_test`/`outpainted`/`pipeline_runs` etc. |
+
 ## When in doubt
 
 - Check `parallel_work_plan.md` for coordination

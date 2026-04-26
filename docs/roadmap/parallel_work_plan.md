@@ -104,10 +104,18 @@ Each stream writes its progress here at the end of each work cycle:
 ### Stream A status (latest)
 
 ```
-[2026-04-26 evening] In progress: ___
-Last commit: ___
-Next up: ___
-Blocked on: none / waiting for B's API contract / etc.
+[2026-04-26 12:30] DONE: 7.4/7.5 backend prep — kling_prompt_rules.yaml + research guide,
+            5 story arc YAMLs, 15-entry cinematic_devices.yaml, story.py + prompt_writer.py
+            services (TDD green), movie_judge story_arc/brief contract tests.
+Last commit: 5563e8d (Step 9 - movie_judge story_arc + brief contract verification)
+Test delta: 156 backend tests passing (was 141 baseline + 15 added).
+Next up: 7.2 eval harness OR 7.4 router (POST /projects/{id}/story endpoint
+         + main.py registration). Both unblocked now that Sub-plan B is done.
+Blocked on: none.
+
+✅ STREAM A DONE WITH THIS CYCLE; SAFE FOR STREAM B SUB-PLAN B (already done).
+   movie_judge.py touched by tests only — strict-additive policy honored.
+   Stream B free to take 7.7 stitch xfade, 7.5b Wan 2.7 adapter, or 7.4 frontend.
 ```
 
 ### Stream B status (latest)
